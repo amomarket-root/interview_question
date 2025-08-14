@@ -1,4 +1,3 @@
-<img src="https://r2cdn.perplexity.ai/pplx-full-logo-primary-dark%402x.png" style="height:64px;margin-right:32px"/>
 
 # 🚀 Full Stack Developer Portfolio
 
@@ -7,11 +6,6 @@
 
 ### 👋 **Hello, I'm Sameer**
 #### 💻 **Passionate Full Stack Developer | Problem Solver | Code Enthusiast**
-
-[
-[
-[
-[
 
 </div>
 
