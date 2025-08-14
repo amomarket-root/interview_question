@@ -1,8 +1,8 @@
-# 🚀 **Full Stack Developer Portfolio**
+# 
 
 <div align="center">
 
-![Developer Banner](https://via.placeholder.com/800x200/1a1a2e/ffffff?text=Full+Stack+Developer)
+![Developer Banner](https://t4.ftcdn.net/jpg/13/28/21/31/360_F_1328213149_ojKp46SEfUlaRVxcnVpY5MtA1B122GVv.jpg)
 
 ### 👋 **Hello, I'm Sameer (Call me Jack)**
 #### 💻 **Passionate Full Stack Developer | Problem Solver | Code Enthusiast**
