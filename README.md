@@ -129,7 +129,7 @@ const developer = {
 <small>Containerization</small>
 </td>
 <td align="center">
-<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/amazonwebservices/amazonwebservices-original.svg" width="50" height="50"/><br>
+<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/amazonwebservices/amazonwebservices-original-wordmark.svg" width="50" height="50"/><br>
 <strong>AWS</strong><br>
 <small>EC2, S3, Lambda</small>
 </td>
