@@ -4,13 +4,13 @@
 
 ![Developer Banner](https://via.placeholder.com/800x200/1a1a2e/ffffff?text=Full+Stack+Developer)
 
-### 👋 **Hello, I'm Sameer** *(Call me Jack)*
+### 👋 **Hello, I'm Sameer (Call me Jack)**
 #### 💻 **Passionate Full Stack Developer | Problem Solver | Code Enthusiast**
 
-[![Portfolio](https://img.shields.io/badge/Portfolio-FF5722?style=for-the-badge&logo=todoist&logoColor=white)](https://sameerportfolio.com)
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://linkedin.com/in/sameer-jack)
-[![GitHub](https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white)](https://github.com/sameer-jack)
-[![Email](https://img.shields.io/badge/Email-D14836?style=for-the-badge&logo=gmail&logoColor=white)](mailto:sameer.jack.dev@gmail.com)
+[![Portfolio](https://img.shields.io/badge/Portfolio-FF5722?style=for-the-badge&logo=todoist&logoColor=white)](https://yourportfolio.com)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://linkedin.com/in/yourprofile)
+[![GitHub](https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white)](https://github.com/yourusername)
+[![Email](https://img.shields.io/badge/Email-D14836?style=for-the-badge&logo=gmail&logoColor=white)](mailto:your.email@example.com)
 
 </div>
 
@@ -23,10 +23,9 @@
 ```javascript
 const developer = {
     name: "Sameer",
-    nickname: "Jack",
     role: "Full Stack Developer",
-    location: "📍 India",
-    experience: "3+ Years",
+    location: "📍 Your Location",
+    experience: "X+ Years",
     passion: ["Clean Code", "Problem Solving", "Learning New Technologies"],
     philosophy: "Code is poetry written in logic 💡"
 };
@@ -210,7 +209,7 @@ class ECommercePlatform {
 }
 ```
 
-**🔗 Links:** [Live Demo](https://sameer-ecommerce.netlify.app) | [GitHub](https://github.com/sameer-jack/ecommerce-platform) | [Case Study](https://sameer-casestudy.dev)
+**🔗 Links:** [Live Demo](https://demo-link.com) | [GitHub](https://github.com/yourrepo) | [Case Study](https://casestudy-link.com)
 
 ---
 
@@ -228,7 +227,7 @@ const taskApp = {
 };
 ```
 
-**🔗 Links:** [Live Demo](https://sameer-taskapp.vercel.app) | [GitHub](https://github.com/sameer-jack/task-management) | [Mobile App](https://task-mobile.app)
+**🔗 Links:** [Live Demo](https://demo-link.com) | [GitHub](https://github.com/yourrepo) | [Mobile App](https://app-link.com)
 
 ---
 
@@ -248,7 +247,7 @@ GROUP BY DATE(created_at)
 ORDER BY date DESC;
 ```
 
-**🔗 Links:** [Live Demo](https://sameer-analytics.herokuapp.com) | [GitHub](https://github.com/sameer-jack/analytics-dashboard) | [Documentation](https://analytics-docs.dev)
+**🔗 Links:** [Live Demo](https://demo-link.com) | [GitHub](https://github.com/yourrepo) | [Documentation](https://docs-link.com)
 
 ---
 
@@ -256,10 +255,10 @@ ORDER BY date DESC;
 
 <div align="center">
 
-![GitHub Stats](https://github-readme-stats.vercel.app/api?username=sameer-jack&show_icons=true&theme=radical)
-![Top Languages](https://github-readme-stats.vercel.app/api/top-langs/?username=sameer-jack&layout=compact&theme=radical)
+![GitHub Stats](https://github-readme-stats.vercel.app/api?username=yourusername&show_icons=true&theme=radical)
+![Top Languages](https://github-readme-stats.vercel.app/api/top-langs/?username=yourusername&layout=compact&theme=radical)
 
-![GitHub Streak](https://github-readme-streak-stats.herokuapp.com/?user=sameer-jack&theme=radical)
+![GitHub Streak](https://github-readme-streak-stats.herokuapp.com/?user=yourusername&theme=radical)
 
 </div>
 
@@ -268,9 +267,14 @@ ORDER BY date DESC;
 ## 🎯 **Problem Solving Skills**
 
 ### **LeetCode Profile** 📈
-- **Problems Solved:** 350+ 
-- **Contest Rating:** 1650+
+- **Problems Solved:** 500+ 
+- **Contest Rating:** 1800+
 - **Strong Areas:** Dynamic Programming, Graph Algorithms, Tree Traversals
+
+### **HackerRank Achievements** 🏅
+- **Problem Solving:** ⭐⭐⭐⭐⭐ (5 Star)
+- **SQL:** ⭐⭐⭐⭐⭐ (5 Star)
+- **JavaScript:** ⭐⭐⭐⭐⭐ (5 Star)
 
 ```javascript
 // Sample Algorithm Implementation
@@ -285,6 +289,37 @@ function quickSort(arr) {
     return [...quickSort(left), ...middle, ...quickSort(right)];
 }
 // Time Complexity: O(n log n) average case
+```
+
+---
+
+## 💼 **Professional Experience**
+
+### **🏢 Senior Full Stack Developer**
+**Company Name** | *Jan 2022 - Present*
+
+```yaml
+Responsibilities:
+  - Led development of 5+ enterprise web applications
+  - Mentored junior developers and conducted code reviews
+  - Implemented CI/CD pipelines reducing deployment time by 60%
+  - Architected scalable solutions serving 100K+ users daily
+
+Key Achievements:
+  - Improved application performance by 40% through optimization
+  - Reduced server costs by 30% through efficient architecture
+  - Achieved 99.9% uptime across all production systems
+```
+
+### **🏢 Full Stack Developer**
+**Previous Company** | *Jun 2020 - Dec 2021*
+
+```yaml
+Responsibilities:
+  - Developed RESTful APIs and microservices architecture
+  - Built responsive web applications using React and Laravel
+  - Optimized database queries improving response time by 50%
+  - Collaborated with cross-functional teams in Agile environment
 ```
 
 ---
@@ -336,38 +371,38 @@ function quickSort(arr) {
 <tr>
 <td>🐘 PHP</td>
 <td>⭐⭐⭐⭐⭐</td>
-<td>3+ years</td>
-<td>12+ projects</td>
+<td>5+ years</td>
+<td>15+ projects</td>
 </tr>
 <tr>
 <td>🅛 Laravel</td>
+<td>⭐⭐⭐⭐⭐</td>
+<td>4+ years</td>
+<td>12+ projects</td>
+</tr>
+<tr>
+<td>⚛️ React</td>
 <td>⭐⭐⭐⭐⭐</td>
 <td>3+ years</td>
 <td>10+ projects</td>
 </tr>
 <tr>
-<td>⚛️ React</td>
-<td>⭐⭐⭐⭐</td>
-<td>2+ years</td>
-<td>8+ projects</td>
-</tr>
-<tr>
 <td>📜 JavaScript</td>
 <td>⭐⭐⭐⭐⭐</td>
-<td>3+ years</td>
-<td>15+ projects</td>
+<td>4+ years</td>
+<td>20+ projects</td>
 </tr>
 <tr>
 <td>🗄️ MySQL</td>
 <td>⭐⭐⭐⭐⭐</td>
-<td>3+ years</td>
-<td>12+ projects</td>
+<td>5+ years</td>
+<td>15+ projects</td>
 </tr>
 <tr>
 <td>🐳 Docker</td>
 <td>⭐⭐⭐⭐</td>
-<td>1+ years</td>
-<td>6+ projects</td>
+<td>2+ years</td>
+<td>8+ projects</td>
 </tr>
 </table>
 
@@ -432,12 +467,12 @@ const performanceStats = {
 
 ### **📬 Get In Touch:**
 
-[![Email](https://img.shields.io/badge/📧_Email-sameer.jack.dev@gmail.com-red?style=for-the-badge)](mailto:sameer.jack.dev@gmail.com)
-[![LinkedIn](https://img.shields.io/badge/💼_LinkedIn-Connect-blue?style=for-the-badge)](https://linkedin.com/in/sameer-jack)
-[![GitHub](https://img.shields.io/badge/🐱_GitHub-Follow-black?style=for-the-badge)](https://github.com/sameer-jack)
-[![Portfolio](https://img.shields.io/badge/🌐_Portfolio-Visit-green?style=for-the-badge)](https://sameerportfolio.com)
-[![Twitter](https://img.shields.io/badge/🐦_Twitter-Follow-lightblue?style=for-the-badge)](https://twitter.com/sameer_jack_dev)
-[![Discord](https://img.shields.io/badge/💬_Discord-Chat-purple?style=for-the-badge)](https://discord.gg/sameerjack)
+[![Email](https://img.shields.io/badge/📧_Email-your.email@example.com-red?style=for-the-badge)](mailto:your.email@example.com)
+[![LinkedIn](https://img.shields.io/badge/💼_LinkedIn-Connect-blue?style=for-the-badge)](https://linkedin.com/in/yourprofile)
+[![GitHub](https://img.shields.io/badge/🐱_GitHub-Follow-black?style=for-the-badge)](https://github.com/yourusername)
+[![Portfolio](https://img.shields.io/badge/🌐_Portfolio-Visit-green?style=for-the-badge)](https://yourportfolio.com)
+[![Twitter](https://img.shields.io/badge/🐦_Twitter-Follow-lightblue?style=for-the-badge)](https://twitter.com/yourusername)
+[![Discord](https://img.shields.io/badge/💬_Discord-Chat-purple?style=for-the-badge)](https://discord.gg/yourdiscord)
 
 ---
 
@@ -465,6 +500,6 @@ const performanceStats = {
 
 **Made with ❤️ and lots of ☕**
 
-![Visitor Count](https://visitor-badge.laobi.icu/badge?page_id=sameer-jack.portfolio)
+![Visitor Count](https://visitor-badge.laobi.icu/badge?page_id=yourusername.portfolio)
 
 </div>
