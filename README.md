@@ -77,7 +77,7 @@ const developer = {
 <small>OOP, MVC, PSR Standards</small>
 </td>
 <td align="center">
-<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/laravel/laravel-plain.svg" width="50" height="50"/><br>
+<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/laravel/laravel-original.svg" width="50" height="50"/><br>
 <strong>Laravel</strong><br>
 <small>Eloquent, Artisan, Queues</small>
 </td>
