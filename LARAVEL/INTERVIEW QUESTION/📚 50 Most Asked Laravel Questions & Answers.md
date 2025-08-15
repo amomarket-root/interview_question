@@ -76,8 +76,15 @@ php artisan cache:clear
 <details>
 <summary><strong>4. What are Laravel events?</strong></summary>
 
-**Answer:**
-Events are program-recognizable actions or occurrences that the program or its code processes. Laravel events provide a simple observer implementation, allowing us to subscribe and listen to various application events and actions.[^2]
+**Answer:**  
+Events in Laravel are program-recognizable actions or occurrences within the application that can trigger specific responses.  
+
+Laravel provides a simple **observer pattern** implementation for handling events, allowing developers to:
+
+- **Listen** for certain events in the application.
+- **Respond** to them with event listeners.
+
+This makes it easy to decouple different parts of the application, improving maintainability and scalability.
 
 **Example:**
 ```php
