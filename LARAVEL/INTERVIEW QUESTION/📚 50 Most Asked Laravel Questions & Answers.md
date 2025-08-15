@@ -34,7 +34,13 @@ Route::get('/users', function () {
 <summary><strong>2. What is MVC architecture in Laravel?</strong></summary>
 
 **Answer:**
-MVC is an architectural pattern that divides an application into three logical elements: Model, View, and Controller. The model describes the logic of writing Laravel applications, the view decides the user interface logic, and the controller acts as an interface between model and view.[^2]
+MVC (Model–View–Controller) is a design pattern that separates an application into three main components:
+
+- **Model** – Handles the data layer and business logic (e.g., interacting with the database, defining relationships).
+- **View** – Manages the presentation layer, i.e., what the user sees (HTML, Blade templates).
+- **Controller** – Acts as the intermediary between the Model and View, receiving user requests, processing them via the Model, and returning the appropriate View.
+
+In Laravel, MVC helps keep the code organized, maintainable, and scalable by clearly separating concerns.
 
 **Example:**
 ```php
