@@ -32,14 +32,15 @@ echo findMax($numbers); // Output: 9
 **Answer:**
 ```php
 function findSecondLargest($arr) {
-    $first = $second = PHP_INT_MIN;
+    $first = 0;   // Will hold the largest
+    $second = 0;  // Will hold second largest
     
-    foreach ($arr as $value) {
-        if ($value > $first) {
+    foreach ($arr as $number) {
+        if ($number > $first) {
             $second = $first;
-            $first = $value;
-        } elseif ($value > $second && $value != $first) {
-            $second = $value;
+            $first = $number;
+        } else if ($number > $second && $number != $first) {
+            $second = $number;
         }
     }
     
