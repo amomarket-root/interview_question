@@ -69,6 +69,9 @@ visit_care/
 │   │   │   └── layout/
 │   │   │       └── MainLayout.jsx
 │   │   ├── pages/
+│   │   │   ├── BookAppointmentPage.jsx
+│   │   │   ├── ClinicDetailPage.jsx
+│   │   │   ├── DoctorDetailPage.jsx
 │   │   │   └── HomePage.jsx
 │   │   |    ├── admin/
 │   │   │    |   └── AdminDashboard.jsx
@@ -541,12 +544,16 @@ return new class extends Migration
             $table->string('license_number')->unique();
             $table->integer('experience_years');
             $table->text('bio')->nullable();
+            $table->text('education')->nullable();
             $table->decimal('consultation_fee', 8, 2);
             $table->text('qualification');
             $table->json('languages')->nullable();
+            $table->json('services')->nullable(); // Array of services offered
             $table->decimal('rating', 3, 2)->default(0.00);
             $table->integer('total_reviews')->default(0);
             $table->boolean('is_verified')->default(false);
+            $table->boolean('is_available')->default(true);
+            $table->string('profile_image')->nullable();
             $table->timestamps();
         });
     }
@@ -580,11 +587,18 @@ return new class extends Migration
             $table->decimal('longitude', 11, 8);
             $table->string('phone');
             $table->string('email')->nullable();
+            $table->string('website')->nullable();
             $table->json('facilities')->nullable();
+            $table->json('specialties')->nullable();
             $table->string('image')->nullable();
+            $table->json('images')->nullable(); // Multiple images
             $table->time('opening_time')->default('09:00');
             $table->time('closing_time')->default('18:00');
+            $table->json('working_days')->nullable(); // ['monday', 'tuesday', etc.]
+            $table->decimal('rating', 3, 2)->default(0.00);
+            $table->integer('total_reviews')->default(0);
             $table->boolean('is_active')->default(true);
+            $table->boolean('is_featured')->default(false);
             $table->timestamps();
         });
     }
@@ -904,15 +918,18 @@ class Doctor extends Model
 
     protected $fillable = [
         'user_id', 'specialization', 'license_number', 'experience_years',
-        'bio', 'consultation_fee', 'qualification', 'languages',
-        'rating', 'total_reviews', 'is_verified'
+        'bio', 'education', 'consultation_fee', 'qualification', 
+        'languages', 'services', 'rating', 'total_reviews', 
+        'is_verified', 'is_available', 'profile_image'
     ];
 
     protected $casts = [
         'languages' => 'array',
+        'services' => 'array',
         'consultation_fee' => 'decimal:2',
-        'rating' => 'decimal:1',
-        'is_verified' => 'boolean'
+        'rating' => 'decimal:2',
+        'is_verified' => 'boolean',
+        'is_available' => 'boolean'
     ];
 
     public function user()
@@ -922,15 +939,33 @@ class Doctor extends Model
 
     public function clinics()
     {
-        return $this->belongsToMany(Clinic::class)->withPivot([
-            'available_days', 'start_time', 'end_time', 
-            'slot_duration', 'is_active'
-        ])->withTimestamps();
+        return $this->belongsToMany(Clinic::class, 'clinic_doctor')
+                    ->withPivot(['available_days', 'start_time', 'end_time', 'slot_duration', 'is_active'])
+                    ->withTimestamps();
     }
 
     public function appointments()
     {
         return $this->hasMany(Appointment::class);
+    }
+
+    // Scope for verified doctors
+    public function scopeVerified($query)
+    {
+        return $query->where('is_verified', true);
+    }
+
+    // Scope for available doctors
+    public function scopeAvailable($query)
+    {
+        return $query->where('is_available', true);
+    }
+
+    // Get next available appointment slot
+    public function getNextAvailableSlot()
+    {
+        // Logic to calculate next available slot
+        return now()->addDays(1)->format('Y-m-d H:i');
     }
 }
 ```
@@ -951,28 +986,62 @@ class Clinic extends Model
 
     protected $fillable = [
         'name', 'description', 'address', 'latitude', 'longitude',
-        'phone', 'email', 'facilities', 'image', 
-        'opening_time', 'closing_time', 'is_active'
+        'phone', 'email', 'website', 'facilities', 'specialties', 
+        'image', 'images', 'opening_time', 'closing_time', 
+        'working_days', 'rating', 'total_reviews', 'is_active', 'is_featured'
     ];
 
     protected $casts = [
         'facilities' => 'array',
+        'specialties' => 'array',
+        'images' => 'array',
+        'working_days' => 'array',
         'latitude' => 'decimal:8',
         'longitude' => 'decimal:8',
-        'is_active' => 'boolean'
+        'rating' => 'decimal:2',
+        'is_active' => 'boolean',
+        'is_featured' => 'boolean'
     ];
 
     public function doctors()
     {
-        return $this->belongsToMany(Doctor::class)->withPivot([
-            'available_days', 'start_time', 'end_time',
-            'slot_duration', 'is_active'
-        ])->withTimestamps();
+        return $this->belongsToMany(Doctor::class, 'clinic_doctor')
+                    ->withPivot(['available_days', 'start_time', 'end_time', 'slot_duration', 'is_active'])
+                    ->withTimestamps();
     }
 
     public function appointments()
     {
         return $this->hasMany(Appointment::class);
+    }
+
+    // Calculate distance from given coordinates
+    public function getDistanceFromPoint($latitude, $longitude)
+    {
+        $earthRadius = 6371; // Earth radius in kilometers
+
+        $latDelta = deg2rad($latitude - $this->latitude);
+        $lonDelta = deg2rad($longitude - $this->longitude);
+
+        $a = sin($latDelta / 2) * sin($latDelta / 2) +
+             cos(deg2rad($this->latitude)) * cos(deg2rad($latitude)) *
+             sin($lonDelta / 2) * sin($lonDelta / 2);
+
+        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+
+        return round($earthRadius * $c, 2);
+    }
+
+    // Scope for active clinics
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
+    }
+
+    // Scope for featured clinics
+    public function scopeFeatured($query)
+    {
+        return $query->where('is_featured', true);
     }
 }
 ```
@@ -1484,47 +1553,269 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Clinic;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ClinicController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Clinic::with('doctors.user')->where('is_active', true);
+        $query = Clinic::with(['doctors.user'])
+                      ->active();
 
-        if ($request->has('latitude') && $request->has('longitude')) {
-            $lat = $request->latitude;
-            $lng = $request->longitude;
-            $radius = $request->radius ?? 10;
-
-            $query->selectRaw("*, (6371 * acos(cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude)))) AS distance", [$lat, $lng, $lat])
-                  ->havingRaw('distance < ?', [$radius])
-                  ->orderBy('distance');
-        }
-
-        if ($request->has('search')) {
+        // Search by name, address, or specialties
+        if ($request->has('search') && !empty($request->search)) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
                 $q->where('name', 'like', '%' . $search . '%')
+                  ->orWhere('address', 'like', '%' . $search . '%')
                   ->orWhere('description', 'like', '%' . $search . '%')
+                  ->orWhereJsonContains('specialties', $search)
                   ->orWhereJsonContains('facilities', $search);
             });
         }
 
-        $clinics = $query->paginate(10);
+        // Filter by specialty
+        if ($request->has('specialty') && !empty($request->specialty)) {
+            $query->whereJsonContains('specialties', $request->specialty);
+        }
+
+        // Filter by facilities
+        if ($request->has('facility') && !empty($request->facility)) {
+            $query->whereJsonContains('facilities', $request->facility);
+        }
+
+        // Location-based search
+        if ($request->has('latitude') && $request->has('longitude')) {
+            $lat = $request->latitude;
+            $lng = $request->longitude;
+            $radius = $request->radius ?? 10; // Default 10km radius
+
+            $query->selectRaw("*, 
+                (6371 * acos(cos(radians(?)) * cos(radians(latitude)) * 
+                cos(radians(longitude) - radians(?)) + sin(radians(?)) * 
+                sin(radians(latitude)))) AS distance", [$lat, $lng, $lat])
+                  ->havingRaw('distance < ?', [$radius])
+                  ->orderBy('distance');
+        } else {
+            // Order by rating if no location provided
+            $query->orderBy('rating', 'desc');
+        }
+
+        $perPage = $request->get('per_page', 12);
+        $clinics = $query->paginate($perPage);
+
+        // Add distance to each clinic if coordinates provided
+        if ($request->has('latitude') && $request->has('longitude')) {
+            $clinics->getCollection()->transform(function ($clinic) use ($request) {
+                $clinic->distance_km = $clinic->getDistanceFromPoint(
+                    $request->latitude, 
+                    $request->longitude
+                );
+                return $clinic;
+            });
+        }
+
         return response()->json($clinics);
     }
 
     public function show($id)
     {
-        $clinic = Clinic::with(['doctors.user'])->findOrFail($id);
+        $clinic = Clinic::with([
+            'doctors.user',
+            'doctors' => function($query) {
+                $query->verified()->available();
+            }
+        ])->findOrFail($id);
+
         return response()->json($clinic);
     }
 
-    public function getDoctors($id)
+    public function getDoctors($id, Request $request)
     {
         $clinic = Clinic::findOrFail($id);
-        $doctors = $clinic->doctors()->with('user')->get();
+        
+        $query = $clinic->doctors()
+                       ->with('user')
+                       ->verified()
+                       ->available();
+
+        // Filter by specialization
+        if ($request->has('specialization')) {
+            $query->where('specialization', $request->specialization);
+        }
+
+        $doctors = $query->get();
+
+        // Add clinic-specific schedule information
+        $doctors->transform(function ($doctor) use ($clinic) {
+            $pivot = $doctor->pivot;
+            $doctor->clinic_schedule = [
+                'available_days' => $pivot->available_days,
+                'start_time' => $pivot->start_time,
+                'end_time' => $pivot->end_time,
+                'slot_duration' => $pivot->slot_duration,
+                'is_active' => $pivot->is_active
+            ];
+            return $doctor;
+        });
+
         return response()->json($doctors);
+    }
+
+    public function featured()
+    {
+        $clinics = Clinic::with(['doctors.user'])
+                        ->featured()
+                        ->active()
+                        ->orderBy('rating', 'desc')
+                        ->limit(6)
+                        ->get();
+
+        return response()->json($clinics);
+    }
+}
+```
+
+**app/Http/Controllers/Api/DoctorController.php**
+
+```php
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\Doctor;
+use Illuminate\Http\Request;
+
+class DoctorController extends Controller
+{
+    public function index(Request $request)
+    {
+        $query = Doctor::with(['user', 'clinics'])
+                      ->verified()
+                      ->available();
+
+        // Search by name or specialization
+        if ($request->has('search') && !empty($request->search)) {
+            $search = $request->search;
+            $query->whereHas('user', function($q) use ($search) {
+                $q->where('name', 'like', '%' . $search . '%');
+            })->orWhere('specialization', 'like', '%' . $search . '%')
+              ->orWhere('bio', 'like', '%' . $search . '%');
+        }
+
+        // Filter by specialization
+        if ($request->has('specialization') && !empty($request->specialization)) {
+            $query->where('specialization', $request->specialization);
+        }
+
+        // Filter by clinic
+        if ($request->has('clinic_id') && !empty($request->clinic_id)) {
+            $query->whereHas('clinics', function($q) use ($request) {
+                $q->where('clinic_id', $request->clinic_id);
+            });
+        }
+
+        // Location-based search
+        if ($request->has('latitude') && $request->has('longitude')) {
+            $lat = $request->latitude;
+            $lng = $request->longitude;
+            $radius = $request->radius ?? 10;
+
+            $query->whereHas('clinics', function($q) use ($lat, $lng, $radius) {
+                $q->selectRaw("*, 
+                    (6371 * acos(cos(radians(?)) * cos(radians(latitude)) * 
+                    cos(radians(longitude) - radians(?)) + sin(radians(?)) * 
+                    sin(radians(latitude)))) AS distance", [$lat, $lng, $lat])
+                  ->havingRaw('distance < ?', [$radius]);
+            });
+        }
+
+        // Order by rating
+        $query->orderBy('rating', 'desc');
+
+        $perPage = $request->get('per_page', 12);
+        $doctors = $query->paginate($perPage);
+
+        return response()->json($doctors);
+    }
+
+    public function show($id)
+    {
+        $doctor = Doctor::with(['user', 'clinics'])
+                       ->findOrFail($id);
+
+        return response()->json($doctor);
+    }
+
+    public function getAvailability($doctorId, $clinicId, Request $request)
+    {
+        $doctor = Doctor::with(['clinics' => function($query) use ($clinicId) {
+            $query->where('clinic_id', $clinicId);
+        }])->findOrFail($doctorId);
+
+        $clinic = $doctor->clinics->first();
+        
+        if (!$clinic) {
+            return response()->json(['error' => 'Doctor not available at this clinic'], 404);
+        }
+
+        $schedule = $clinic->pivot;
+        $availableDays = json_decode($schedule->available_days, true);
+        
+        // Generate available slots for the next 7 days
+        $availableSlots = [];
+        $startDate = now();
+        
+        for ($i = 0; $i < 7; $i++) {
+            $date = $startDate->copy()->addDays($i);
+            $dayName = strtolower($date->format('l'));
+            
+            if (in_array($dayName, $availableDays)) {
+                $slots = $this->generateTimeSlots(
+                    $schedule->start_time,
+                    $schedule->end_time,
+                    $schedule->slot_duration
+                );
+                
+                $availableSlots[] = [
+                    'date' => $date->format('Y-m-d'),
+                    'day' => $date->format('l'),
+                    'slots' => $slots
+                ];
+            }
+        }
+
+        return response()->json([
+            'doctor' => $doctor,
+            'clinic' => $clinic,
+            'schedule' => $schedule,
+            'available_slots' => $availableSlots
+        ]);
+    }
+
+    private function generateTimeSlots($startTime, $endTime, $duration)
+    {
+        $slots = [];
+        $current = \Carbon\Carbon::createFromFormat('H:i:s', $startTime);
+        $end = \Carbon\Carbon::createFromFormat('H:i:s', $endTime);
+
+        while ($current->lt($end)) {
+            $slots[] = $current->format('H:i');
+            $current->addMinutes($duration);
+        }
+
+        return $slots;
+    }
+
+    public function specializations()
+    {
+        $specializations = Doctor::verified()
+                                ->select('specialization')
+                                ->distinct()
+                                ->pluck('specialization');
+
+        return response()->json($specializations);
     }
 }
 ```
@@ -1538,7 +1829,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Appointment;
+use App\Models\Doctor;
+use App\Models\Clinic;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class AppointmentController extends Controller
 {
@@ -1548,44 +1842,86 @@ class AppointmentController extends Controller
             'doctor_id' => 'required|exists:doctors,id',
             'clinic_id' => 'required|exists:clinics,id',
             'appointment_date' => 'required|date|after_or_equal:today',
-            'appointment_time' => 'required',
-            'symptoms' => 'nullable|string',
+            'appointment_time' => 'required|date_format:H:i',
+            'symptoms' => 'nullable|string|max:1000',
+            'notes' => 'nullable|string|max:500'
         ]);
 
+        // Check if user is authenticated
+        if (!auth()->check()) {
+            return response()->json([
+                'error' => 'Authentication required',
+                'message' => 'Please login to book an appointment'
+            ], 401);
+        }
+
+        // Check if the time slot is available
         $existingAppointment = Appointment::where([
             'doctor_id' => $request->doctor_id,
             'clinic_id' => $request->clinic_id,
             'appointment_date' => $request->appointment_date,
             'appointment_time' => $request->appointment_time,
-        ])->where('status', '!=', 'cancelled')->first();
+        ])->whereIn('status', ['pending', 'confirmed'])->first();
 
         if ($existingAppointment) {
-            return response()->json(['message' => 'Time slot not available'], 409);
+            return response()->json([
+                'error' => 'Time slot not available',
+                'message' => 'This time slot is already booked. Please choose another time.'
+            ], 409);
         }
 
-        $doctor = \App\Models\Doctor::findOrFail($request->doctor_id);
-        
-        $appointment = Appointment::create([
-            'patient_id' => $request->user()->id,
-            'doctor_id' => $request->doctor_id,
-            'clinic_id' => $request->clinic_id,
-            'appointment_date' => $request->appointment_date,
-            'appointment_time' => $request->appointment_time,
-            'symptoms' => $request->symptoms,
-            'amount' => $doctor->consultation_fee,
-            'status' => 'pending'
-        ]);
+        // Verify doctor works at this clinic
+        $doctor = Doctor::with('clinics')->findOrFail($request->doctor_id);
+        $clinic = $doctor->clinics->where('id', $request->clinic_id)->first();
 
-        return response()->json($appointment->load(['doctor.user', 'clinic']), 201);
+        if (!$clinic) {
+            return response()->json([
+                'error' => 'Invalid booking',
+                'message' => 'Doctor is not available at this clinic'
+            ], 400);
+        }
+
+        // Create appointment
+        $appointment = DB::transaction(function () use ($request, $doctor) {
+            return Appointment::create([
+                'patient_id' => auth()->id(),
+                'doctor_id' => $request->doctor_id,
+                'clinic_id' => $request->clinic_id,
+                'appointment_date' => $request->appointment_date,
+                'appointment_time' => $request->appointment_time,
+                'symptoms' => $request->symptoms,
+                'notes' => $request->notes,
+                'amount' => $doctor->consultation_fee,
+                'status' => 'pending',
+                'payment_status' => 'pending'
+            ]);
+        });
+
+        $appointment->load(['doctor.user', 'clinic', 'patient']);
+
+        return response()->json([
+            'message' => 'Appointment booked successfully',
+            'appointment' => $appointment
+        ], 201);
     }
 
     public function index(Request $request)
     {
-        $appointments = $request->user()
-                              ->patientAppointments()
-                              ->with(['doctor.user', 'clinic'])
-                              ->orderBy('appointment_date', 'desc')
-                              ->paginate(10);
+        if (!auth()->check()) {
+            return response()->json(['error' => 'Authentication required'], 401);
+        }
+
+        $query = auth()->user()->patientAppointments()
+                            ->with(['doctor.user', 'clinic'])
+                            ->orderBy('appointment_date', 'desc')
+                            ->orderBy('appointment_time', 'desc');
+
+        // Filter by status
+        if ($request->has('status')) {
+            $query->where('status', $request->status);
+        }
+
+        $appointments = $query->paginate(10);
 
         return response()->json($appointments);
     }
@@ -1595,9 +1931,10 @@ class AppointmentController extends Controller
         $appointment = Appointment::with(['doctor.user', 'clinic', 'patient'])
                                  ->findOrFail($id);
         
+        // Check if user has permission to view this appointment
         if ($appointment->patient_id !== auth()->id() && 
             $appointment->doctor->user_id !== auth()->id()) {
-            return response()->json(['message' => 'Unauthorized'], 403);
+            return response()->json(['error' => 'Unauthorized'], 403);
         }
 
         return response()->json($appointment);
@@ -1607,16 +1944,38 @@ class AppointmentController extends Controller
     {
         $appointment = Appointment::findOrFail($id);
         
+        // Check if user owns this appointment
         if ($appointment->patient_id !== auth()->id()) {
-            return response()->json(['message' => 'Unauthorized'], 403);
+            return response()->json(['error' => 'Unauthorized'], 403);
         }
 
+        // Check if appointment can be cancelled
         if ($appointment->status === 'completed') {
-            return response()->json(['message' => 'Cannot cancel completed appointment'], 400);
+            return response()->json([
+                'error' => 'Cannot cancel completed appointment'
+            ], 400);
+        }
+
+        if ($appointment->status === 'cancelled') {
+            return response()->json([
+                'error' => 'Appointment is already cancelled'
+            ], 400);
+        }
+
+        // Check if appointment is within cancellation window (e.g., 2 hours before)
+        $appointmentDateTime = \Carbon\Carbon::parse($appointment->appointment_date . ' ' . $appointment->appointment_time);
+        if ($appointmentDateTime->diffInHours(now()) < 2) {
+            return response()->json([
+                'error' => 'Cannot cancel appointment less than 2 hours before scheduled time'
+            ], 400);
         }
 
         $appointment->update(['status' => 'cancelled']);
-        return response()->json(['message' => 'Appointment cancelled successfully']);
+
+        return response()->json([
+            'message' => 'Appointment cancelled successfully',
+            'appointment' => $appointment
+        ]);
     }
 }
 ```
@@ -1863,7 +2222,6 @@ Route::get('/{any}', function () {
 
 ```php
 <?php
-// routes/api.php
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
@@ -1876,52 +2234,53 @@ use App\Http\Controllers\Api\SocialAuthController;
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
-// Social Authentication Feature Routes
+// Social Authentication routes
 Route::prefix('auth/social')->group(function () {
-    // Get available providers
     Route::get('/providers', [SocialAuthController::class, 'getProviders']);
-    
-    // Initiate social auth for any provider
     Route::get('/{provider}', [SocialAuthController::class, 'redirectToProvider'])
         ->where('provider', 'google|facebook|github|apple');
-    
-    // Handle callbacks for any provider
     Route::get('/{provider}/callback', [SocialAuthController::class, 'handleProviderCallback'])
         ->where('provider', 'google|facebook|github|apple');
 });
 
-// Protected Social Auth routes
-Route::middleware('auth:sanctum')->prefix('auth/social')->group(function () {
-    // Get user's linked providers
-    Route::get('/user/providers', [SocialAuthController::class, 'getUserProviders']);
-    
-    // Link a new provider to existing account
-    Route::post('/link/{provider}', [SocialAuthController::class, 'linkProvider'])
-        ->where('provider', 'google|facebook|github|apple');
-    
-    // Unlink a provider from account
-    Route::delete('/unlink/{provider}', [SocialAuthController::class, 'unlinkProvider'])
-        ->where('provider', 'google|facebook|github|apple');
+// Public routes - Clinics
+Route::prefix('clinics')->group(function () {
+    Route::get('/', [ClinicController::class, 'index']);
+    Route::get('/featured', [ClinicController::class, 'featured']);
+    Route::get('/{id}', [ClinicController::class, 'show']);
+    Route::get('/{id}/doctors', [ClinicController::class, 'getDoctors']);
 });
 
-// Public routes
-Route::get('/doctors', [DoctorController::class, 'index']);
-Route::get('/doctors/{id}', [DoctorController::class, 'show']);
-Route::get('/doctors/{doctorId}/availability/{clinicId}', [DoctorController::class, 'getAvailability']);
-Route::get('/clinics', [ClinicController::class, 'index']);
-Route::get('/clinics/{id}', [ClinicController::class, 'show']);
-Route::get('/clinics/{id}/doctors', [ClinicController::class, 'getDoctors']);
+// Public routes - Doctors
+Route::prefix('doctors')->group(function () {
+    Route::get('/', [DoctorController::class, 'index']);
+    Route::get('/specializations', [DoctorController::class, 'specializations']);
+    Route::get('/{id}', [DoctorController::class, 'show']);
+    Route::get('/{doctorId}/availability/{clinicId}', [DoctorController::class, 'getAvailability']);
+});
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
+    // Auth routes
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
     
+    // Social auth management
+    Route::prefix('auth/social')->group(function () {
+        Route::get('/user/providers', [SocialAuthController::class, 'getUserProviders']);
+        Route::post('/link/{provider}', [SocialAuthController::class, 'linkProvider'])
+            ->where('provider', 'google|facebook|github|apple');
+        Route::delete('/unlink/{provider}', [SocialAuthController::class, 'unlinkProvider'])
+            ->where('provider', 'google|facebook|github|apple');
+    });
+    
     // Appointments
-    Route::get('/appointments', [AppointmentController::class, 'index']);
-    Route::post('/appointments', [AppointmentController::class, 'store']);
-    Route::get('/appointments/{id}', [AppointmentController::class, 'show']);
-    Route::put('/appointments/{id}/cancel', [AppointmentController::class, 'cancel']);
+    Route::prefix('appointments')->group(function () {
+        Route::get('/', [AppointmentController::class, 'index']);
+        Route::post('/', [AppointmentController::class, 'store']);
+        Route::get('/{id}', [AppointmentController::class, 'show']);
+        Route::put('/{id}/cancel', [AppointmentController::class, 'cancel']);
+    });
 });
 ```
 
@@ -1963,7 +2322,8 @@ Route::middleware('auth:sanctum')->group(function () {
         "@mui/icons-material": "^6.4.4",
         "@mui/material": "^6.4.4",
         "@mui/x-charts": "^7.26.0",
-        "@react-google-maps/api": "^2.20.6",
+        "@mui/x-date-pickers": "^8.10.2",
+        "@react-google-maps/api": "^2.20.7",
         "@socket.io/redis-adapter": "^8.2.1",
         "@vitejs/plugin-react": "^4.5.0",
         "cors": "^2.8.5",
@@ -2122,6 +2482,9 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import theme from './theme/theme';
 import HomePage from './pages/HomePage';
+import ClinicDetailPage from './pages/ClinicDetailPage';
+import DoctorDetailPage from './pages/DoctorDetailPage';
+import BookAppointmentPage from './pages/BookAppointmentPage';
 import DoctorDashboard from './pages/doctor/DoctorDashboard';
 import HealthcareDashboard from './pages/healthcare/HealthcareDashboard';
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -2137,6 +2500,11 @@ function App() {
                 <Routes>
                     {/* Public Routes */}
                     <Route path="/" element={<HomePage />} />
+                    <Route path="/clinic/:id" element={<ClinicDetailPage />} />
+                    <Route path="/doctor/:id" element={<DoctorDetailPage />} />
+                    
+                    {/* Protected Routes */}
+                    <Route path="/book-appointment" element={<BookAppointmentPage />} />
                     
                     {/* Auth Callback Route */}
                     <Route path="/auth/callback" element={<AuthCallback />} />
@@ -3550,6 +3918,1426 @@ const HomePage = () => {
 export default HomePage;
 ```
 
+**resources/js/pages/DoctorDetailPage.jsx**
+
+```jsx
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import {
+    Container,
+    Typography,
+    Box,
+    Grid,
+    Card,
+    CardContent,
+    Button,
+    Chip,
+    Rating,
+    Avatar,
+    List,
+    ListItem,
+    ListItemIcon,
+    ListItemText,
+    Paper,
+    CircularProgress,
+    Alert,
+    Tabs,
+    Tab,
+    Accordion,
+    AccordionSummary,
+    AccordionDetails,
+} from '@mui/material';
+import {
+    Person,
+    Schedule,
+    LocalHospital,
+    CalendarToday,
+    LocationOn,
+    Verified,
+    ExpandMore,
+    MedicalServices,
+} from '@mui/icons-material';
+import MainLayout from '../components/layout/MainLayout';
+import LoginModal from '../components/auth/LoginModal';
+import axios from 'axios';
+
+const DoctorDetailPage = () => {
+    const { id } = useParams();
+    const navigate = useNavigate();
+    const apiUrl = import.meta.env.VITE_API_URL;
+
+    const [doctor, setDoctor] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [tabValue, setTabValue] = useState(0);
+    const [showLoginModal, setShowLoginModal] = useState(false);
+    const [selectedClinic, setSelectedClinic] = useState(null);
+
+    useEffect(() => {
+        loadDoctorDetails();
+    }, [id]);
+
+    const loadDoctorDetails = async () => {
+        try {
+            const response = await axios.get(`${apiUrl}/doctors/${id}`);
+            setDoctor(response.data);
+        } catch (error) {
+            console.error('Failed to load doctor details:', error);
+            setError('Failed to load doctor details');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleBookAppointment = (clinic) => {
+        const token = localStorage.getItem('auth_token');
+        if (!token) {
+            setSelectedClinic(clinic);
+            setShowLoginModal(true);
+        } else {
+            navigate(`/book-appointment`, {
+                state: {
+                    doctor: doctor,
+                    clinic: clinic,
+                    type: 'doctor'
+                }
+            });
+        }
+    };
+
+    const handleLoginSuccess = (userData, token) => {
+        localStorage.setItem('auth_token', token);
+        localStorage.setItem('user_data', JSON.stringify(userData));
+        setShowLoginModal(false);
+        
+        if (selectedClinic) {
+            navigate(`/book-appointment`, {
+                state: {
+                    doctor: doctor,
+                    clinic: selectedClinic,
+                    type: 'doctor'
+                }
+            });
+        }
+    };
+
+    const renderDoctorInfo = () => (
+        <Grid container spacing={4}>
+            <Grid item xs={12} md={4}>
+                <Card elevation={3} sx={{ textAlign: 'center', p: 3 }}>
+                    <Avatar
+                        src={doctor.profile_image}
+                        sx={{ 
+                            width: 150, 
+                            height: 150, 
+                            mx: 'auto', 
+                            mb: 2,
+                            border: '4px solid',
+                            borderColor: 'primary.main'
+                        }}
+                    >
+                        <Person sx={{ fontSize: 60 }} />
+                    </Avatar>
+                    
+                    <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold' }}>
+                        👨‍⚕️ {doctor.user.name}
+                    </Typography>
+                    
+                    <Typography variant="h6" color="primary" gutterBottom>
+                        {doctor.specialization}
+                    </Typography>
+                    
+                    {doctor.is_verified && (
+                        <Chip 
+                            label="✅ Verified Doctor" 
+                            color="success"
+                            icon={<Verified />}
+                            sx={{ mb: 2 }}
+                        />
+                    )}
+                    
+                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mb: 2 }}>
+                        <Rating value={doctor.rating} precision={0.1} readOnly />
+                        <Typography variant="body1" sx={{ ml: 1 }}>
+                            ⭐ {doctor.rating} ({doctor.total_reviews} reviews)
+                        </Typography>
+                    </Box>
+                    
+                    <Typography variant="caption" color="text.secondary">
+                        📅 {doctor.experience_years} years of experience
+                    </Typography>
+                </Card>
+            </Grid>
+
+            <Grid item xs={12} md={8}>
+                <Card elevation={3} sx={{ p: 3, mb: 3 }}>
+                    <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold' }}>
+                        👨‍⚕️ About Dr. {doctor.user.name}
+                    </Typography>
+                    
+                    <Typography variant="body1" paragraph>
+                        {doctor.bio}
+                    </Typography>
+                    
+                    <Grid container spacing={3}>
+                        <Grid item xs={12} sm={6}>
+                            <Typography variant="h6" gutterBottom>
+                                🎓 Education
+                            </Typography>
+                            <Typography variant="body2">
+                                {doctor.qualification}
+                            </Typography>
+                            {doctor.education && (
+                                <Typography variant="body2" sx={{ mt: 1 }}>
+                                    {doctor.education}
+                                </Typography>
+                            )}
+                        </Grid>
+                        
+                        <Grid item xs={12} sm={6}>
+                            <Typography variant="h6" gutterBottom>
+                                🗣️ Languages
+                            </Typography>
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                {doctor.languages && doctor.languages.map((language, index) => (
+                                    <Chip key={index} label={language} size="small" variant="outlined" />
+                                ))}
+                            </Box>
+                        </Grid>
+                    </Grid>
+                    
+                    {doctor.services && (
+                        <Box sx={{ mt: 3 }}>
+                            <Typography variant="h6" gutterBottom>
+                                🩺 Services
+                            </Typography>
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                {doctor.services.map((service, index) => (
+                                    <Chip key={index} label={service} color="primary" variant="outlined" />
+                                ))}
+                            </Box>
+                        </Box>
+                    )}
+                </Card>
+
+                <Card elevation={3} sx={{ p: 3 }}>
+                    <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
+                        💰 Consultation Fee
+                    </Typography>
+                    <Typography variant="h4" color="primary" sx={{ fontWeight: 'bold' }}>
+                        ₹{doctor.consultation_fee}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        Per consultation
+                    </Typography>
+                </Card>
+            </Grid>
+        </Grid>
+    );
+
+    const renderClinics = () => (
+        <Box>
+            <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
+                🏥 Available at Clinics
+            </Typography>
+            
+            {doctor.clinics.map((clinic, index) => (
+                <Accordion key={clinic.id} elevation={3} sx={{ mb: 2 }}>
+                    <AccordionSummary expandIcon={<ExpandMore />}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                            <LocalHospital sx={{ mr: 2, color: 'primary.main' }} />
+                            <Box sx={{ flexGrow: 1 }}>
+                                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                                    🏥 {clinic.name}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    📍 {clinic.address}
+                                </Typography>
+                            </Box>
+                            <Button
+                                variant="contained"
+                                startIcon={<CalendarToday />}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleBookAppointment(clinic);
+                                }}
+                                sx={{ ml: 2, color: 'white' }}
+                            >
+                                📅 Book Here
+                            </Button>
+                        </Box>
+                    </AccordionSummary>
+                    <AccordionDetails>
+                        <Grid container spacing={3}>
+                            <Grid item xs={12} md={6}>
+                                <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
+                                    📞 Contact Information
+                                </Typography>
+                                <List dense>
+                                    <ListItem disablePadding>
+                                        <ListItemIcon>
+                                            <LocationOn fontSize="small" />
+                                        </ListItemIcon>
+                                        <ListItemText primary={`📍 ${clinic.address}`} />
+                                    </ListItem>
+                                    <ListItem disablePadding>
+                                        <ListItemIcon>
+                                            <MedicalServices fontSize="small" />
+                                        </ListItemIcon>
+                                        <ListItemText primary={`📞 ${clinic.phone}`} />
+                                    </ListItem>
+                                </List>
+                            </Grid>
+                            
+                            <Grid item xs={12} md={6}>
+                                <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
+                                    🕒 Schedule
+                                </Typography>
+                                {clinic.pivot && (
+                                    <List dense>
+                                        <ListItem disablePadding>
+                                            <ListItemIcon>
+                                                <Schedule fontSize="small" />
+                                            </ListItemIcon>
+                                            <ListItemText 
+                                                primary={`⏰ ${clinic.pivot.start_time} - ${clinic.pivot.end_time}`}
+                                                secondary={`Available days: ${JSON.parse(clinic.pivot.available_days || '[]').join(', ')}`}
+                                            />
+                                        </ListItem>
+                                    </List>
+                                )}
+                            </Grid>
+                        </Grid>
+                        
+                        {clinic.facilities && (
+                            <Box sx={{ mt: 2 }}>
+                                <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
+                                    🛠️ Facilities
+                                </Typography>
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                    {clinic.facilities.map((facility, idx) => (
+                                        <Chip key={idx} label={facility} size="small" variant="outlined" />
+                                    ))}
+                                </Box>
+                            </Box>
+                        )}
+                    </AccordionDetails>
+                </Accordion>
+            ))}
+        </Box>
+    );
+
+    if (loading) {
+        return (
+            <MainLayout>
+                <Container maxWidth="lg" sx={{ py: 10, textAlign: 'center' }}>
+                    <CircularProgress size={60} />
+                    <Typography variant="h6" sx={{ mt: 2 }}>
+                        Loading doctor details...
+                    </Typography>
+                </Container>
+            </MainLayout>
+        );
+    }
+
+    if (error || !doctor) {
+        return (
+            <MainLayout>
+                <Container maxWidth="lg" sx={{ py: 10 }}>
+                    <Alert severity="error">
+                        {error || 'Doctor not found'}
+                    </Alert>
+                </Container>
+            </MainLayout>
+        );
+    }
+
+    return (
+        <MainLayout>
+            <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 }, mt: { xs: 8, md: 10 } }}>
+                <Box sx={{ mb: 4 }}>
+                    <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)}>
+                        <Tab label="👨‍⚕️ Doctor Info" />
+                        <Tab label={`🏥 Clinics (${doctor.clinics.length})`} />
+                    </Tabs>
+                </Box>
+
+                {tabValue === 0 && renderDoctorInfo()}
+                {tabValue === 1 && renderClinics()}
+            </Container>
+
+            <LoginModal
+                open={showLoginModal}
+                onClose={() => setShowLoginModal(false)}
+                onLoginSuccess={handleLoginSuccess}
+            />
+        </MainLayout>
+    );
+};
+
+export default DoctorDetailPage;
+```
+
+**resources/js/pages/ClinicDetailPage.jsx**
+
+```jsx
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import {
+    Container,
+    Typography,
+    Box,
+    Grid,
+    Card,
+    CardContent,
+    CardMedia,
+    Button,
+    Chip,
+    Rating,
+    Avatar,
+    List,
+    ListItem,
+    ListItemIcon,
+    ListItemText,
+    Divider,
+    Paper,
+    CircularProgress,
+    Alert,
+    Tabs,
+    Tab,
+} from '@mui/material';
+import {
+    LocationOn,
+    Phone,
+    Email,
+    Schedule,
+    LocalHospital,
+    Star,
+    Verified,
+    CalendarToday,
+    Person,
+} from '@mui/icons-material';
+import MainLayout from '../components/layout/MainLayout';
+import LoginModal from '../components/auth/LoginModal';
+import axios from 'axios';
+
+const ClinicDetailPage = () => {
+    const { id } = useParams();
+    const navigate = useNavigate();
+    const apiUrl = import.meta.env.VITE_API_URL;
+
+    const [clinic, setClinic] = useState(null);
+    const [doctors, setDoctors] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [tabValue, setTabValue] = useState(0);
+    const [showLoginModal, setShowLoginModal] = useState(false);
+    const [selectedDoctor, setSelectedDoctor] = useState(null);
+
+    useEffect(() => {
+        loadClinicDetails();
+        loadClinicDoctors();
+    }, [id]);
+
+    const loadClinicDetails = async () => {
+        try {
+            const response = await axios.get(`${apiUrl}/clinics/${id}`);
+            setClinic(response.data);
+        } catch (error) {
+            console.error('Failed to load clinic details:', error);
+            setError('Failed to load clinic details');
+        }
+    };
+
+    const loadClinicDoctors = async () => {
+        try {
+            const response = await axios.get(`${apiUrl}/clinics/${id}/doctors`);
+            setDoctors(response.data);
+        } catch (error) {
+            console.error('Failed to load doctors:', error);
+            setError('Failed to load doctors');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleBookAppointment = (doctor) => {
+        const token = localStorage.getItem('auth_token');
+        if (!token) {
+            setSelectedDoctor(doctor);
+            setShowLoginModal(true);
+        } else {
+            navigate(`/book-appointment`, {
+                state: {
+                    doctor: doctor,
+                    clinic: clinic,
+                    type: 'clinic'
+                }
+            });
+        }
+    };
+
+    const handleLoginSuccess = (userData, token) => {
+        localStorage.setItem('auth_token', token);
+        localStorage.setItem('user_data', JSON.stringify(userData));
+        setShowLoginModal(false);
+        
+        if (selectedDoctor) {
+            navigate(`/book-appointment`, {
+                state: {
+                    doctor: selectedDoctor,
+                    clinic: clinic,
+                    type: 'clinic'
+                }
+            });
+        }
+    };
+
+    const renderClinicInfo = () => (
+        <Grid container spacing={4}>
+            <Grid item xs={12} md={8}>
+                <Card elevation={3}>
+                    <CardMedia
+                        component="img"
+                        height="300"
+                        image={clinic.image || '/images/clinic-default.jpg'}
+                        alt={clinic.name}
+                    />
+                    <CardContent>
+                        <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold' }}>
+                            🏥 {clinic.name}
+                        </Typography>
+                        
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                            <Rating value={clinic.rating} precision={0.1} readOnly />
+                            <Typography variant="body1">
+                                ⭐ {clinic.rating} ({clinic.total_reviews} reviews)
+                            </Typography>
+                        </Box>
+
+                        <Typography variant="body1" paragraph sx={{ mb: 3 }}>
+                            {clinic.description}
+                        </Typography>
+
+                        <Box sx={{ mb: 3 }}>
+                            <Typography variant="h6" gutterBottom>
+                                🏷️ Specialties
+                            </Typography>
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                {clinic.specialties && clinic.specialties.map((specialty, index) => (
+                                    <Chip key={index} label={specialty} color="primary" variant="outlined" />
+                                ))}
+                            </Box>
+                        </Box>
+
+                        <Box sx={{ mb: 3 }}>
+                            <Typography variant="h6" gutterBottom>
+                                🛠️ Facilities
+                            </Typography>
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                {clinic.facilities && clinic.facilities.map((facility, index) => (
+                                    <Chip key={index} label={facility} color="success" variant="outlined" />
+                                ))}
+                            </Box>
+                        </Box>
+                    </CardContent>
+                </Card>
+            </Grid>
+
+            <Grid item xs={12} md={4}>
+                <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+                    <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
+                        📞 Contact Information
+                    </Typography>
+                    
+                    <List disablePadding>
+                        <ListItem disablePadding sx={{ mb: 1 }}>
+                            <ListItemIcon>
+                                <LocationOn color="primary" />
+                            </ListItemIcon>
+                            <ListItemText primary={`📍 ${clinic.address}`} />
+                        </ListItem>
+                        
+                        <ListItem disablePadding sx={{ mb: 1 }}>
+                            <ListItemIcon>
+                                <Phone color="primary" />
+                            </ListItemIcon>
+                            <ListItemText primary={`📞 ${clinic.phone}`} />
+                        </ListItem>
+                        
+                        {clinic.email && (
+                            <ListItem disablePadding sx={{ mb: 1 }}>
+                                <ListItemIcon>
+                                    <Email color="primary" />
+                                </ListItemIcon>
+                                <ListItemText primary={`📧 ${clinic.email}`} />
+                            </ListItem>
+                        )}
+                        
+                        <ListItem disablePadding>
+                            <ListItemIcon>
+                                <Schedule color="primary" />
+                            </ListItemIcon>
+                            <ListItemText 
+                                primary={`🕒 ${clinic.opening_time} - ${clinic.closing_time}`}
+                                secondary="Working Hours"
+                            />
+                        </ListItem>
+                    </List>
+                </Paper>
+
+                <Paper elevation={3} sx={{ p: 3 }}>
+                    <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
+                        📊 Quick Stats
+                    </Typography>
+                    
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <Typography>👨‍⚕️ Total Doctors:</Typography>
+                            <Typography fontWeight="bold">{doctors.length}</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <Typography>⭐ Rating:</Typography>
+                            <Typography fontWeight="bold">{clinic.rating}/5</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <Typography>📝 Reviews:</Typography>
+                            <Typography fontWeight="bold">{clinic.total_reviews}</Typography>
+                        </Box>
+                    </Box>
+                </Paper>
+            </Grid>
+        </Grid>
+    );
+
+    const renderDoctors = () => (
+        <Grid container spacing={3}>
+            {doctors.map((doctor) => (
+                <Grid item xs={12} sm={6} md={4} key={doctor.id}>
+                    <Card elevation={3} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                        <CardContent sx={{ flexGrow: 1 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                <Avatar
+                                    src={doctor.profile_image}
+                                    sx={{ width: 60, height: 60, mr: 2 }}
+                                >
+                                    <Person />
+                                </Avatar>
+                                <Box>
+                                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                                        👨‍⚕️ {doctor.user.name}
+                                    </Typography>
+                                    {doctor.is_verified && (
+                                        <Chip 
+                                            label="✅ Verified" 
+                                            size="small" 
+                                            color="success"
+                                            icon={<Verified />}
+                                        />
+                                    )}
+                                </Box>
+                            </Box>
+
+                            <Typography variant="body2" color="primary" sx={{ mb: 1 }}>
+                                {doctor.specialization}
+                            </Typography>
+
+                            <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
+                                📅 {doctor.experience_years} years experience
+                            </Typography>
+
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                <Rating value={doctor.rating} precision={0.1} size="small" readOnly />
+                                <Typography variant="body2" sx={{ ml: 1 }}>
+                                    ⭐ {doctor.rating} ({doctor.total_reviews})
+                                </Typography>
+                            </Box>
+
+                            <Typography variant="h6" color="primary" sx={{ fontWeight: 'bold', mb: 2 }}>
+                                💰 ₹{doctor.consultation_fee}
+                            </Typography>
+
+                            {doctor.clinic_schedule && (
+                                <Box sx={{ mb: 2 }}>
+                                    <Typography variant="caption" color="text.secondary">
+                                        🕒 Available: {doctor.clinic_schedule.start_time} - {doctor.clinic_schedule.end_time}
+                                    </Typography>
+                                </Box>
+                            )}
+                        </CardContent>
+
+                        <Box sx={{ p: 2, pt: 0 }}>
+                            <Button
+                                fullWidth
+                                variant="contained"
+                                startIcon={<CalendarToday />}
+                                onClick={() => handleBookAppointment(doctor)}
+                                sx={{ 
+                                    borderRadius: 2,
+                                    fontWeight: 600,
+                                    color: 'white'
+                                }}
+                            >
+                                📅 Book Appointment
+                            </Button>
+                        </Box>
+                    </Card>
+                </Grid>
+            ))}
+        </Grid>
+    );
+
+    if (loading) {
+        return (
+            <MainLayout>
+                <Container maxWidth="lg" sx={{ py: 10, textAlign: 'center' }}>
+                    <CircularProgress size={60} />
+                    <Typography variant="h6" sx={{ mt: 2 }}>
+                        Loading clinic details...
+                    </Typography>
+                </Container>
+            </MainLayout>
+        );
+    }
+
+    if (error || !clinic) {
+        return (
+            <MainLayout>
+                <Container maxWidth="lg" sx={{ py: 10 }}>
+                    <Alert severity="error">
+                        {error || 'Clinic not found'}
+                    </Alert>
+                </Container>
+            </MainLayout>
+        );
+    }
+
+    return (
+        <MainLayout>
+            <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 }, mt: { xs: 8, md: 10 } }}>
+                <Box sx={{ mb: 4 }}>
+                    <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)}>
+                        <Tab label="🏥 Clinic Info" />
+                        <Tab label={`👨‍⚕️ Doctors (${doctors.length})`} />
+                    </Tabs>
+                </Box>
+
+                {tabValue === 0 && renderClinicInfo()}
+                {tabValue === 1 && renderDoctors()}
+            </Container>
+
+            <LoginModal
+                open={showLoginModal}
+                onClose={() => setShowLoginModal(false)}
+                onLoginSuccess={handleLoginSuccess}
+            />
+        </MainLayout>
+    );
+};
+
+export default ClinicDetailPage;
+```
+
+
+**resources/js/pages/BookAppointmentPage.jsx**
+
+```jsx
+import React, { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import {
+    Container,
+    Typography,
+    Box,
+    Grid,
+    Card,
+    CardContent,
+    Button,
+    TextField,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    Alert,
+    Avatar,
+    Chip,
+    Paper,
+    CircularProgress,
+    Stepper,
+    Step,
+    StepLabel,
+} from "@mui/material";
+import {
+    Person,
+    LocalHospital,
+    CalendarToday,
+    Schedule,
+    Payment,
+    CheckCircle,
+} from "@mui/icons-material";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
+import MainLayout from "../components/layout/MainLayout";
+import axios from "axios";
+import { format, isToday, isTomorrow, parseISO } from "date-fns";
+
+const BookAppointmentPage = () => {
+    const location = useLocation();
+    const navigate = useNavigate();
+    const apiUrl = import.meta.env.VITE_API_URL;
+
+    const { doctor, clinic, type } = location.state || {};
+
+    const [activeStep, setActiveStep] = useState(0);
+    const [selectedDate, setSelectedDate] = useState(null);
+    const [selectedTime, setSelectedTime] = useState("");
+    const [symptoms, setSymptoms] = useState("");
+    const [notes, setNotes] = useState("");
+    const [availableSlots, setAvailableSlots] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+    const [booking, setBooking] = useState(false);
+    const [appointmentId, setAppointmentId] = useState(null);
+
+    const steps = [
+        "📅 Select Date & Time",
+        "📋 Details",
+        "💳 Payment",
+        "✅ Confirmation",
+    ];
+
+    useEffect(() => {
+        if (!doctor || !clinic) {
+            navigate("/");
+            return;
+        }
+
+        // Check authentication
+        const token = localStorage.getItem("auth_token");
+        if (!token) {
+            navigate("/");
+            return;
+        }
+    }, [doctor, clinic, navigate]);
+
+    useEffect(() => {
+        if (selectedDate) {
+            loadAvailableSlots();
+        }
+    }, [selectedDate]);
+
+    const loadAvailableSlots = async () => {
+        if (!selectedDate || !doctor || !clinic) return;
+
+        setLoading(true);
+        try {
+            const response = await axios.get(
+                `${apiUrl}/doctors/${doctor.id}/availability/${clinic.id}`,
+                {
+                    params: {
+                        date: format(selectedDate, "yyyy-MM-dd"),
+                    },
+                }
+            );
+
+            const dateSlots = response.data.available_slots.find(
+                (slot) => slot.date === format(selectedDate, "yyyy-MM-dd")
+            );
+
+            setAvailableSlots(dateSlots ? dateSlots.slots : []);
+            setError("");
+        } catch (error) {
+            console.error("Failed to load available slots:", error);
+            setError("Failed to load available time slots");
+            setAvailableSlots([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleNext = () => {
+        setActiveStep((prevActiveStep) => prevActiveStep + 1);
+    };
+
+    const handleBack = () => {
+        setActiveStep((prevActiveStep) => prevActiveStep - 1);
+    };
+
+    const handleBookAppointment = async () => {
+        if (!selectedDate || !selectedTime) {
+            setError("Please select date and time");
+            return;
+        }
+
+        setBooking(true);
+        setError("");
+
+        try {
+            const token = localStorage.getItem("auth_token");
+            const response = await axios.post(
+                `${apiUrl}/appointments`,
+                {
+                    doctor_id: doctor.id,
+                    clinic_id: clinic.id,
+                    appointment_date: format(selectedDate, "yyyy-MM-dd"),
+                    appointment_time: selectedTime,
+                    symptoms: symptoms,
+                    notes: notes,
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            setAppointmentId(response.data.appointment.id);
+            setActiveStep(3); // Move to confirmation step
+        } catch (error) {
+            console.error("Booking failed:", error);
+            setError(
+                error.response?.data?.message ||
+                    "Failed to book appointment. Please try again."
+            );
+        } finally {
+            setBooking(false);
+        }
+    };
+
+    const formatDateDisplay = (date) => {
+        if (isToday(date)) return "Today";
+        if (isTomorrow(date)) return "Tomorrow";
+        return format(date, "EEEE, MMM dd, yyyy");
+    };
+
+    const renderStepContent = (step) => {
+        switch (step) {
+            case 0:
+                return (
+                    <Box>
+                        <Typography variant="h6" gutterBottom>
+                            📅 Select Appointment Date & Time
+                        </Typography>
+
+                        <Grid container spacing={3}>
+                            <Grid item xs={12} md={6}>
+                                <LocalizationProvider
+                                    dateAdapter={AdapterDateFns}
+                                >
+                                    <DatePicker
+                                        label="Select Date"
+                                        value={selectedDate}
+                                        onChange={(newValue) =>
+                                            setSelectedDate(newValue)
+                                        }
+                                        minDate={new Date()}
+                                        maxDate={
+                                            new Date(
+                                                Date.now() +
+                                                    30 * 24 * 60 * 60 * 1000
+                                            )
+                                        } // 30 days from now
+                                        slots={{
+                                            textField: TextField,
+                                        }}
+                                        slotProps={{
+                                            textField: {
+                                                fullWidth: true,
+                                                sx: {
+                                                    "& .MuiOutlinedInput-root":
+                                                        {
+                                                            borderRadius: 2,
+                                                        },
+                                                },
+                                            },
+                                        }}
+                                    />
+                                </LocalizationProvider>
+                            </Grid>
+
+                            <Grid item xs={12} md={6}>
+                                <FormControl
+                                    fullWidth
+                                    disabled={!selectedDate || loading}
+                                >
+                                    <InputLabel>Select Time</InputLabel>
+                                    <Select
+                                        value={selectedTime}
+                                        onChange={(e) =>
+                                            setSelectedTime(e.target.value)
+                                        }
+                                        label="Select Time"
+                                    >
+                                        {availableSlots.length === 0 &&
+                                            selectedDate &&
+                                            !loading && (
+                                                <MenuItem disabled>
+                                                    No slots available for
+                                                    selected date
+                                                </MenuItem>
+                                            )}
+                                        {availableSlots.map((slot) => (
+                                            <MenuItem key={slot} value={slot}>
+                                                🕒 {slot}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                                {loading && (
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            justifyContent: "center",
+                                            mt: 2,
+                                        }}
+                                    >
+                                        <CircularProgress size={24} />
+                                    </Box>
+                                )}
+                            </Grid>
+                        </Grid>
+
+                        {selectedDate && (
+                            <Alert severity="info" sx={{ mt: 2 }}>
+                                📅 Selected: {formatDateDisplay(selectedDate)}
+                                {selectedTime && ` at ${selectedTime}`}
+                            </Alert>
+                        )}
+                    </Box>
+                );
+
+            case 1:
+                return (
+                    <Box>
+                        <Typography variant="h6" gutterBottom>
+                            📋 Appointment Details
+                        </Typography>
+
+                        <Grid container spacing={3}>
+                            <Grid item xs={12}>
+                                <TextField
+                                    fullWidth
+                                    label="Symptoms / Reason for Visit"
+                                    multiline
+                                    rows={4}
+                                    value={symptoms}
+                                    onChange={(e) =>
+                                        setSymptoms(e.target.value)
+                                    }
+                                    placeholder="Please describe your symptoms or reason for visiting the doctor..."
+                                    required
+                                    helperText="This information helps the doctor prepare for your visit"
+                                />
+                            </Grid>
+
+                            <Grid item xs={12}>
+                                <TextField
+                                    fullWidth
+                                    label="Additional Notes (Optional)"
+                                    multiline
+                                    rows={2}
+                                    value={notes}
+                                    onChange={(e) => setNotes(e.target.value)}
+                                    placeholder="Any additional information you'd like to share..."
+                                />
+                            </Grid>
+                        </Grid>
+                    </Box>
+                );
+
+            case 2:
+                return (
+                    <Box>
+                        <Typography variant="h6" gutterBottom>
+                            💳 Payment & Review
+                        </Typography>
+
+                        <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
+                            <Typography variant="h6" gutterBottom>
+                                📋 Appointment Summary
+                            </Typography>
+
+                            <Grid container spacing={2}>
+                                <Grid item xs={12} sm={6}>
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                    >
+                                        Doctor:
+                                    </Typography>
+                                    <Typography
+                                        variant="body1"
+                                        fontWeight="bold"
+                                    >
+                                        👨‍⚕️ {doctor.user.name}
+                                    </Typography>
+                                </Grid>
+
+                                <Grid item xs={12} sm={6}>
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                    >
+                                        Specialization:
+                                    </Typography>
+                                    <Typography
+                                        variant="body1"
+                                        fontWeight="bold"
+                                    >
+                                        🩺 {doctor.specialization}
+                                    </Typography>
+                                </Grid>
+
+                                <Grid item xs={12} sm={6}>
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                    >
+                                        Clinic:
+                                    </Typography>
+                                    <Typography
+                                        variant="body1"
+                                        fontWeight="bold"
+                                    >
+                                        🏥 {clinic.name}
+                                    </Typography>
+                                </Grid>
+
+                                <Grid item xs={12} sm={6}>
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                    >
+                                        Date:
+                                    </Typography>
+                                    <Typography
+                                        variant="body1"
+                                        fontWeight="bold"
+                                    >
+                                        📅{" "}
+                                        {selectedDate
+                                            ? formatDateDisplay(selectedDate)
+                                            : ""}
+                                    </Typography>
+                                </Grid>
+
+                                <Grid item xs={12} sm={6}>
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                    >
+                                        Time:
+                                    </Typography>
+                                    <Typography
+                                        variant="body1"
+                                        fontWeight="bold"
+                                    >
+                                        🕒 {selectedTime}
+                                    </Typography>
+                                </Grid>
+
+                                <Grid item xs={12} sm={6}>
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                    >
+                                        Consultation Fee:
+                                    </Typography>
+                                    <Typography
+                                        variant="h5"
+                                        color="primary"
+                                        fontWeight="bold"
+                                    >
+                                        💰 ₹{doctor.consultation_fee}
+                                    </Typography>
+                                </Grid>
+                            </Grid>
+
+                            {symptoms && (
+                                <Box
+                                    sx={{
+                                        mt: 2,
+                                        pt: 2,
+                                        borderTop: "1px solid #e0e0e0",
+                                    }}
+                                >
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                    >
+                                        Symptoms/Reason:
+                                    </Typography>
+                                    <Typography variant="body2">
+                                        {symptoms}
+                                    </Typography>
+                                </Box>
+                            )}
+
+                            {notes && (
+                                <Box sx={{ mt: 1 }}>
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                    >
+                                        Additional Notes:
+                                    </Typography>
+                                    <Typography variant="body2">
+                                        {notes}
+                                    </Typography>
+                                </Box>
+                            )}
+                        </Paper>
+
+                        <Alert severity="info" sx={{ mb: 2 }}>
+                            💡 You can pay at the clinic during your visit.
+                            Payment confirmation will be updated after your
+                            appointment.
+                        </Alert>
+                    </Box>
+                );
+
+            case 3:
+                return (
+                    <Box textAlign="center">
+                        <CheckCircle
+                            sx={{ fontSize: 80, color: "success.main", mb: 2 }}
+                        />
+                        <Typography variant="h4" gutterBottom>
+                            🎉 Appointment Booked Successfully!
+                        </Typography>
+                        <Typography
+                            variant="body1"
+                            color="text.secondary"
+                            paragraph
+                        >
+                            Your appointment has been confirmed. You will
+                            receive a confirmation message shortly.
+                        </Typography>
+
+                        {appointmentId && (
+                            <Paper
+                                elevation={2}
+                                sx={{ p: 2, mb: 3, bgcolor: "success.50" }}
+                            >
+                                <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                >
+                                    Appointment ID:
+                                </Typography>
+                                <Typography variant="h6" fontWeight="bold">
+                                    #{appointmentId.slice(-8).toUpperCase()}
+                                </Typography>
+                            </Paper>
+                        )}
+
+                        <Alert severity="success" sx={{ mb: 3 }}>
+                            📱 Please arrive 15 minutes early for your
+                            appointment.
+                        </Alert>
+
+                        <Box sx={{ mt: 3 }}>
+                            <Button
+                                variant="contained"
+                                onClick={() => navigate("/appointments")}
+                                sx={{ mr: 2, color: "white" }}
+                            >
+                                📋 View My Appointments
+                            </Button>
+                            <Button
+                                variant="outlined"
+                                onClick={() => navigate("/")}
+                            >
+                                🏠 Go Home
+                            </Button>
+                        </Box>
+                    </Box>
+                );
+
+            default:
+                return null;
+        }
+    };
+
+    if (!doctor || !clinic) {
+        return (
+            <MainLayout>
+                <Container maxWidth="md" sx={{ py: 10, textAlign: "center" }}>
+                    <Alert severity="error">
+                        Invalid booking request. Please try again.
+                    </Alert>
+                </Container>
+            </MainLayout>
+        );
+    }
+
+    return (
+        <MainLayout>
+            <Container
+                maxWidth="md"
+                sx={{ py: { xs: 2, md: 4 }, mt: { xs: 8, md: 10 } }}
+            >
+                <Typography
+                    variant="h4"
+                    gutterBottom
+                    textAlign="center"
+                    sx={{ fontWeight: "bold" }}
+                >
+                    📅 Book Appointment
+                </Typography>
+
+                {/* Doctor & Clinic Info */}
+                <Card elevation={3} sx={{ mb: 4 }}>
+                    <CardContent>
+                        <Grid container spacing={3} alignItems="center">
+                            <Grid item xs={12} sm={6}>
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                    }}
+                                >
+                                    <Avatar
+                                        src={doctor.profile_image}
+                                        sx={{ width: 60, height: 60, mr: 2 }}
+                                    >
+                                        <Person />
+                                    </Avatar>
+                                    <Box>
+                                        <Typography
+                                            variant="h6"
+                                            sx={{ fontWeight: "bold" }}
+                                        >
+                                            👨‍⚕️ {doctor.user.name}
+                                        </Typography>
+                                        <Typography
+                                            variant="body2"
+                                            color="primary"
+                                        >
+                                            {doctor.specialization}
+                                        </Typography>
+                                        <Chip
+                                            label={`💰 ₹${doctor.consultation_fee}`}
+                                            size="small"
+                                            color="primary"
+                                        />
+                                    </Box>
+                                </Box>
+                            </Grid>
+
+                            <Grid item xs={12} sm={6}>
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                    }}
+                                >
+                                    <LocalHospital
+                                        sx={{ mr: 2, color: "primary.main" }}
+                                    />
+                                    <Box>
+                                        <Typography
+                                            variant="h6"
+                                            sx={{ fontWeight: "bold" }}
+                                        >
+                                            🏥 {clinic.name}
+                                        </Typography>
+                                        <Typography
+                                            variant="body2"
+                                            color="text.secondary"
+                                        >
+                                            📍 {clinic.address}
+                                        </Typography>
+                                    </Box>
+                                </Box>
+                            </Grid>
+                        </Grid>
+                    </CardContent>
+                </Card>
+
+                {/* Stepper */}
+                <Box sx={{ mb: 4 }}>
+                    <Stepper activeStep={activeStep} alternativeLabel>
+                        {steps.map((label) => (
+                            <Step key={label}>
+                                <StepLabel>{label}</StepLabel>
+                            </Step>
+                        ))}
+                    </Stepper>
+                </Box>
+
+                {/* Error Alert */}
+                {error && (
+                    <Alert severity="error" sx={{ mb: 3 }}>
+                        {error}
+                    </Alert>
+                )}
+
+                {/* Step Content */}
+                <Card elevation={3} sx={{ mb: 4 }}>
+                    <CardContent sx={{ p: 4 }}>
+                        {renderStepContent(activeStep)}
+                    </CardContent>
+                </Card>
+
+                {/* Navigation Buttons */}
+                {activeStep < 3 && (
+                    <Box
+                        sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                        }}
+                    >
+                        <Button
+                            disabled={activeStep === 0}
+                            onClick={handleBack}
+                            variant="outlined"
+                        >
+                            ← Back
+                        </Button>
+
+                        {activeStep === 2 ? (
+                            <Button
+                                variant="contained"
+                                onClick={handleBookAppointment}
+                                disabled={
+                                    booking || !selectedDate || !selectedTime
+                                }
+                                startIcon={
+                                    booking ? (
+                                        <CircularProgress size={20} />
+                                    ) : (
+                                        <CheckCircle />
+                                    )
+                                }
+                                sx={{ color: "white" }}
+                            >
+                                {booking ? "Booking..." : "✅ Confirm Booking"}
+                            </Button>
+                        ) : (
+                            <Button
+                                variant="contained"
+                                onClick={handleNext}
+                                disabled={
+                                    (activeStep === 0 &&
+                                        (!selectedDate || !selectedTime)) ||
+                                    (activeStep === 1 && !symptoms.trim())
+                                }
+                                sx={{ color: "white" }}
+                            >
+                                Next →
+                            </Button>
+                        )}
+                    </Box>
+                )}
+            </Container>
+        </MainLayout>
+    );
+};
+
+export default BookAppointmentPage;
+```
+
 **resources/js/pages/admin/AdminDashboard.jsx**
 
 ```jsx
@@ -4201,6 +5989,7 @@ export default HealthcareDashboard;
 
 ```jsx
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Box,
     Container,
@@ -4211,8 +6000,6 @@ import {
     MenuItem,
     TextField,
     Button,
-    Card,
-    CardContent,
     Avatar,
     Chip,
     Rating,
@@ -4224,43 +6011,59 @@ import {
     ListItemText,
     Divider,
     ButtonBase,
+    CircularProgress,
 } from '@mui/material';
 import { 
     Search, 
     LocationOn, 
     LocalHospital, 
     Person, 
-    MedicalServices,
     Verified,
-    Star,
-    AccessTime,
-    Phone
+    AccessTime
 } from '@mui/icons-material';
-import { specialties, doctors, clinics } from '../../data/dummyData';
+import axios from 'axios';
 
 const SearchSection = () => {
+    const navigate = useNavigate();
+    const apiUrl = import.meta.env.VITE_API_URL;
+
+    // Search functionality states
+    const [searchType, setSearchType] = useState('both'); // 'doctors', 'clinics', 'both'
     const [selectedSpecialty, setSelectedSpecialty] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [showResults, setShowResults] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [specializations, setSpecializations] = useState([]);
+    
+    // Animation states (from old UI)
     const [currentWordIndex, setCurrentWordIndex] = useState(0);
     const [displayedText, setDisplayedText] = useState('');
     const [isTyping, setIsTyping] = useState(true);
 
+    // Words to cycle through (from old UI)
     const words = ['Healthcare', 'Doctor'];
     
+    // Static parts of the title and subtitle (from old UI)
     const titleTemplate = 'Find _ Near You';
     const subtitles = [
         "🔍 Discover verified doctors and top-rated clinics in your area with smart location-based search",
         "📅 Connect with qualified medical professionals and book appointments at your convenience"
     ];
 
+    // Load specializations on component mount
+    useEffect(() => {
+        loadSpecializations();
+    }, []);
+
+    // Typewriter effect with slower speed (from old UI)
     useEffect(() => {
         const currentWord = words[currentWordIndex];
         let currentIndex = 0;
         setDisplayedText('');
         setIsTyping(true);
 
+        // Typing animation - slower speed
         const typingInterval = setInterval(() => {
             if (currentIndex < currentWord.length) {
                 setDisplayedText(currentWord.substring(0, currentIndex + 1));
@@ -4269,38 +6072,83 @@ const SearchSection = () => {
                 clearInterval(typingInterval);
                 setIsTyping(false);
                 
+                // Wait 6 seconds before starting next word
                 setTimeout(() => {
                     setCurrentWordIndex((prevIndex) => (prevIndex + 1) % words.length);
                 }, 6000);
             }
-        }, 300);
+        }, 300); // Changed from 150ms to 300ms for slower typing
 
         return () => clearInterval(typingInterval);
     }, [currentWordIndex]);
 
-    const handleSearch = () => {
-        let results = [];
-        
-        const filteredDoctors = doctors.filter(doctor => 
-            (selectedSpecialty === '' || doctor.specialty.includes(selectedSpecialty)) &&
-            (searchQuery === '' || 
-             doctor.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-             doctor.specialty.toLowerCase().includes(searchQuery.toLowerCase()))
-        );
+    const loadSpecializations = async () => {
+        try {
+            const response = await axios.get(`${apiUrl}/doctors/specializations`);
+            setSpecializations(response.data);
+        } catch (error) {
+            console.error('Failed to load specializations:', error);
+        }
+    };
 
-        const filteredClinics = clinics.filter(clinic =>
-            searchQuery === '' || 
-            clinic.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            clinic.address.toLowerCase().includes(searchQuery.toLowerCase())
-        );
+    const handleSearch = async () => {
+        if (!searchQuery.trim() && !selectedSpecialty) {
+            return;
+        }
 
-        results = [
-            ...filteredDoctors.map(d => ({ ...d, type: 'doctor' })),
-            ...filteredClinics.map(c => ({ ...c, type: 'clinic' }))
-        ];
-
-        setSearchResults(results);
+        setLoading(true);
         setShowResults(true);
+
+        try {
+            const results = [];
+            
+            // Search doctors if type is 'doctors' or 'both'
+            if (searchType === 'doctors' || searchType === 'both') {
+                const doctorParams = {
+                    search: searchQuery,
+                    specialization: selectedSpecialty,
+                    per_page: 5
+                };
+
+                const doctorResponse = await axios.get(`${apiUrl}/doctors`, {
+                    params: doctorParams
+                });
+
+                const doctors = doctorResponse.data.data.map(doctor => ({
+                    ...doctor,
+                    type: 'doctor'
+                }));
+
+                results.push(...doctors);
+            }
+
+            // Search clinics if type is 'clinics' or 'both'
+            if (searchType === 'clinics' || searchType === 'both') {
+                const clinicParams = {
+                    search: searchQuery,
+                    specialty: selectedSpecialty,
+                    per_page: 5
+                };
+
+                const clinicResponse = await axios.get(`${apiUrl}/clinics`, {
+                    params: clinicParams
+                });
+
+                const clinics = clinicResponse.data.data.map(clinic => ({
+                    ...clinic,
+                    type: 'clinic'
+                }));
+
+                results.push(...clinics);
+            }
+
+            setSearchResults(results);
+        } catch (error) {
+            console.error('Search failed:', error);
+            setSearchResults([]);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleKeyPress = (event) => {
@@ -4310,20 +6158,25 @@ const SearchSection = () => {
     };
 
     const handleResultClick = (result) => {
-        console.log('Selected:', result);
+        if (result.type === 'doctor') {
+            navigate(`/doctor/${result.id}`);
+        } else if (result.type === 'clinic') {
+            navigate(`/clinic/${result.id}`);
+        }
     };
 
+    // Function to render the animated title (from old UI)
     const renderAnimatedTitle = () => {
         const parts = titleTemplate.split('_');
         return (
             <>
-                {parts[^0]}{' '}
+                {parts[0]}{' '} {/* "Find " with natural space */}
                 <span 
                     style={{ 
                         color: '#ff5983',
                         position: 'relative',
                         display: 'inline-block',
-                        textShadow: '2px 2px 4px rgba(255, 89, 131, 0.3)',
+                        textShadow: '2px 2px 4px rgba(255, 89, 131, 0.3)', // Pink shadow for animated word
                     }}
                 >
                     {displayedText}
@@ -4337,9 +6190,15 @@ const SearchSection = () => {
                         />
                     )}
                 </span>
-                {' '}{parts[^1]}
+                {' '}{parts[1]} {/* " Near You" with natural space before */}
             </>
         );
+    };
+
+    // Safe number conversion for ratings
+    const safeRating = (rating) => {
+        const numRating = typeof rating === 'string' ? parseFloat(rating) : rating;
+        return isNaN(numRating) ? 0 : numRating;
     };
 
     return (
@@ -4357,6 +6216,7 @@ const SearchSection = () => {
                 }}
             >
                 <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1 }}>
+                    {/* Hero Content with Typewriter Animation (from old UI) */}
                     <Box textAlign="center" mb={6}>
                         <Typography 
                             variant="h2" 
@@ -4367,20 +6227,10 @@ const SearchSection = () => {
                                 fontSize: { xs: '2.5rem', md: '3.5rem', lg: '4rem' },
                                 color: '#10d915',
                                 mb: 3,
-                                minHeight: { xs: '3rem', md: '4rem', lg: '5rem' },
-                                textShadow: '3px 3px 6px rgba(16, 217, 21, 0.3)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: 2,
+                                minHeight: { xs: '3rem', md: '4rem', lg: '5rem' }, // Prevent layout shift
+                                textShadow: '3px 3px 6px rgba(16, 217, 21, 0.3)', // Green shadow for main text
                             }}
                         >
-                            <MedicalServices 
-                                sx={{ 
-                                    fontSize: { xs: '2rem', md: '3rem', lg: '3.5rem' },
-                                    color: '#10d915'
-                                }} 
-                            />
                             {renderAnimatedTitle()}
                         </Typography>
                         <Typography 
@@ -4392,7 +6242,7 @@ const SearchSection = () => {
                                 mx: 'auto',
                                 lineHeight: 1.4,
                                 transition: 'opacity 0.5s ease-in-out',
-                                textShadow: '1px 1px 2px rgba(0, 0, 0, 0.1)',
+                                textShadow: '1px 1px 2px rgba(0, 0, 0, 0.1)', // Subtle shadow for subtitle
                             }}
                             key={`subtitle-${currentWordIndex}`}
                         >
@@ -4400,6 +6250,7 @@ const SearchSection = () => {
                         </Typography>
                     </Box>
 
+                    {/* Search Form (updated with new functionality) */}
                     <Paper 
                         elevation={8} 
                         sx={{ 
@@ -4412,6 +6263,30 @@ const SearchSection = () => {
                         }}
                     >
                         <Grid container spacing={3} alignItems="end">
+                            {/* Search Type Dropdown (new functionality) */}
+                            <Grid item xs={12} md={2}>
+                                <Typography variant="subtitle2" color="text.primary" gutterBottom>
+                                    🔍 Search Type
+                                </Typography>
+                                <FormControl fullWidth>
+                                    <Select
+                                        value={searchType}
+                                        onChange={(e) => setSearchType(e.target.value)}
+                                        sx={{ 
+                                            borderRadius: 2,
+                                            '& .MuiOutlinedInput-root': {
+                                                '& fieldset': { borderColor: 'rgba(0,0,0,0.07)' },
+                                            }
+                                        }}
+                                    >
+                                        <MenuItem value="both">🌟 Both</MenuItem>
+                                        <MenuItem value="doctors">👨‍⚕️ Doctors</MenuItem>
+                                        <MenuItem value="clinics">🏥 Clinics</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+
+                            {/* Specialty Dropdown (updated with real data) */}
                             <Grid item xs={12} md={3}>
                                 <Typography variant="subtitle2" color="text.primary" gutterBottom>
                                     🩺 Medical Specialty
@@ -4429,7 +6304,7 @@ const SearchSection = () => {
                                         }}
                                     >
                                         <MenuItem value="">🌟 All Specialties</MenuItem>
-                                        {specialties.map((specialty) => (
+                                        {specializations.map((specialty) => (
                                             <MenuItem key={specialty} value={specialty}>
                                                 🩺 {specialty}
                                             </MenuItem>
@@ -4438,7 +6313,8 @@ const SearchSection = () => {
                                 </FormControl>
                             </Grid>
 
-                            <Grid item xs={12} md={7}>
+                            {/* Search Field (same as old UI) */}
+                            <Grid item xs={12} md={5}>
                                 <Typography variant="subtitle2" color="text.primary" gutterBottom>
                                     🔍 Search Doctor or Clinic
                                 </Typography>
@@ -4460,27 +6336,30 @@ const SearchSection = () => {
                                 />
                             </Grid>
 
+                            {/* Search Button (updated with loading state) */}
                             <Grid item xs={12} md={2}>
                                 <Button
                                     fullWidth
                                     variant="contained"
                                     size="large"
                                     onClick={handleSearch}
-                                    startIcon={<Search />}
+                                    disabled={loading}
+                                    startIcon={loading ? <CircularProgress size={20} /> : <Search />}
                                     sx={{ 
                                         py: 1.8,
                                         borderRadius: 2,
                                         fontWeight: 600,
                                         boxShadow: 3,
-                                        color:"white",
+                                        color: "white",
                                         '&:hover': { boxShadow: 6 }
                                     }}
                                 >
-                                    Search
+                                    {loading ? 'Searching...' : 'Search'}
                                 </Button>
                             </Grid>
                         </Grid>
 
+                        {/* Search Results (Fixed DOM nesting issues) */}
                         <Collapse in={showResults}>
                             <Box sx={{ mt: 4, pt: 3, borderTop: '1px solid rgba(0,0,0,0.08)' }}>
                                 <Typography variant="h6" gutterBottom color="text.primary">
@@ -4516,7 +6395,7 @@ const SearchSection = () => {
                                                     >
                                                         <ListItemAvatar sx={{ mr: 2 }}>
                                                             <Avatar 
-                                                                src={result.image}
+                                                                src={result.type === 'doctor' ? result.profile_image : result.image}
                                                                 sx={{ 
                                                                     width: 60, 
                                                                     height: 60,
@@ -4532,9 +6411,9 @@ const SearchSection = () => {
                                                             primary={
                                                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                                                                     <Typography variant="h6" component="span">
-                                                                        {result.type === 'doctor' ? '👨‍⚕️' : '🏥'} {result.name}
+                                                                        {result.type === 'doctor' ? '👨‍⚕️' : '🏥'} {result.type === 'doctor' ? result.user?.name : result.name}
                                                                     </Typography>
-                                                                    {result.type === 'doctor' && result.isVerified && (
+                                                                    {result.type === 'doctor' && result.is_verified && (
                                                                         <Chip 
                                                                             label="✅ Verified" 
                                                                             size="small" 
@@ -4546,21 +6425,26 @@ const SearchSection = () => {
                                                                 </Box>
                                                             }
                                                             secondary={
-                                                                <Box>
+                                                                <Box component="div">
                                                                     {result.type === 'doctor' ? (
                                                                         <>
-                                                                            <Typography variant="body2" color="primary">
-                                                                                {result.specialty} • {result.experience} years exp.
+                                                                            <Typography variant="body2" color="primary" component="div">
+                                                                                {result.specialization} • {result.experience_years} years exp.
                                                                             </Typography>
                                                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1 }}>
                                                                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                                                    <Rating value={result.rating} precision={0.1} size="small" readOnly />
-                                                                                    <Typography variant="body2">
-                                                                                        ⭐ {result.rating} ({result.reviewCount} reviews)
+                                                                                    <Rating 
+                                                                                        value={safeRating(result.rating)} 
+                                                                                        precision={0.1} 
+                                                                                        size="small" 
+                                                                                        readOnly 
+                                                                                    />
+                                                                                    <Typography variant="body2" component="span">
+                                                                                        ⭐ {safeRating(result.rating)} ({result.total_reviews || 0} reviews)
                                                                                     </Typography>
                                                                                 </Box>
                                                                                 <Chip 
-                                                                                    label={`💰 $${result.fee}`}
+                                                                                    label={`💰 ₹${result.consultation_fee}`}
                                                                                     size="small"
                                                                                     color="primary"
                                                                                     variant="outlined"
@@ -4568,14 +6452,8 @@ const SearchSection = () => {
                                                                             </Box>
                                                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
                                                                                 <AccessTime fontSize="small" color="action" />
-                                                                                <Typography variant="caption" color="text.secondary">
-                                                                                    🕒 Available: {result.nextAvailable}
-                                                                                </Typography>
-                                                                            </Box>
-                                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                                                                                <LocalHospital fontSize="small" color="action" />
-                                                                                <Typography variant="caption" color="text.secondary">
-                                                                                    🏥 {result.clinicName}
+                                                                                <Typography variant="caption" color="text.secondary" component="span">
+                                                                                    🕒 Available for appointments
                                                                                 </Typography>
                                                                             </Box>
                                                                         </>
@@ -4583,53 +6461,44 @@ const SearchSection = () => {
                                                                         <>
                                                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                                                                                 <LocationOn fontSize="small" color="action" />
-                                                                                <Typography variant="body2">
+                                                                                <Typography variant="body2" component="span">
                                                                                     📍 {result.address}
                                                                                 </Typography>
                                                                             </Box>
                                                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
                                                                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                                                    <Rating value={result.rating} precision={0.1} size="small" readOnly />
-                                                                                    <Typography variant="body2">
-                                                                                        ⭐ {result.rating} ({result.reviewCount} reviews)
+                                                                                    <Rating 
+                                                                                        value={safeRating(result.rating)} 
+                                                                                        precision={0.1} 
+                                                                                        size="small" 
+                                                                                        readOnly 
+                                                                                    />
+                                                                                    <Typography variant="body2" component="span">
+                                                                                        ⭐ {safeRating(result.rating)} ({result.total_reviews || 0} reviews)
                                                                                     </Typography>
                                                                                 </Box>
-                                                                                <Chip 
-                                                                                    label={`📍 ${result.distance}`}
-                                                                                    size="small"
-                                                                                    color="info"
-                                                                                    variant="outlined"
-                                                                                />
-                                                                            </Box>
-                                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                                                                                <AccessTime fontSize="small" color="action" />
-                                                                                <Typography variant="caption" color="text.secondary">
-                                                                                    🕒 {result.openTime === '24/7' 
-                                                                                        ? 'Open 24/7' 
-                                                                                        : `${result.openTime} - ${result.closeTime}`}
-                                                                                </Typography>
-                                                                                {result.isOpen && (
+                                                                                {result.distance_km && (
                                                                                     <Chip 
-                                                                                        label="🟢 Open Now"
+                                                                                        label={`📍 ${result.distance_km} km`}
                                                                                         size="small"
-                                                                                        color="success"
-                                                                                        sx={{ fontSize: '0.6rem', height: '20px' }}
+                                                                                        color="info"
+                                                                                        variant="outlined"
                                                                                     />
                                                                                 )}
                                                                             </Box>
                                                                             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
-                                                                                {result.facilities.slice(0, 3).map((facility, idx) => (
+                                                                                {result.specialties && result.specialties.slice(0, 3).map((specialty, idx) => (
                                                                                     <Chip 
                                                                                         key={idx} 
-                                                                                        label={facility} 
+                                                                                        label={specialty} 
                                                                                         size="small" 
                                                                                         variant="outlined"
                                                                                         sx={{ fontSize: '0.7rem', height: '22px' }}
                                                                                     />
                                                                                 ))}
-                                                                                {result.facilities.length > 3 && (
+                                                                                {result.specialties && result.specialties.length > 3 && (
                                                                                     <Chip 
-                                                                                        label={`+${result.facilities.length - 3} more`} 
+                                                                                        label={`+${result.specialties.length - 3} more`} 
                                                                                         size="small"
                                                                                         sx={{ fontSize: '0.7rem', height: '22px' }}
                                                                                     />
@@ -4645,7 +6514,7 @@ const SearchSection = () => {
                                                 {index < searchResults.length - 1 && <Divider />}
                                             </React.Fragment>
                                         ))}
-                                        {searchResults.length === 0 && showResults && (
+                                        {searchResults.length === 0 && showResults && !loading && (
                                             <ListItem>
                                                 <ListItemText
                                                     primary={
@@ -4669,6 +6538,7 @@ const SearchSection = () => {
                 </Container>
             </Box>
 
+            {/* Regular CSS instead of styled-jsx (from old UI) */}
             <style>{`
                 @keyframes blink {
                     0%, 50% {
@@ -8881,7 +10751,7 @@ button:focus {
 ```
 
 
-### Step 29: Database Seeders (Complete Implementation)
+### Step 29: Database Seeders
 
 **database/seeders/UserSeeder.php**
 
@@ -8906,9 +10776,9 @@ class UserSeeder extends Seeder
                 'password' => Hash::make('password'),
                 'user_type' => 'doctor',
                 'phone' => '+91-9876543210',
-                'address' => '12 Medical Complex, Mysuru, Karnataka',
-                'latitude' => 12.2958,
-                'longitude' => 76.6394
+                'address' => '12 Medical Complex, Bhubaneswar, Odisha',
+                'latitude' => 20.2961,
+                'longitude' => 85.8245
             ],
             [
                 'name' => 'Dr. Priya Sharma',
@@ -8916,9 +10786,9 @@ class UserSeeder extends Seeder
                 'password' => Hash::make('password'),
                 'user_type' => 'doctor',
                 'phone' => '+91-9876543220',
-                'address' => '34 Healthcare Avenue, Mysuru, Karnataka',
-                'latitude' => 12.3047,
-                'longitude' => 76.6551
+                'address' => '34 Healthcare Avenue, Cuttack, Odisha',
+                'latitude' => 20.4625,
+                'longitude' => 85.8828
             ],
             [
                 'name' => 'Dr. Arun Patel',
@@ -8926,9 +10796,9 @@ class UserSeeder extends Seeder
                 'password' => Hash::make('password'),
                 'user_type' => 'doctor',
                 'phone' => '+91-9876543230',
-                'address' => '56 Medical Street, Mysuru, Karnataka',
-                'latitude' => 12.3100,
-                'longitude' => 76.6600
+                'address' => '56 Medical Street, Berhampur, Odisha',
+                'latitude' => 19.3149,
+                'longitude' => 84.7941
             ],
             [
                 'name' => 'Dr. Kavya Reddy',
@@ -8936,9 +10806,9 @@ class UserSeeder extends Seeder
                 'password' => Hash::make('password'),
                 'user_type' => 'doctor',
                 'phone' => '+91-9876543240',
-                'address' => '78 Pediatric Lane, Mysuru, Karnataka',
-                'latitude' => 12.2800,
-                'longitude' => 76.6200
+                'address' => '78 Pediatric Lane, Rourkela, Odisha',
+                'latitude' => 22.2604,
+                'longitude' => 84.8536
             ],
             [
                 'name' => 'Dr. Vikram Singh',
@@ -8946,64 +10816,126 @@ class UserSeeder extends Seeder
                 'password' => Hash::make('password'),
                 'user_type' => 'doctor',
                 'phone' => '+91-9876543250',
-                'address' => '90 Dermatology Plaza, Mysuru, Karnataka',
-                'latitude' => 12.3200,
-                'longitude' => 76.6700
+                'address' => '90 Dermatology Plaza, Sambalpur, Odisha',
+                'latitude' => 21.4669,
+                'longitude' => 83.9812
+            ],
+            [
+                'name' => 'Dr. Sunita Mohanty',
+                'email' => 'dr.sunita@example.com',
+                'password' => Hash::make('password'),
+                'user_type' => 'doctor',
+                'phone' => '+91-9876543260',
+                'address' => '101 Cardiology Center, Puri, Odisha',
+                'latitude' => 19.8135,
+                'longitude' => 85.8312
+            ],
+            [
+                'name' => 'Dr. Ramesh Jena',
+                'email' => 'dr.ramesh@example.com',
+                'password' => Hash::make('password'),
+                'user_type' => 'doctor',
+                'phone' => '+91-9876543270',
+                'address' => '202 Orthopedic Clinic, Balasore, Odisha',
+                'latitude' => 21.4934,
+                'longitude' => 86.9335
+            ],
+            [
+                'name' => 'Dr. Sujata Pradhan',
+                'email' => 'dr.pradhan@example.com',
+                'password' => Hash::make('password'),
+                'user_type' => 'doctor',
+                'phone' => '+91-9876543280',
+                'address' => '303 Gynecology Wing, Angul, Odisha',
+                'latitude' => 20.8397,
+                'longitude' => 85.1022
+            ],
+            [
+                'name' => 'Dr. Biswajit Mishra',
+                'email' => 'dr.mishra@example.com',
+                'password' => Hash::make('password'),
+                'user_type' => 'doctor',
+                'phone' => '+91-9876543290',
+                'address' => '404 Neurology Department, Jharsuguda, Odisha',
+                'latitude' => 21.8643,
+                'longitude' => 84.0081
+            ],
+            [
+                'name' => 'Dr. Rashmi Behera',
+                'email' => 'dr.behera@example.com',
+                'password' => Hash::make('password'),
+                'user_type' => 'doctor',
+                'phone' => '+91-9876543300',
+                'address' => '505 ENT Specialist Center, Koraput, Odisha',
+                'latitude' => 18.8126,
+                'longitude' => 82.7095
             ]
         ];
 
         // Create patient users
         $patientUsers = [
             [
-                'name' => 'John Doe',
-                'email' => 'john@example.com',
+                'name' => 'Rahul Nayak',
+                'email' => 'rahul@example.com',
                 'password' => Hash::make('password'),
                 'user_type' => 'patient',
                 'phone' => '+91-9876543211',
-                'address' => '789 Patient Street, Mysuru, Karnataka',
-                'latitude' => 12.2958,
-                'longitude' => 76.6394
+                'address' => '789 Patient Street, Bhubaneswar, Odisha',
+                'latitude' => 20.2961,
+                'longitude' => 85.8245
             ],
             [
-                'name' => 'Jane Smith',
-                'email' => 'jane@example.com',
+                'name' => 'Shreya Das',
+                'email' => 'shreya@example.com',
                 'password' => Hash::make('password'),
                 'user_type' => 'patient',
                 'phone' => '+91-9876543212',
-                'address' => '456 Health Avenue, Mysuru, Karnataka',
-                'latitude' => 12.3047,
-                'longitude' => 76.6551
+                'address' => '456 Health Avenue, Cuttack, Odisha',
+                'latitude' => 20.4625,
+                'longitude' => 85.8828
             ],
             [
-                'name' => 'Robert Johnson',
-                'email' => 'robert@example.com',
+                'name' => 'Amit Sahoo',
+                'email' => 'amit@example.com',
                 'password' => Hash::make('password'),
                 'user_type' => 'patient',
                 'phone' => '+91-9876543213',
-                'address' => '123 Wellness Road, Mysuru, Karnataka',
-                'latitude' => 12.3100,
-                'longitude' => 76.6600
+                'address' => '123 Wellness Road, Berhampur, Odisha',
+                'latitude' => 19.3149,
+                'longitude' => 84.7941
             ],
             [
-                'name' => 'Emily Davis',
-                'email' => 'emily@example.com',
+                'name' => 'Priyanka Swain',
+                'email' => 'priyanka@example.com',
                 'password' => Hash::make('password'),
                 'user_type' => 'patient',
                 'phone' => '+91-9876543214',
-                'address' => '321 Care Lane, Mysuru, Karnataka',
-                'latitude' => 12.2800,
-                'longitude' => 76.6200
+                'address' => '321 Care Lane, Rourkela, Odisha',
+                'latitude' => 22.2604,
+                'longitude' => 84.8536
             ],
             [
-                'name' => 'Michael Brown',
-                'email' => 'michael@example.com',
+                'name' => 'Sanjay Parida',
+                'email' => 'sanjay@example.com',
                 'password' => Hash::make('password'),
                 'user_type' => 'patient',
                 'phone' => '+91-9876543215',
-                'address' => '654 Treatment Street, Mysuru, Karnataka',
-                'latitude' => 12.3200,
-                'longitude' => 76.6700
+                'address' => '654 Treatment Street, Sambalpur, Odisha',
+                'latitude' => 21.4669,
+                'longitude' => 83.9812
             ]
+        ];
+
+        // Create healthcare admin user
+        $healthcareUser = [
+            'name' => 'Dr. Manoj Patnaik',
+            'email' => 'healthcare@example.com',
+            'password' => Hash::make('password'),
+            'user_type' => 'healthcare',
+            'phone' => '+91-9876543199',
+            'address' => 'Healthcare Administration, Medical College, Bhubaneswar',
+            'latitude' => 20.2961,
+            'longitude' => 85.8245
         ];
 
         // Create admin user
@@ -9013,9 +10945,9 @@ class UserSeeder extends Seeder
             'password' => Hash::make('password'),
             'user_type' => 'admin',
             'phone' => '+91-9876543200',
-            'address' => 'Admin Office, Healthcare Plaza, Mysuru',
-            'latitude' => 12.2958,
-            'longitude' => 76.6394
+            'address' => 'Admin Office, Healthcare Plaza, Bhubaneswar',
+            'latitude' => 20.2961,
+            'longitude' => 85.8245
         ];
 
         // Insert all users
@@ -9027,9 +10959,10 @@ class UserSeeder extends Seeder
             User::create($userData);
         }
 
+        User::create($healthcareUser);
         User::create($adminUser);
 
-        $this->command->info('✅ Users seeded successfully!');
+        $this->command->info('✅ Users seeded successfully with Odisha locations!');
     }
 }
 ```
@@ -9050,64 +10983,112 @@ class ClinicSeeder extends Seeder
     {
         $clinics = [
             [
-                'name' => 'City General Hospital',
-                'description' => 'Multi-specialty hospital with modern facilities and experienced medical professionals',
-                'address' => '123 Main Street, Mysuru, Karnataka 570001',
-                'latitude' => 12.2958,
-                'longitude' => 76.6394,
-                'phone' => '+91-821-2345678',
-                'email' => 'info@citygeneral.com',
-                'facilities' => ['🚨 Emergency', '🩻 X-Ray', '🔬 Lab', '💊 Pharmacy', '🏥 ICU'],
-                'opening_time' => '08:00',
-                'closing_time' => '22:00'
+                'name' => 'Apollo Health City',
+                'description' => 'Multi-specialty tertiary care hospital with state-of-the-art facilities and world-class medical services across all major specialties.',
+                'address' => '154, Bannerghatta Road, Opposite IIM, Bangalore, Karnataka 560076',
+                'latitude' => 12.9343,
+                'longitude' => 77.6114,
+                'phone' => '+91-80-2692-2222',
+                'email' => 'info@apollohealthcity.com',
+                'website' => 'https://www.apollohealthcity.com',
+                'facilities' => ['🚨 24/7 Emergency', '🩻 Digital X-Ray', '🧲 MRI & CT Scan', '🔬 Advanced Lab', '💊 24/7 Pharmacy', '🏥 ICU & NICU', '🩺 OPD Consultation', '🚑 Ambulance Service'],
+                'specialties' => ['Cardiology', 'Neurology', 'Oncology', 'Orthopedics', 'Gastroenterology', 'Nephrology', 'Endocrinology', 'Pulmonology'],
+                'working_days' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+                'opening_time' => '00:00',
+                'closing_time' => '23:59',
+                'rating' => 4.8,
+                'total_reviews' => 2547,
+                'is_featured' => true
             ],
             [
-                'name' => 'Wellness Clinic',
-                'description' => 'Specialized in preventive healthcare and family medicine',
-                'address' => '456 Health Lane, Mysuru, Karnataka 570002',
-                'latitude' => 12.3047,
-                'longitude' => 76.6551,
-                'phone' => '+91-821-3456789',
-                'email' => 'contact@wellness.com',
-                'facilities' => ['🩺 Consultation', '🔬 Lab', '💊 Pharmacy'],
-                'opening_time' => '09:00',
-                'closing_time' => '18:00'
-            ],
-            [
-                'name' => 'Heart Care Center',
-                'description' => 'Specialized cardiac care facility with advanced equipment',
-                'address' => '789 Cardiac Lane, Mysuru, Karnataka 570003',
-                'latitude' => 12.3100,
-                'longitude' => 76.6600,
-                'phone' => '+91-821-4567890',
-                'email' => 'care@heartcenter.com',
-                'facilities' => ['⚡ ECG', '🫀 Echo', '🏃‍♂️ Stress Test', '🚨 Emergency'],
+                'name' => 'Fortis Hospital',
+                'description' => 'Leading healthcare provider offering comprehensive medical services with cutting-edge technology and experienced medical professionals.',
+                'address' => '14, Cunningham Road, Bangalore, Karnataka 560052',
+                'latitude' => 12.9855,
+                'longitude' => 77.5990,
+                'phone' => '+91-80-6621-4444',
+                'email' => 'info@fortishealthcare.com',
+                'website' => 'https://www.fortishealthcare.com',
+                'facilities' => ['🚨 Emergency Care', '🩻 Radiology', '🔬 Pathology Lab', '💊 Pharmacy', '🏥 Critical Care', '🩺 Specialist Clinics', '🔄 Dialysis Center'],
+                'specialties' => ['Cardiology', 'Neuroscience', 'Orthopedics', 'Oncology', 'Gastroenterology', 'Urology', 'Dermatology'],
+                'working_days' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
                 'opening_time' => '06:00',
-                'closing_time' => '20:00'
+                'closing_time' => '22:00',
+                'rating' => 4.6,
+                'total_reviews' => 1889,
+                'is_featured' => true
             ],
             [
-                'name' => 'Pediatric Care Center',
-                'description' => 'Specialized children healthcare facility with child-friendly environment',
-                'address' => '321 Kids Avenue, Mysuru, Karnataka 570004',
-                'latitude' => 12.2800,
-                'longitude' => 76.6200,
-                'phone' => '+91-821-5678901',
-                'email' => 'info@pediatriccare.com',
-                'facilities' => ['💉 Vaccination', '🏥 Pediatric ICU', '🚨 Emergency', '🔬 Lab'],
+                'name' => 'Manipal Hospital',
+                'description' => 'Trusted healthcare institution providing patient-centric care with advanced medical technology and skilled healthcare professionals.',
+                'address' => '98, Rustom Bagh, Airport Road, Bangalore, Karnataka 560017',
+                'latitude' => 13.0181,
+                'longitude' => 77.5619,
+                'phone' => '+91-80-2502-4444',
+                'email' => 'info@manipalhospitals.com',
+                'website' => 'https://www.manipalhospitals.com',
+                'facilities' => ['🚨 24x7 Emergency', '🩻 Advanced Imaging', '🔬 Clinical Lab', '💊 Retail Pharmacy', '🏥 Intensive Care', '🩺 Outpatient Services'],
+                'specialties' => ['Cardiology', 'Neurology', 'Pediatrics', 'Orthopedics', 'General Surgery', 'Internal Medicine', 'Psychiatry'],
+                'working_days' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
                 'opening_time' => '08:00',
-                'closing_time' => '20:00'
+                'closing_time' => '20:00',
+                'rating' => 4.5,
+                'total_reviews' => 1634,
+                'is_featured' => true
             ],
             [
-                'name' => 'Skin & Beauty Clinic',
-                'description' => 'Advanced dermatology and cosmetic treatments center',
-                'address' => '654 Beauty Street, Mysuru, Karnataka 570005',
-                'latitude' => 12.3200,
-                'longitude' => 76.6700,
-                'phone' => '+91-821-6789012',
-                'email' => 'contact@skinbeauty.com',
-                'facilities' => ['✨ Laser Treatment', '🔬 Cosmetic Surgery', '🩺 Consultation'],
-                'opening_time' => '10:00',
-                'closing_time' => '19:00'
+                'name' => 'Columbia Asia Hospital',
+                'description' => 'International standard healthcare facility offering comprehensive medical services with focus on patient safety and quality care.',
+                'address' => 'Kirloskar Business Park, Bellary Road, Hebbal, Bangalore, Karnataka 560024',
+                'latitude' => 13.0513,
+                'longitude' => 77.5944,
+                'phone' => '+91-80-6742-5000',
+                'email' => 'info@columbiaasia.com',
+                'website' => 'https://www.columbiaasia.com',
+                'facilities' => ['🚨 Emergency Department', '🩻 Diagnostic Imaging', '🔬 Laboratory Services', '💊 Pharmacy', '🏥 Day Care Surgery', '🩺 Health Screening'],
+                'specialties' => ['General Medicine', 'Pediatrics', 'Obstetrics & Gynecology', 'Orthopedics', 'ENT', 'Ophthalmology', 'Dermatology'],
+                'working_days' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
+                'opening_time' => '09:00',
+                'closing_time' => '21:00',
+                'rating' => 4.4,
+                'total_reviews' => 967,
+                'is_featured' => false
+            ],
+            [
+                'name' => 'Narayana Health City',
+                'description' => 'Affordable healthcare destination providing world-class medical services across multiple specialties with state-of-the-art infrastructure.',
+                'address' => '258/A, Bommasandra Industrial Area, Anekal Taluk, Bangalore, Karnataka 560099',
+                'latitude' => 12.8068,
+                'longitude' => 77.6785,
+                'phone' => '+91-80-7122-2200',
+                'email' => 'info@narayanahealth.org',
+                'website' => 'https://www.narayanahealth.org',
+                'facilities' => ['🚨 Trauma & Emergency', '🩻 Advanced Radiology', '🔬 Reference Lab', '💊 24-Hour Pharmacy', '🏥 Critical Care Units', '🩺 Specialty Clinics', '🚁 Air Ambulance'],
+                'specialties' => ['Cardiac Sciences', 'Neurosciences', 'Oncology', 'Transplant Medicine', 'Orthopedics', 'Gastroenterology', 'Nephrology'],
+                'working_days' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+                'opening_time' => '00:00',
+                'closing_time' => '23:59',
+                'rating' => 4.7,
+                'total_reviews' => 3245,
+                'is_featured' => true
+            ],
+            [
+                'name' => 'Sakra World Hospital',
+                'description' => 'Premium healthcare facility offering personalized medical care with Japanese hospital management standards and cutting-edge technology.',
+                'address' => 'Syamala Hills, Opposite to Science City, Sompura Gate, Off Sarjapur Road, Bangalore, Karnataka 560034',
+                'latitude' => 12.9057,
+                'longitude' => 77.6906,
+                'phone' => '+91-80-4969-4969',
+                'email' => 'info@sakraworldhospital.com',
+                'website' => 'https://www.sakraworldhospital.com',
+                'facilities' => ['🚨 Level 1 Trauma Center', '🩻 3T MRI & 128 Slice CT', '🔬 NABL Accredited Lab', '💊 Clinical Pharmacy', '🏥 Robotic Surgery', '🩺 International Patient Services'],
+                'specialties' => ['Cardiac Sciences', 'Neurosciences', 'Oncology', 'Orthopedics', 'Gastroenterology', 'Pulmonology', 'Emergency Medicine'],
+                'working_days' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
+                'opening_time' => '08:00',
+                'closing_time' => '22:00',
+                'rating' => 4.6,
+                'total_reviews' => 876,
+                'is_featured' => false
             ]
         ];
 
@@ -9115,7 +11096,7 @@ class ClinicSeeder extends Seeder
             Clinic::create($clinicData);
         }
 
-        $this->command->info('✅ Clinics seeded successfully!');
+        $this->command->info('✅ Real healthcare clinics seeded successfully!');
     }
 }
 ```
@@ -9141,12 +11122,13 @@ class DoctorSeeder extends Seeder
             [
                 'email' => 'dr.rajesh@example.com',
                 'specialization' => 'Cardiology',
-                'license_number' => 'MCI12345',
+                'license_number' => 'ODISHA12345',
                 'experience_years' => 15,
-                'bio' => '🫀 Experienced cardiologist specializing in interventional cardiology and heart disease prevention with advanced expertise in cardiac procedures.',
+                'bio' => '🫀 Experienced cardiologist with expertise in interventional cardiology and heart disease prevention. Specializes in advanced cardiac procedures and patient care.',
                 'consultation_fee' => 800.00,
                 'qualification' => 'MBBS, MD Cardiology, Fellowship in Interventional Cardiology',
-                'languages' => ['🇺🇸 English', '🇮🇳 Hindi', '🇮🇳 Kannada'],
+                'languages' => ['🇺🇸 English', '🇮🇳 Hindi', '🇮🇳 Odia'],
+                'services' => ['🫀 Heart Checkup', '⚡ ECG', '🩺 Consultation', '💊 Treatment'],
                 'rating' => 4.8,
                 'total_reviews' => 125,
                 'is_verified' => true
@@ -9154,12 +11136,13 @@ class DoctorSeeder extends Seeder
             [
                 'email' => 'dr.priya@example.com',
                 'specialization' => 'Dermatology',
-                'license_number' => 'MCI12346',
+                'license_number' => 'ODISHA12346',
                 'experience_years' => 8,
-                'bio' => '✨ Specialist in skin care, cosmetic dermatology, and advanced skin treatments with focus on aesthetic medicine.',
+                'bio' => '✨ Specialist in skin care, cosmetic dermatology, and advanced skin treatments with focus on aesthetic medicine and dermatological conditions.',
                 'consultation_fee' => 600.00,
                 'qualification' => 'MBBS, MD Dermatology, Aesthetic Medicine Certification',
-                'languages' => ['🇺🇸 English', '🇮🇳 Hindi'],
+                'languages' => ['🇺🇸 English', '🇮🇳 Hindi', '🇮🇳 Odia'],
+                'services' => ['🌟 Skin Treatment', '💄 Cosmetic Care', '🔬 Skin Analysis', '💊 Medication'],
                 'rating' => 4.5,
                 'total_reviews' => 89,
                 'is_verified' => true
@@ -9167,12 +11150,13 @@ class DoctorSeeder extends Seeder
             [
                 'email' => 'dr.arun@example.com',
                 'specialization' => 'General Medicine',
-                'license_number' => 'MCI12347',
+                'license_number' => 'ODISHA12347',
                 'experience_years' => 12,
-                'bio' => '🩺 General practitioner with expertise in family medicine and preventive healthcare, providing comprehensive medical care.',
+                'bio' => '🩺 General practitioner with expertise in family medicine and preventive healthcare, providing comprehensive medical care for all ages.',
                 'consultation_fee' => 400.00,
                 'qualification' => 'MBBS, MD General Medicine, Diploma in Family Medicine',
-                'languages' => ['🇺🇸 English', '🇮🇳 Hindi', '🇮🇳 Gujarati'],
+                'languages' => ['🇺🇸 English', '🇮🇳 Hindi', '🇮🇳 Odia'],
+                'services' => ['🩺 General Checkup', '💉 Vaccination', '🔬 Health Screening', '💊 Treatment'],
                 'rating' => 4.3,
                 'total_reviews' => 156,
                 'is_verified' => true
@@ -9180,12 +11164,13 @@ class DoctorSeeder extends Seeder
             [
                 'email' => 'dr.kavya@example.com',
                 'specialization' => 'Pediatrics',
-                'license_number' => 'MCI12348',
+                'license_number' => 'ODISHA12348',
                 'experience_years' => 10,
-                'bio' => '👶 Pediatric specialist focusing on child health, vaccination, and developmental care with compassionate approach.',
+                'bio' => '👶 Pediatric specialist focusing on child health, vaccination, and developmental care with compassionate approach to young patients.',
                 'consultation_fee' => 500.00,
                 'qualification' => 'MBBS, MD Pediatrics, Fellowship in Pediatric Critical Care',
-                'languages' => ['🇺🇸 English', '🇮🇳 Hindi', '🇮🇳 Telugu'],
+                'languages' => ['🇺🇸 English', '🇮🇳 Hindi', '🇮🇳 Odia', '🇮🇳 Telugu'],
+                'services' => ['👶 Child Care', '💉 Immunization', '📏 Growth Monitoring', '💊 Pediatric Treatment'],
                 'rating' => 4.7,
                 'total_reviews' => 203,
                 'is_verified' => true
@@ -9193,14 +11178,85 @@ class DoctorSeeder extends Seeder
             [
                 'email' => 'dr.vikram@example.com',
                 'specialization' => 'Dermatology',
-                'license_number' => 'MCI12349',
+                'license_number' => 'ODISHA12349',
                 'experience_years' => 6,
-                'bio' => '🌟 Young dermatologist specializing in acne treatment and laser therapies with modern treatment approaches.',
+                'bio' => '🌟 Young dermatologist specializing in acne treatment and laser therapies with modern treatment approaches and advanced technology.',
                 'consultation_fee' => 550.00,
                 'qualification' => 'MBBS, MD Dermatology, Laser Therapy Certification',
-                'languages' => ['🇺🇸 English', '🇮🇳 Hindi', '🇮🇳 Punjabi'],
+                'languages' => ['🇺🇸 English', '🇮🇳 Hindi', '🇮🇳 Odia', '🇮🇳 Punjabi'],
+                'services' => ['✨ Laser Treatment', '🌟 Acne Care', '🔬 Skin Analysis', '💊 Dermatology Care'],
                 'rating' => 4.4,
                 'total_reviews' => 67,
+                'is_verified' => true
+            ],
+            [
+                'email' => 'dr.sunita@example.com',
+                'specialization' => 'Cardiology',
+                'license_number' => 'ODISHA12350',
+                'experience_years' => 14,
+                'bio' => '❤️ Senior cardiologist with specialization in women\'s heart health and preventive cardiology. Expert in cardiac rehabilitation.',
+                'consultation_fee' => 750.00,
+                'qualification' => 'MBBS, MD Cardiology, DM Cardiology, Women\'s Heart Health Certificate',
+                'languages' => ['🇺🇸 English', '🇮🇳 Hindi', '🇮🇳 Odia'],
+                'services' => ['💖 Women\'s Heart Care', '⚡ Cardiac Screening', '🏃‍♀️ Cardiac Rehab', '💊 Heart Treatment'],
+                'rating' => 4.6,
+                'total_reviews' => 178,
+                'is_verified' => true
+            ],
+            [
+                'email' => 'dr.ramesh@example.com',
+                'specialization' => 'Orthopedics',
+                'license_number' => 'ODISHA12351',
+                'experience_years' => 18,
+                'bio' => '🦴 Senior orthopedic surgeon specializing in joint replacement, sports injuries, and spine surgery with extensive surgical experience.',
+                'consultation_fee' => 900.00,
+                'qualification' => 'MBBS, MS Orthopedics, Fellowship in Joint Replacement',
+                'languages' => ['🇺🇸 English', '🇮🇳 Hindi', '🇮🇳 Odia'],
+                'services' => ['🦴 Bone Surgery', '🏃‍♂️ Sports Injury', '🔧 Joint Replacement', '💊 Orthopedic Care'],
+                'rating' => 4.9,
+                'total_reviews' => 245,
+                'is_verified' => true
+            ],
+            [
+                'email' => 'dr.pradhan@example.com',
+                'specialization' => 'Gynecology',
+                'license_number' => 'ODISHA12352',
+                'experience_years' => 16,
+                'bio' => '👩‍⚕️ Experienced gynecologist specializing in women\'s health, pregnancy care, and minimally invasive gynecological surgeries.',
+                'consultation_fee' => 700.00,
+                'qualification' => 'MBBS, MD Gynecology, Fellowship in Laparoscopic Surgery',
+                'languages' => ['🇺🇸 English', '🇮🇳 Hindi', '🇮🇳 Odia'],
+                'services' => ['🤱 Pregnancy Care', '👩 Women\'s Health', '🔬 Gynec Surgery', '💊 Reproductive Health'],
+                'rating' => 4.7,
+                'total_reviews' => 189,
+                'is_verified' => true
+            ],
+            [
+                'email' => 'dr.mishra@example.com',
+                'specialization' => 'Neurology',
+                'license_number' => 'ODISHA12353',
+                'experience_years' => 13,
+                'bio' => '🧠 Neurologist specializing in stroke care, epilepsy management, and neurodegenerative diseases with advanced diagnostic expertise.',
+                'consultation_fee' => 850.00,
+                'qualification' => 'MBBS, MD Medicine, DM Neurology, Stroke Specialist Certificate',
+                'languages' => ['🇺🇸 English', '🇮🇳 Hindi', '🇮🇳 Odia'],
+                'services' => ['🧠 Neuro Care', '⚡ Stroke Treatment', '💊 Epilepsy Management', '🔬 Neuro Diagnostics'],
+                'rating' => 4.8,
+                'total_reviews' => 134,
+                'is_verified' => true
+            ],
+            [
+                'email' => 'dr.behera@example.com',
+                'specialization' => 'ENT',
+                'license_number' => 'ODISHA12354',
+                'experience_years' => 11,
+                'bio' => '👂 ENT specialist with expertise in ear, nose, and throat disorders, endoscopic surgeries, and hearing disorders management.',
+                'consultation_fee' => 650.00,
+                'qualification' => 'MBBS, MS ENT, Fellowship in Endoscopic Surgery',
+                'languages' => ['🇺🇸 English', '🇮🇳 Hindi', '🇮🇳 Odia'],
+                'services' => ['👂 Hearing Care', '👃 Nasal Treatment', '🗣️ Throat Care', '🔬 ENT Surgery'],
+                'rating' => 4.5,
+                'total_reviews' => 98,
                 'is_verified' => true
             ]
         ];
@@ -9217,6 +11273,7 @@ class DoctorSeeder extends Seeder
                     'consultation_fee' => $doctorData['consultation_fee'],
                     'qualification' => $doctorData['qualification'],
                     'languages' => $doctorData['languages'],
+                    'services' => $doctorData['services'],
                     'rating' => $doctorData['rating'],
                     'total_reviews' => $doctorData['total_reviews'],
                     'is_verified' => $doctorData['is_verified']
@@ -9249,14 +11306,14 @@ class DoctorClinicScheduleSeeder extends Seeder
 
         $schedules = [
             'dr.rajesh@example.com' => [
-                'City General Hospital' => [
+                'Apollo Health City' => [
                     'available_days' => ['monday', 'tuesday', 'wednesday', 'friday'],
                     'start_time' => '10:00',
                     'end_time' => '16:00',
                     'slot_duration' => 30,
                     'is_active' => true
                 ],
-                'Heart Care Center' => [
+                'Fortis Hospital' => [
                     'available_days' => ['thursday', 'saturday'],
                     'start_time' => '09:00',
                     'end_time' => '13:00',
@@ -9265,14 +11322,14 @@ class DoctorClinicScheduleSeeder extends Seeder
                 ]
             ],
             'dr.priya@example.com' => [
-                'City General Hospital' => [
+                'Fortis Hospital' => [
                     'available_days' => ['monday', 'wednesday', 'friday'],
                     'start_time' => '14:00',
                     'end_time' => '18:00',
                     'slot_duration' => 30,
                     'is_active' => true
                 ],
-                'Skin & Beauty Clinic' => [
+                'Manipal Hospital' => [
                     'available_days' => ['tuesday', 'thursday', 'saturday'],
                     'start_time' => '10:00',
                     'end_time' => '17:00',
@@ -9281,14 +11338,14 @@ class DoctorClinicScheduleSeeder extends Seeder
                 ]
             ],
             'dr.arun@example.com' => [
-                'City General Hospital' => [
+                'Manipal Hospital' => [
                     'available_days' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
                     'start_time' => '09:00',
                     'end_time' => '17:00',
                     'slot_duration' => 20,
                     'is_active' => true
                 ],
-                'Wellness Clinic' => [
+                'Columbia Asia Hospital' => [
                     'available_days' => ['saturday'],
                     'start_time' => '10:00',
                     'end_time' => '16:00',
@@ -9297,14 +11354,14 @@ class DoctorClinicScheduleSeeder extends Seeder
                 ]
             ],
             'dr.kavya@example.com' => [
-                'Pediatric Care Center' => [
+                'Columbia Asia Hospital' => [
                     'available_days' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
                     'start_time' => '09:00',
                     'end_time' => '17:00',
                     'slot_duration' => 30,
                     'is_active' => true
                 ],
-                'City General Hospital' => [
+                'Narayana Health City' => [
                     'available_days' => ['saturday'],
                     'start_time' => '10:00',
                     'end_time' => '14:00',
@@ -9313,16 +11370,61 @@ class DoctorClinicScheduleSeeder extends Seeder
                 ]
             ],
             'dr.vikram@example.com' => [
-                'Skin & Beauty Clinic' => [
+                'Narayana Health City' => [
                     'available_days' => ['monday', 'wednesday', 'friday'],
                     'start_time' => '11:00',
                     'end_time' => '18:00',
                     'slot_duration' => 45,
                     'is_active' => true
                 ],
-                'Wellness Clinic' => [
+                'Sakra World Hospital' => [
                     'available_days' => ['tuesday', 'thursday'],
                     'start_time' => '14:00',
+                    'end_time' => '17:00',
+                    'slot_duration' => 30,
+                    'is_active' => true
+                ]
+            ],
+            'dr.sunita@example.com' => [
+                'Apollo Health City' => [
+                    'available_days' => ['tuesday', 'thursday', 'saturday'],
+                    'start_time' => '09:00',
+                    'end_time' => '15:00',
+                    'slot_duration' => 30,
+                    'is_active' => true
+                ]
+            ],
+            'dr.ramesh@example.com' => [
+                'Fortis Hospital' => [
+                    'available_days' => ['monday', 'wednesday', 'friday'],
+                    'start_time' => '10:00',
+                    'end_time' => '16:00',
+                    'slot_duration' => 45,
+                    'is_active' => true
+                ]
+            ],
+            'dr.pradhan@example.com' => [
+                'Manipal Hospital' => [
+                    'available_days' => ['tuesday', 'thursday', 'saturday'],
+                    'start_time' => '10:00',
+                    'end_time' => '17:00',
+                    'slot_duration' => 30,
+                    'is_active' => true
+                ]
+            ],
+            'dr.mishra@example.com' => [
+                'Sakra World Hospital' => [
+                    'available_days' => ['monday', 'wednesday', 'friday'],
+                    'start_time' => '12:00',
+                    'end_time' => '18:00',
+                    'slot_duration' => 40,
+                    'is_active' => true
+                ]
+            ],
+            'dr.behera@example.com' => [
+                'Narayana Health City' => [
+                    'available_days' => ['tuesday', 'thursday', 'saturday'],
+                    'start_time' => '11:00',
                     'end_time' => '17:00',
                     'slot_duration' => 30,
                     'is_active' => true
@@ -9347,12 +11449,16 @@ class DoctorClinicScheduleSeeder extends Seeder
                             'created_at' => now(),
                             'updated_at' => now()
                         ]);
+                    } else {
+                        $this->command->warn("Clinic '{$clinicName}' not found for doctor {$doctorEmail}");
                     }
                 }
+            } else {
+                $this->command->warn("Doctor with email {$doctorEmail} not found");
             }
         }
 
-        $this->command->info('✅ Doctor-Clinic schedules seeded successfully!');
+        $this->command->info('✅ Doctor-Clinic schedules seeded successfully for Odisha locations!');
     }
 }
 ```
@@ -9379,9 +11485,9 @@ class AppointmentSeeder extends Seeder
 
         $appointmentsData = [
             [
-                'patient_email' => 'john@example.com',
+                'patient_email' => 'rahul@example.com',
                 'doctor_email' => 'dr.rajesh@example.com',
-                'clinic_name' => 'City General Hospital',
+                'clinic_name' => 'Apollo Health City',
                 'appointment_date' => Carbon::today()->addDays(1)->format('Y-m-d'),
                 'appointment_time' => '10:00',
                 'status' => 'confirmed',
@@ -9389,9 +11495,9 @@ class AppointmentSeeder extends Seeder
                 'payment_status' => 'paid'
             ],
             [
-                'patient_email' => 'jane@example.com',
+                'patient_email' => 'shreya@example.com',
                 'doctor_email' => 'dr.priya@example.com',
-                'clinic_name' => 'Skin & Beauty Clinic',
+                'clinic_name' => 'Fortis Hospital',
                 'appointment_date' => Carbon::today()->addDays(2)->format('Y-m-d'),
                 'appointment_time' => '14:30',
                 'status' => 'pending',
@@ -9399,9 +11505,9 @@ class AppointmentSeeder extends Seeder
                 'payment_status' => 'pending'
             ],
             [
-                'patient_email' => 'robert@example.com',
+                'patient_email' => 'amit@example.com',
                 'doctor_email' => 'dr.arun@example.com',
-                'clinic_name' => 'Wellness Clinic',
+                'clinic_name' => 'Manipal Hospital',
                 'appointment_date' => Carbon::today()->addDays(3)->format('Y-m-d'),
                 'appointment_time' => '11:00',
                 'status' => 'confirmed',
@@ -9409,9 +11515,9 @@ class AppointmentSeeder extends Seeder
                 'payment_status' => 'paid'
             ],
             [
-                'patient_email' => 'emily@example.com',
+                'patient_email' => 'priyanka@example.com',
                 'doctor_email' => 'dr.kavya@example.com',
-                'clinic_name' => 'Pediatric Care Center',
+                'clinic_name' => 'Columbia Asia Hospital',
                 'appointment_date' => Carbon::today()->addDays(1)->format('Y-m-d'),
                 'appointment_time' => '15:00',
                 'status' => 'confirmed',
@@ -9419,13 +11525,63 @@ class AppointmentSeeder extends Seeder
                 'payment_status' => 'paid'
             ],
             [
-                'patient_email' => 'michael@example.com',
+                'patient_email' => 'sanjay@example.com',
                 'doctor_email' => 'dr.vikram@example.com',
-                'clinic_name' => 'Skin & Beauty Clinic',
+                'clinic_name' => 'Narayana Health City',
                 'appointment_date' => Carbon::today()->addDays(4)->format('Y-m-d'),
                 'appointment_time' => '16:00',
                 'status' => 'pending',
                 'symptoms' => '✨ Laser treatment consultation for skin pigmentation',
+                'payment_status' => 'pending'
+            ],
+            [
+                'patient_email' => 'rahul@example.com',
+                'doctor_email' => 'dr.sunita@example.com',
+                'clinic_name' => 'Apollo Health City',
+                'appointment_date' => Carbon::today()->addDays(5)->format('Y-m-d'),
+                'appointment_time' => '09:30',
+                'status' => 'confirmed',
+                'symptoms' => '💖 Heart palpitations and irregular heartbeat concerns',
+                'payment_status' => 'paid'
+            ],
+            [
+                'patient_email' => 'shreya@example.com',
+                'doctor_email' => 'dr.ramesh@example.com',
+                'clinic_name' => 'Fortis Hospital',
+                'appointment_date' => Carbon::today()->addDays(6)->format('Y-m-d'),
+                'appointment_time' => '12:00',
+                'status' => 'pending',
+                'symptoms' => '🦴 Knee joint pain and mobility issues after sports injury',
+                'payment_status' => 'pending'
+            ],
+            [
+                'patient_email' => 'amit@example.com',
+                'doctor_email' => 'dr.pradhan@example.com',
+                'clinic_name' => 'Manipal Hospital',
+                'appointment_date' => Carbon::today()->addDays(7)->format('Y-m-d'),
+                'appointment_time' => '10:30',
+                'status' => 'confirmed',
+                'symptoms' => '👩 Routine gynecological checkup and women\'s health consultation',
+                'payment_status' => 'paid'
+            ],
+            [
+                'patient_email' => 'priyanka@example.com',
+                'doctor_email' => 'dr.mishra@example.com',
+                'clinic_name' => 'Sakra World Hospital',
+                'appointment_date' => Carbon::today()->addDays(8)->format('Y-m-d'),
+                'appointment_time' => '14:00',
+                'status' => 'confirmed',
+                'symptoms' => '🧠 Frequent headaches and neurological symptoms evaluation',
+                'payment_status' => 'paid'
+            ],
+            [
+                'patient_email' => 'sanjay@example.com',
+                'doctor_email' => 'dr.behera@example.com',
+                'clinic_name' => 'Narayana Health City',
+                'appointment_date' => Carbon::today()->addDays(9)->format('Y-m-d'),
+                'appointment_time' => '11:30',
+                'status' => 'pending',
+                'symptoms' => '👂 Hearing problems and ear infection treatment needed',
                 'payment_status' => 'pending'
             ]
         ];
@@ -9433,24 +11589,36 @@ class AppointmentSeeder extends Seeder
         foreach ($appointmentsData as $appointmentData) {
             $patient = $patients->where('email', $appointmentData['patient_email'])->first();
             $doctor = $doctors->where('user.email', $appointmentData['doctor_email'])->first();
-            $clinic = $doctor?->clinics->where('name', $appointmentData['clinic_name'])->first();
-
-            if ($patient && $doctor && $clinic) {
-                Appointment::create([
-                    'patient_id' => $patient->id,
-                    'doctor_id' => $doctor->id,
-                    'clinic_id' => $clinic->id,
-                    'appointment_date' => $appointmentData['appointment_date'],
-                    'appointment_time' => $appointmentData['appointment_time'],
-                    'status' => $appointmentData['status'],
-                    'symptoms' => $appointmentData['symptoms'],
-                    'amount' => $doctor->consultation_fee,
-                    'payment_status' => $appointmentData['payment_status']
-                ]);
+            
+            if ($patient && $doctor) {
+                $clinic = $doctor->clinics->where('name', $appointmentData['clinic_name'])->first();
+                
+                if ($clinic) {
+                    Appointment::create([
+                        'patient_id' => $patient->id,
+                        'doctor_id' => $doctor->id,
+                        'clinic_id' => $clinic->id,
+                        'appointment_date' => $appointmentData['appointment_date'],
+                        'appointment_time' => $appointmentData['appointment_time'],
+                        'symptoms' => $appointmentData['symptoms'],
+                        'amount' => $doctor->consultation_fee,
+                        'status' => $appointmentData['status'],
+                        'payment_status' => $appointmentData['payment_status']
+                    ]);
+                } else {
+                    $this->command->warn("Clinic '{$appointmentData['clinic_name']}' not found for doctor {$appointmentData['doctor_email']}");
+                }
+            } else {
+                if (!$patient) {
+                    $this->command->warn("Patient with email {$appointmentData['patient_email']} not found. Skipping appointment.");
+                }
+                if (!$doctor) {
+                    $this->command->warn("Doctor with email {$appointmentData['doctor_email']} not found. Skipping appointment.");
+                }
             }
         }
 
-        $this->command->info('✅ Sample appointments seeded successfully!');
+        $this->command->info('✅ Sample appointments seeded successfully for Odisha healthcare system!');
     }
 }
 ```
