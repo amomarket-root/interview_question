@@ -2850,17 +2850,60 @@ export const whyChooseFeatures = [
 
 ```jsx
 import React from 'react';
-import { Box } from '@mui/material';
+import { Box, useTheme, useMediaQuery } from '@mui/material';
 import Header from '../common/Header';
 import Footer from '../common/Footer';
 
-const MainLayout = ({ children }) => {
+const MainLayout = ({ children, disableGutters = false, maxWidth = "lg", sx = {} }) => {
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+    const isSmallMobile = useMediaQuery(theme.breakpoints.down('sm'));
+    const isTablet = useMediaQuery(theme.breakpoints.between('sm', 'md'));
+
+    // Calculate appropriate top padding based on device type - REDUCED VALUES
+    const getTopPadding = () => {
+        if (isSmallMobile) return '40px'; // Reduced from 60px
+        if (isMobile) return '60px'; // Reduced from 100px  
+        if (isTablet) return '50px'; // Reduced from 80px
+        return '0px'; // Desktop header height remains same
+    };
+
     return (
-        <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+        <Box 
+            sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: '100vh',
+                width: '100%',
+                overflowX: 'hidden',
+                ...sx
+            }}
+        >
+            {/* Header - Fixed */}
             <Header />
-            <Box component="main" sx={{ flexGrow: 1 }}>
+            
+            {/* Main Content Area */}
+            <Box
+                component="main"
+                sx={{
+                    flexGrow: 1,
+                    width: '100%',
+                    paddingTop: getTopPadding(), // Dynamic padding based on screen size - REDUCED
+                    paddingX: disableGutters ? 0 : { xs: 1, sm: 2, md: 3 },
+                    minHeight: `calc(100vh - ${getTopPadding()})`,
+                    // Ensure content doesn't get cut off on mobile
+                    position: 'relative',
+                    zIndex: 1,
+                    // Add safe area for notched devices - with reduced padding
+                    '@supports (padding: max(0px))': {
+                        paddingTop: `max(${getTopPadding()}, env(safe-area-inset-top))`,
+                    }
+                }}
+            >
                 {children}
             </Box>
+            
+            {/* Footer */}
             <Footer />
         </Box>
     );
@@ -3946,6 +3989,7 @@ import {
     Accordion,
     AccordionSummary,
     AccordionDetails,
+    IconButton,
 } from '@mui/material';
 import {
     Person,
@@ -4021,6 +4065,13 @@ const DoctorDetailPage = () => {
         }
     };
 
+    // Safe number conversion for ratings
+    const safeRating = (rating) => {
+        if (rating === null || rating === undefined) return 0;
+        const numRating = typeof rating === 'string' ? parseFloat(rating) : rating;
+        return isNaN(numRating) ? 0 : numRating;
+    };
+
     const renderDoctorInfo = () => (
         <Grid container spacing={4}>
             <Grid item xs={12} md={4}>
@@ -4057,9 +4108,9 @@ const DoctorDetailPage = () => {
                     )}
                     
                     <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mb: 2 }}>
-                        <Rating value={doctor.rating} precision={0.1} readOnly />
+                        <Rating value={safeRating(doctor.rating)} precision={0.1} readOnly />
                         <Typography variant="body1" sx={{ ml: 1 }}>
-                            ⭐ {doctor.rating} ({doctor.total_reviews} reviews)
+                            ⭐ {safeRating(doctor.rating)} ({doctor.total_reviews} reviews)
                         </Typography>
                     </Box>
                     
@@ -4143,7 +4194,10 @@ const DoctorDetailPage = () => {
             
             {doctor.clinics.map((clinic, index) => (
                 <Accordion key={clinic.id} elevation={3} sx={{ mb: 2 }}>
-                    <AccordionSummary expandIcon={<ExpandMore />}>
+                    <AccordionSummary 
+                        expandIcon={<ExpandMore />}
+                        sx={{ '& .MuiAccordionSummary-content': { alignItems: 'center' } }}
+                    >
                         <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
                             <LocalHospital sx={{ mr: 2, color: 'primary.main' }} />
                             <Box sx={{ flexGrow: 1 }}>
@@ -4154,17 +4208,6 @@ const DoctorDetailPage = () => {
                                     📍 {clinic.address}
                                 </Typography>
                             </Box>
-                            <Button
-                                variant="contained"
-                                startIcon={<CalendarToday />}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleBookAppointment(clinic);
-                                }}
-                                sx={{ ml: 2, color: 'white' }}
-                            >
-                                📅 Book Here
-                            </Button>
                         </Box>
                     </AccordionSummary>
                     <AccordionDetails>
@@ -4221,6 +4264,17 @@ const DoctorDetailPage = () => {
                                 </Box>
                             </Box>
                         )}
+                        
+                        <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
+                            <Button
+                                variant="contained"
+                                startIcon={<CalendarToday />}
+                                onClick={() => handleBookAppointment(clinic)}
+                                sx={{ color: 'white' }}
+                            >
+                                📅 Book Here
+                            </Button>
+                        </Box>
                     </AccordionDetails>
                 </Accordion>
             ))}
@@ -4836,10 +4890,8 @@ const BookAppointmentPage = () => {
                                                 Date.now() +
                                                     30 * 24 * 60 * 60 * 1000
                                             )
-                                        } // 30 days from now
-                                        slots={{
-                                            textField: TextField,
-                                        }}
+                                        }
+                                        enableAccessibleFieldDOMStructure={false}
                                         slotProps={{
                                             textField: {
                                                 fullWidth: true,
@@ -6000,6 +6052,8 @@ import {
     MenuItem,
     TextField,
     Button,
+    Card,
+    CardContent,
     Avatar,
     Chip,
     Rating,
@@ -6017,7 +6071,7 @@ import {
     Search, 
     LocationOn, 
     LocalHospital, 
-    Person, 
+    Person,
     Verified,
     AccessTime
 } from '@mui/icons-material';
@@ -6027,36 +6081,36 @@ const SearchSection = () => {
     const navigate = useNavigate();
     const apiUrl = import.meta.env.VITE_API_URL;
 
-    // Search functionality states
+    // NEW: Search functionality states
     const [searchType, setSearchType] = useState('both'); // 'doctors', 'clinics', 'both'
+    const [specializations, setSpecializations] = useState([]);
+    const [loading, setLoading] = useState(false);
+
+    // OLD: Original states
     const [selectedSpecialty, setSelectedSpecialty] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [showResults, setShowResults] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const [specializations, setSpecializations] = useState([]);
-    
-    // Animation states (from old UI)
     const [currentWordIndex, setCurrentWordIndex] = useState(0);
     const [displayedText, setDisplayedText] = useState('');
     const [isTyping, setIsTyping] = useState(true);
 
-    // Words to cycle through (from old UI)
+    // OLD: Words to cycle through
     const words = ['Healthcare', 'Doctor'];
     
-    // Static parts of the title and subtitle (from old UI)
+    // OLD: Static parts of the title and subtitle
     const titleTemplate = 'Find _ Near You';
     const subtitles = [
-        "🔍 Discover verified doctors and top-rated clinics in your area with smart location-based search",
-        "📅 Connect with qualified medical professionals and book appointments at your convenience"
+        "Discover verified doctors and top-rated clinics in your area with smart location-based search",
+        "Connect with qualified medical professionals and book appointments at your convenience"
     ];
 
-    // Load specializations on component mount
+    // NEW: Load specializations on component mount
     useEffect(() => {
         loadSpecializations();
     }, []);
 
-    // Typewriter effect with slower speed (from old UI)
+    // OLD: Typewriter effect with slower speed
     useEffect(() => {
         const currentWord = words[currentWordIndex];
         let currentIndex = 0;
@@ -6082,15 +6136,22 @@ const SearchSection = () => {
         return () => clearInterval(typingInterval);
     }, [currentWordIndex]);
 
+    // NEW: Load specializations function
     const loadSpecializations = async () => {
         try {
             const response = await axios.get(`${apiUrl}/doctors/specializations`);
             setSpecializations(response.data);
         } catch (error) {
             console.error('Failed to load specializations:', error);
+            // Fallback to old static data if API fails
+            setSpecializations([
+                'Cardiology', 'Dermatology', 'Endocrinology', 'Gastroenterology',
+                'Neurology', 'Orthopedics', 'Pediatrics', 'Psychiatry'
+            ]);
         }
     };
 
+    // NEW: Updated search function with API calls
     const handleSearch = async () => {
         if (!searchQuery.trim() && !selectedSpecialty) {
             return;
@@ -6104,42 +6165,64 @@ const SearchSection = () => {
             
             // Search doctors if type is 'doctors' or 'both'
             if (searchType === 'doctors' || searchType === 'both') {
-                const doctorParams = {
-                    search: searchQuery,
-                    specialization: selectedSpecialty,
-                    per_page: 5
-                };
+                try {
+                    const doctorParams = {
+                        search: searchQuery,
+                        specialization: selectedSpecialty,
+                        per_page: 5
+                    };
 
-                const doctorResponse = await axios.get(`${apiUrl}/doctors`, {
-                    params: doctorParams
-                });
+                    const doctorResponse = await axios.get(`${apiUrl}/doctors`, {
+                        params: doctorParams
+                    });
 
-                const doctors = doctorResponse.data.data.map(doctor => ({
-                    ...doctor,
-                    type: 'doctor'
-                }));
+                    const doctors = doctorResponse.data.data.map(doctor => ({
+                        ...doctor,
+                        type: 'doctor',
+                        // Map API fields to old UI expected fields for compatibility
+                        name: doctor.user?.name || doctor.name,
+                        specialty: doctor.specialization,
+                        experience: doctor.experience_years,
+                        rating: parseFloat(doctor.rating) || 0,
+                        reviewCount: doctor.total_reviews || 0,
+                        fee: doctor.consultation_fee,
+                        nextAvailable: 'Available for appointments',
+                        isVerified: doctor.is_verified,
+                        image: doctor.profile_image
+                    }));
 
-                results.push(...doctors);
+                    results.push(...doctors);
+                } catch (doctorError) {
+                    console.error('Doctor search failed:', doctorError);
+                }
             }
 
             // Search clinics if type is 'clinics' or 'both'
             if (searchType === 'clinics' || searchType === 'both') {
-                const clinicParams = {
-                    search: searchQuery,
-                    specialty: selectedSpecialty,
-                    per_page: 5
-                };
+                try {
+                    const clinicParams = {
+                        search: searchQuery,
+                        specialty: selectedSpecialty,
+                        per_page: 5
+                    };
 
-                const clinicResponse = await axios.get(`${apiUrl}/clinics`, {
-                    params: clinicParams
-                });
+                    const clinicResponse = await axios.get(`${apiUrl}/clinics`, {
+                        params: clinicParams
+                    });
 
-                const clinics = clinicResponse.data.data.map(clinic => ({
-                    ...clinic,
-                    type: 'clinic'
-                }));
+                    const clinics = clinicResponse.data.data.map(clinic => ({
+                        ...clinic,
+                        type: 'clinic',
+                        // Map API fields to old UI expected fields for compatibility
+                        rating: parseFloat(clinic.rating) || 0,
+                        reviewCount: clinic.total_reviews || 0,
+                        distance: clinic.distance_km ? `${clinic.distance_km} km` : 'Near you'
+                    }));
 
-                results.push(...clinics);
+                    results.push(...clinics);
+                } catch (clinicError) {
+                    console.error('Clinic search failed:', clinicError);
+                }
             }
 
             setSearchResults(results);
@@ -6157,6 +6240,7 @@ const SearchSection = () => {
         }
     };
 
+    // NEW: Updated result click handler with navigation
     const handleResultClick = (result) => {
         if (result.type === 'doctor') {
             navigate(`/doctor/${result.id}`);
@@ -6165,7 +6249,7 @@ const SearchSection = () => {
         }
     };
 
-    // Function to render the animated title (from old UI)
+    // OLD: Function to render the animated title
     const renderAnimatedTitle = () => {
         const parts = titleTemplate.split('_');
         return (
@@ -6195,7 +6279,7 @@ const SearchSection = () => {
         );
     };
 
-    // Safe number conversion for ratings
+    // NEW: Safe number conversion for ratings
     const safeRating = (rating) => {
         const numRating = typeof rating === 'string' ? parseFloat(rating) : rating;
         return isNaN(numRating) ? 0 : numRating;
@@ -6210,13 +6294,12 @@ const SearchSection = () => {
                     boxShadow: '0 8px 32px 0 rgba(16,217,21,0.10), 0 1.5px 4px 0 rgba(60,60,60,0.10)',
                     borderRadius: 5,
                     py: { xs: 8, md: 12 },
-                    pt: { xs: '125px', md: '85px' },
                     position: 'relative',
                     overflow: 'hidden',
                 }}
             >
                 <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1 }}>
-                    {/* Hero Content with Typewriter Animation (from old UI) */}
+                    {/* OLD: Hero Content with Typewriter Animation */}
                     <Box textAlign="center" mb={6}>
                         <Typography 
                             variant="h2" 
@@ -6250,11 +6333,11 @@ const SearchSection = () => {
                         </Typography>
                     </Box>
 
-                    {/* Search Form (updated with new functionality) */}
+                    {/* MIXED: Search Form - Old UI with New Functionality - Mobile Optimized */}
                     <Paper 
                         elevation={8} 
                         sx={{ 
-                            p: { xs: 3, md: 4 }, 
+                            p: { xs: 2, md: 4 }, 
                             borderRadius: 3,
                             background: 'rgba(255, 255, 255, 0.98)',
                             backdropFilter: 'blur(10px)',
@@ -6262,11 +6345,11 @@ const SearchSection = () => {
                             mx: 'auto'
                         }}
                     >
-                        <Grid container spacing={3} alignItems="end">
-                            {/* Search Type Dropdown (new functionality) */}
-                            <Grid item xs={12} md={2}>
-                                <Typography variant="subtitle2" color="text.primary" gutterBottom>
-                                    🔍 Search Type
+                        <Grid container spacing={2} alignItems="end">
+                            {/* NEW: Search Type Dropdown - NOW VISIBLE ON MOBILE */}
+                            <Grid item xs={6} sm={6} md={2}>
+                                <Typography variant="subtitle2" color="text.primary" gutterBottom sx={{ fontSize: { xs: '0.8rem', md: '0.875rem' } }}>
+                                    Type
                                 </Typography>
                                 <FormControl fullWidth>
                                     <Select
@@ -6274,22 +6357,23 @@ const SearchSection = () => {
                                         onChange={(e) => setSearchType(e.target.value)}
                                         sx={{ 
                                             borderRadius: 2,
+                                            fontSize: { xs: '0.85rem', md: '1rem' },
                                             '& .MuiOutlinedInput-root': {
                                                 '& fieldset': { borderColor: 'rgba(0,0,0,0.07)' },
                                             }
                                         }}
                                     >
-                                        <MenuItem value="both">🌟 Both</MenuItem>
-                                        <MenuItem value="doctors">👨‍⚕️ Doctors</MenuItem>
-                                        <MenuItem value="clinics">🏥 Clinics</MenuItem>
+                                        <MenuItem value="both">Both</MenuItem>
+                                        <MenuItem value="doctors">Doctors</MenuItem>
+                                        <MenuItem value="clinics">Clinics</MenuItem>
                                     </Select>
                                 </FormControl>
                             </Grid>
 
-                            {/* Specialty Dropdown (updated with real data) */}
-                            <Grid item xs={12} md={3}>
-                                <Typography variant="subtitle2" color="text.primary" gutterBottom>
-                                    🩺 Medical Specialty
+                            {/* MIXED: Specialty Dropdown - Mobile Optimized */}
+                            <Grid item xs={6} sm={6} md={3}>
+                                <Typography variant="subtitle2" color="text.primary" gutterBottom sx={{ fontSize: { xs: '0.8rem', md: '0.875rem' } }}>
+                                    Specialty
                                 </Typography>
                                 <FormControl fullWidth>
                                     <Select
@@ -6298,25 +6382,26 @@ const SearchSection = () => {
                                         displayEmpty
                                         sx={{ 
                                             borderRadius: 2,
+                                            fontSize: { xs: '0.85rem', md: '1rem' },
                                             '& .MuiOutlinedInput-root': {
                                                 '& fieldset': { borderColor: 'rgba(0,0,0,0.07)' },
                                             }
                                         }}
                                     >
-                                        <MenuItem value="">🌟 All Specialties</MenuItem>
+                                        <MenuItem value="">All Specialties</MenuItem>
                                         {specializations.map((specialty) => (
                                             <MenuItem key={specialty} value={specialty}>
-                                                🩺 {specialty}
+                                                {specialty}
                                             </MenuItem>
                                         ))}
                                     </Select>
                                 </FormControl>
                             </Grid>
 
-                            {/* Search Field (same as old UI) */}
-                            <Grid item xs={12} md={5}>
-                                <Typography variant="subtitle2" color="text.primary" gutterBottom>
-                                    🔍 Search Doctor or Clinic
+                            {/* OLD: Search Field - Mobile Optimized */}
+                            <Grid item xs={12} sm={8} md={5}>
+                                <Typography variant="subtitle2" color="text.primary" gutterBottom sx={{ fontSize: { xs: '0.8rem', md: '0.875rem' } }}>
+                                    Search Doctor or Clinic
                                 </Typography>
                                 <TextField
                                     fullWidth
@@ -6327,28 +6412,30 @@ const SearchSection = () => {
                                     sx={{ 
                                         '& .MuiOutlinedInput-root': { 
                                             borderRadius: 2,
+                                            fontSize: { xs: '0.9rem', md: '1rem' },
                                             '& fieldset': { borderColor: 'rgba(0,0,0,0.07)' },
                                         }
                                     }}
                                     InputProps={{
-                                        startAdornment: <Search sx={{ mr: 1, color: 'action.active' }} />
+                                        startAdornment: <Search sx={{ mr: 1, color: 'action.active', fontSize: { xs: '1.2rem', md: '1.5rem' } }} />
                                     }}
                                 />
                             </Grid>
 
-                            {/* Search Button (updated with loading state) */}
-                            <Grid item xs={12} md={2}>
+                            {/* MIXED: Search Button - Mobile Optimized */}
+                            <Grid item xs={12} sm={4} md={2}>
                                 <Button
                                     fullWidth
                                     variant="contained"
                                     size="large"
                                     onClick={handleSearch}
                                     disabled={loading}
-                                    startIcon={loading ? <CircularProgress size={20} /> : <Search />}
+                                    startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
                                     sx={{ 
-                                        py: 1.8,
+                                        py: { xs: 1.5, md: 1.8 },
                                         borderRadius: 2,
                                         fontWeight: 600,
+                                        fontSize: { xs: '0.9rem', md: '1rem' },
                                         boxShadow: 3,
                                         color: "white",
                                         '&:hover': { boxShadow: 6 }
@@ -6359,16 +6446,16 @@ const SearchSection = () => {
                             </Grid>
                         </Grid>
 
-                        {/* Search Results (Fixed DOM nesting issues) */}
+                        {/* MIXED: Search Results - Mobile Optimized */}
                         <Collapse in={showResults}>
                             <Box sx={{ mt: 4, pt: 3, borderTop: '1px solid rgba(0,0,0,0.08)' }}>
-                                <Typography variant="h6" gutterBottom color="text.primary">
-                                    📊 Search Results ({searchResults.length})
+                                <Typography variant="h6" gutterBottom color="text.primary" sx={{ fontSize: { xs: '1.1rem', md: '1.25rem' } }}>
+                                    Search Results ({searchResults.length})
                                 </Typography>
                                 
                                 <Paper 
                                     sx={{ 
-                                        maxHeight: 400, 
+                                        maxHeight: { xs: 350, md: 400 },
                                         overflow: 'auto',
                                         border: '1px solid rgba(0,0,0,0.07)',
                                         borderRadius: 2
@@ -6377,14 +6464,16 @@ const SearchSection = () => {
                                     <List disablePadding>
                                         {searchResults.map((result, index) => (
                                             <React.Fragment key={`${result.type}-${result.id}`}>
-                                                <ListItem disablePadding>
+                                                <ListItem 
+                                                    disablePadding
+                                                >
                                                     <ButtonBase
                                                         component="div"
                                                         onClick={() => handleResultClick(result)}
                                                         sx={{
                                                             width: '100%',
-                                                            py: 2,
-                                                            px: 2,
+                                                            py: { xs: 1.5, md: 2 },
+                                                            px: { xs: 1.5, md: 2 },
                                                             display: 'flex',
                                                             alignItems: 'flex-start',
                                                             textAlign: 'left',
@@ -6393,12 +6482,12 @@ const SearchSection = () => {
                                                             }
                                                         }}
                                                     >
-                                                        <ListItemAvatar sx={{ mr: 2 }}>
+                                                        <ListItemAvatar sx={{ mr: { xs: 1, md: 2 } }}>
                                                             <Avatar 
-                                                                src={result.type === 'doctor' ? result.profile_image : result.image}
+                                                                src={result.image || result.profile_image}
                                                                 sx={{ 
-                                                                    width: 60, 
-                                                                    height: 60,
+                                                                    width: { xs: 50, md: 60 },
+                                                                    height: { xs: 50, md: 60 },
                                                                     border: '2px solid',
                                                                     borderColor: result.type === 'doctor' ? '#10d915' : 'secondary.main'
                                                                 }}
@@ -6409,101 +6498,114 @@ const SearchSection = () => {
                                                         
                                                         <ListItemText
                                                             primary={
-                                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                                                                    <Typography variant="h6" component="span">
-                                                                        {result.type === 'doctor' ? '👨‍⚕️' : '🏥'} {result.type === 'doctor' ? result.user?.name : result.name}
+                                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, flexWrap: 'wrap' }}>
+                                                                    <Typography variant="h6" component="span" sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>
+                                                                        {result.name}
                                                                     </Typography>
-                                                                    {result.type === 'doctor' && result.is_verified && (
+                                                                    {result.type === 'doctor' && result.isVerified && (
                                                                         <Chip 
-                                                                            label="✅ Verified" 
+                                                                            label="Verified" 
                                                                             size="small" 
                                                                             color="success" 
-                                                                            icon={<Verified />}
-                                                                            sx={{ fontSize: '0.7rem' }}
+                                                                            icon={<Verified sx={{ fontSize: '0.7rem' }} />}
+                                                                            sx={{ 
+                                                                                fontSize: { xs: '0.6rem', md: '0.7rem' },
+                                                                                height: { xs: '18px', md: '24px' },
+                                                                                color: 'white' 
+                                                                            }}
                                                                         />
                                                                     )}
                                                                 </Box>
                                                             }
                                                             secondary={
-                                                                <Box component="div">
+                                                                <Box>
                                                                     {result.type === 'doctor' ? (
                                                                         <>
-                                                                            <Typography variant="body2" color="primary" component="div">
-                                                                                {result.specialization} • {result.experience_years} years exp.
+                                                                            <Typography variant="body2" color="primary" sx={{ fontSize: { xs: '0.85rem', md: '0.875rem' } }}>
+                                                                                {result.specialty || result.specialization} • {result.experience || result.experience_years} years exp.
                                                                             </Typography>
-                                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1 }}>
+                                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1, flexWrap: 'wrap' }}>
                                                                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                                                    <Rating 
-                                                                                        value={safeRating(result.rating)} 
-                                                                                        precision={0.1} 
-                                                                                        size="small" 
-                                                                                        readOnly 
-                                                                                    />
-                                                                                    <Typography variant="body2" component="span">
-                                                                                        ⭐ {safeRating(result.rating)} ({result.total_reviews || 0} reviews)
+                                                                                    <Rating value={safeRating(result.rating)} precision={0.1} size="small" readOnly />
+                                                                                    <Typography variant="body2" sx={{ fontSize: { xs: '0.8rem', md: '0.875rem' } }}>
+                                                                                        {safeRating(result.rating)} ({result.reviewCount || result.total_reviews || 0} reviews)
                                                                                     </Typography>
                                                                                 </Box>
-                                                                                <Chip 
-                                                                                    label={`💰 ₹${result.consultation_fee}`}
-                                                                                    size="small"
-                                                                                    color="primary"
-                                                                                    variant="outlined"
-                                                                                />
+                                                                                {result.fee && (
+                                                                                    <Chip 
+                                                                                        label={`₹${result.fee}`}
+                                                                                        size="small"
+                                                                                        color="primary"
+                                                                                        variant="outlined"
+                                                                                        sx={{ 
+                                                                                            fontSize: { xs: '0.7rem', md: '0.75rem' },
+                                                                                            height: { xs: '20px', md: '24px' }
+                                                                                        }}
+                                                                                    />
+                                                                                )}
                                                                             </Box>
-                                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
-                                                                                <AccessTime fontSize="small" color="action" />
-                                                                                <Typography variant="caption" color="text.secondary" component="span">
-                                                                                    🕒 Available for appointments
+                                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                                                                                <AccessTime fontSize="small" color="action" sx={{ fontSize: { xs: '1rem', md: '1.2rem' } }} />
+                                                                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', md: '0.75rem' } }}>
+                                                                                    {result.nextAvailable || 'Available for appointments'}
                                                                                 </Typography>
                                                                             </Box>
                                                                         </>
                                                                     ) : (
                                                                         <>
                                                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                                                                                <LocationOn fontSize="small" color="action" />
-                                                                                <Typography variant="body2" component="span">
-                                                                                    📍 {result.address}
+                                                                                <LocationOn fontSize="small" color="action" sx={{ fontSize: { xs: '1rem', md: '1.2rem' } }} />
+                                                                                <Typography variant="body2" sx={{ fontSize: { xs: '0.8rem', md: '0.875rem' } }}>
+                                                                                    {result.address}
                                                                                 </Typography>
                                                                             </Box>
-                                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
                                                                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                                                    <Rating 
-                                                                                        value={safeRating(result.rating)} 
-                                                                                        precision={0.1} 
-                                                                                        size="small" 
-                                                                                        readOnly 
-                                                                                    />
-                                                                                    <Typography variant="body2" component="span">
-                                                                                        ⭐ {safeRating(result.rating)} ({result.total_reviews || 0} reviews)
+                                                                                    <Rating value={safeRating(result.rating)} precision={0.1} size="small" readOnly />
+                                                                                    <Typography variant="body2" sx={{ fontSize: { xs: '0.8rem', md: '0.875rem' } }}>
+                                                                                        {safeRating(result.rating)} ({result.reviewCount || result.total_reviews || 0} reviews)
                                                                                     </Typography>
                                                                                 </Box>
-                                                                                {result.distance_km && (
+                                                                                {result.distance && (
                                                                                     <Chip 
-                                                                                        label={`📍 ${result.distance_km} km`}
+                                                                                        label={result.distance}
                                                                                         size="small"
                                                                                         color="info"
                                                                                         variant="outlined"
+                                                                                        sx={{ 
+                                                                                            fontSize: { xs: '0.7rem', md: '0.75rem' },
+                                                                                            height: { xs: '20px', md: '24px' }
+                                                                                        }}
                                                                                     />
                                                                                 )}
                                                                             </Box>
-                                                                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
-                                                                                {result.specialties && result.specialties.slice(0, 3).map((specialty, idx) => (
-                                                                                    <Chip 
-                                                                                        key={idx} 
-                                                                                        label={specialty} 
-                                                                                        size="small" 
-                                                                                        variant="outlined"
-                                                                                        sx={{ fontSize: '0.7rem', height: '22px' }}
-                                                                                    />
-                                                                                ))}
-                                                                                {result.specialties && result.specialties.length > 3 && (
-                                                                                    <Chip 
-                                                                                        label={`+${result.specialties.length - 3} more`} 
-                                                                                        size="small"
-                                                                                        sx={{ fontSize: '0.7rem', height: '22px' }}
-                                                                                    />
-                                                                                )}
-                                                                            </Box>
+                                                                            {/* Show specialties for clinics */}
+                                                                            {result.specialties && result.specialties.length > 0 && (
+                                                                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
+                                                                                    {result.specialties.slice(0, 3).map((specialty, idx) => (
+                                                                                        <Chip 
+                                                                                            key={idx} 
+                                                                                            label={specialty} 
+                                                                                            size="small" 
+                                                                                            variant="outlined"
+                                                                                            sx={{ 
+                                                                                                fontSize: { xs: '0.6rem', md: '0.7rem' },
+                                                                                                height: { xs: '18px', md: '22px' }
+                                                                                            }}
+                                                                                        />
+                                                                                    ))}
+                                                                                    {result.specialties.length > 3 && (
+                                                                                        <Chip 
+                                                                                            label={`+${result.specialties.length - 3} more`} 
+                                                                                            size="small"
+                                                                                            sx={{ 
+                                                                                                fontSize: { xs: '0.6rem', md: '0.7rem' },
+                                                                                                height: { xs: '18px', md: '22px' }
+                                                                                            }}
+                                                                                        />
+                                                                                    )}
+                                                                                </Box>
+                                                                            )}
                                                                         </>
                                                                     )}
                                                                 </Box>
@@ -6514,20 +6616,31 @@ const SearchSection = () => {
                                                 {index < searchResults.length - 1 && <Divider />}
                                             </React.Fragment>
                                         ))}
+
+                                        {/* NEW: No results message */}
                                         {searchResults.length === 0 && showResults && !loading && (
                                             <ListItem>
                                                 <ListItemText
                                                     primary={
-                                                        <Typography variant="h6" color="text.secondary" textAlign="center">
-                                                            🔍 No results found
+                                                        <Typography variant="h6" color="text.secondary" textAlign="center" sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>
+                                                            No results found
                                                         </Typography>
                                                     }
                                                     secondary={
-                                                        <Typography variant="body2" color="text.secondary" textAlign="center">
-                                                            Try adjusting your search criteria or browse our featured doctors and clinics below.
+                                                        <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ fontSize: { xs: '0.8rem', md: '0.875rem' } }}>
+                                                            Try adjusting your search criteria or browse our featured doctors and clinics.
                                                         </Typography>
                                                     }
                                                 />
+                                            </ListItem>
+                                        )}
+
+                                        {/* NEW: Loading state */}
+                                        {loading && (
+                                            <ListItem>
+                                                <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%', py: 2 }}>
+                                                    <CircularProgress />
+                                                </Box>
                                             </ListItem>
                                         )}
                                     </List>
@@ -6538,7 +6651,7 @@ const SearchSection = () => {
                 </Container>
             </Box>
 
-            {/* Regular CSS instead of styled-jsx (from old UI) */}
+            {/* OLD: Regular CSS for animations */}
             <style>{`
                 @keyframes blink {
                     0%, 50% {
