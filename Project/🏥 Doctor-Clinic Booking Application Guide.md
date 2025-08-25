@@ -1,15 +1,119 @@
+# 📋 Visit Care Application - Complete Enhanced Documentation
 
-# 🏥 Doctor-Clinic Booking Application Guide (Updated with Vite + React Integration)
+## 🎯 Project Overview
 
-## 📋 Project Overview
-
-A comprehensive medical appointment booking system with Laravel backend integrated with Vite + React frontend, featuring doctor/clinic search, availability management, and appointment booking with map integration. All primary keys will use UUIDs.
+A comprehensive medical appointment booking system with Laravel backend integrated with Vite + React frontend using Material-UI, featuring doctor/clinic search, availability management, and appointment booking with beautiful icons and enhanced UI. All primary keys use UUIDs with proper Sanctum authentication support.
 
 ***
 
-## 🔧 Backend (Laravel) Setup with Vite + React Integration
+## 📁 Project Structure
 
-### 1. 🚀 Initial Laravel Setup with Vite
+```
+visit_care/
+├── app/
+│   ├── Http/
+│   │   └── Controllers/
+│   │       └── Api/
+│   │           ├── AuthController.php
+|   |           |── SocialAuthController.php
+│   │           ├── DoctorController.php
+│   │           ├── ClinicController.php
+│   │           └── AppointmentController.php
+│   ├── Models/
+│   │   ├── User.php
+|   |   |── SocialProvider.php
+│   │   ├── Doctor.php
+│   │   ├── Clinic.php
+│   │   ├── Appointment.php
+│   │   └── ClinicDoctor.php
+│   └── Services/
+│       └── SocialAuthService.php.php
+│   └── Traits/
+│       └── HasUuid.php
+├── config/
+│   └── cors.php
+├── database/
+│   ├── migrations/
+│   │   ├── xxxx_create_users_table.php
+|   |   ├── xxxx_create_social_providers.php
+│   │   ├── xxxx_create_cache_table.php
+│   │   ├── xxxx_create_jobs_table.php
+│   │   ├── xxxx_create_clinics_table.php
+│   │   ├── xxxx_create_doctors_table.php
+│   │   ├── xxxx_create_clinic_doctor_table.php
+│   │   ├── xxxx_create_appointments_table.php
+│   │   └── xxxx_create_personal_access_tokens_table.php
+│   └── seeders/
+│       ├── DatabaseSeeder.php
+│       ├── UserSeeder.php
+│       ├── ClinicSeeder.php
+│       ├── DoctorSeeder.php
+│       ├── DoctorClinicScheduleSeeder.php
+│       └── AppointmentSeeder.php
+├── resources/
+│   ├── js/
+│   │   ├── components/
+│   │   │   ├── auth/
+│   │   │   │   ├── AuthCallback.jsx
+│   │   │   │   └── LoginModal.jsx
+│   │   │   ├── common/
+│   │   │   │   ├── Header.jsx
+│   │   │   │   └── Footer.jsx
+│   │   │   ├── home/
+│   │   │   │   ├── SearchSection.jsx
+│   │   │   │   ├── NearbySection.jsx
+│   │   │   │   ├── StatsSection.jsx
+│   │   │   │   ├── WhyChooseSection.jsx
+│   │   │   │   ├── TestimonialsSection.jsx
+│   │   │   │   └── LocationMap.jsx
+│   │   │   └── layout/
+│   │   │       └── MainLayout.jsx
+│   │   ├── pages/
+│   │   │   └── HomePage.jsx
+│   │   |    ├── admin/
+│   │   │    |   └── AdminDashboard.jsx
+│   │   |    ├── doctor/
+│   │   │    |   └── DoctorDashboard.jsx
+│   │   |    ├── healthcare/
+│   │   │    |   └── HealthcareDashboard.jsx
+│   │   ├── data/
+│   │   │   └── dummyData.js
+│   │   ├── theme/
+│   │   │   ├── theme.js
+│   │   │   └── theme.css
+│   │   ├── app.jsx
+│   │   └── bootstrap.js
+│   ├── css/
+│   │   └── app.css
+│   └── views/
+│       └── welcome.blade.php
+├── routes/
+|   ├──web.pphp
+│   └── api.php
+├── public/
+│   └── images/
+│       └── common/
+│           ├── visit_care_logo.webp
+│           ├── icon.webp
+│           ├── avatar.webp
+│           ├── apple_app_store.webp
+│           └── google_play_store.webp
+├── Configuration Files:
+│   ├── .env
+│   ├── .env.example
+│   ├── composer.json
+│   ├── package.json
+│   └── vite.config.js
+└── Documentation:
+    └── README.md
+```
+
+
+***
+
+## 🚀 Step-by-Step Installation Guide
+
+### Step 1: Initial Laravel Setup
 
 ```bash
 # Create new Laravel project
@@ -22,85 +126,263 @@ composer require spatie/laravel-permission
 composer require intervention/image
 composer require ramsey/uuid
 php artisan vendor:publish --provider="Laravel\Sanctum\SanctumServiceProvider"
-
-# Remove default Laravel frontend scaffolding and install React with Vite
-npm remove laravel-mix
-npm install
-npm install --save-dev @vitejs/plugin-react
-npm install react react-dom
-npm install @mui/material @emotion/react @emotion/styled
-npm install @mui/icons-material @mui/x-date-pickers
-npm install axios react-router-dom react-query react-hook-form
-npm install leaflet react-leaflet
 ```
 
 
-### 2. ⚙️ Vite Configuration
+### Step 2: Configuration Files
 
-**📄 vite.config.js**
-
-```javascript
-import { defineConfig } from 'vite';
-import laravel from 'laravel-vite-plugin';
-import react from '@vitejs/plugin-react';
-
-export default defineConfig({
-    plugins: [
-        laravel({
-            input: ['resources/css/app.css', 'resources/js/app.jsx'],
-            refresh: true,
-        }),
-        react(),
-    ],
-    resolve: {
-        alias: {
-            '@': '/resources/js',
-        },
-    },
-});
-```
-
-**📄 package.json (Updated)**
+**composer.json**
 
 ```json
 {
-    "private": true,
+    "$schema": "https://getcomposer.org/schema.json",
+    "name": "laravel/laravel",
+    "type": "project",
+    "description": "The skeleton application for the Laravel framework.",
+    "keywords": ["laravel", "framework"],
+    "license": "MIT",
+    "require": {
+        "php": "^8.2",
+        "intervention/image": "^3.11",
+        "laravel/framework": "^12.0",
+        "laravel/sanctum": "^4.2",
+        "laravel/tinker": "^2.10.1",
+        "ramsey/uuid": "^4.9",
+        "spatie/laravel-permission": "^6.21"
+    },
+    "require-dev": {
+        "fakerphp/faker": "^1.23",
+        "laravel/pail": "^1.2.2",
+        "laravel/pint": "^1.13",
+        "laravel/sail": "^1.41",
+        "mockery/mockery": "^1.6",
+        "nunomaduro/collision": "^8.6",
+        "phpunit/phpunit": "^11.5.3"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "app/",
+            "Database\\Factories\\": "database/factories/",
+            "Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
     "scripts": {
-        "build": "vite build",
-        "dev": "vite"
+        "post-autoload-dump": [
+            "@php artisan config:clear",
+            "@php artisan clear-compiled",
+            "@php artisan package:discover --ansi"
+        ],
+        "post-update-cmd": [
+            "@php artisan vendor:publish --tag=laravel-assets --ansi --force"
+        ],
+        "post-root-package-install": [
+            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
+        ],
+        "post-create-project-cmd": [
+            "@php artisan key:generate --ansi",
+            "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
+            "@php artisan migrate --graceful --ansi"
+        ],
+        "dev": [
+            "Composer\\Config::disableProcessTimeout",
+            "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1\" \"php artisan pail --timeout=0\" \"npm run dev\" --names=server,queue,logs,vite"
+        ],
+        "test": [
+            "@php artisan config:clear --ansi",
+            "@php artisan test"
+        ]
     },
-    "devDependencies": {
-        "@vitejs/plugin-react": "^4.0.3",
-        "axios": "^1.1.2",
-        "laravel-vite-plugin": "^0.7.2",
-        "vite": "^4.0.0"
+    "extra": {
+        "laravel": {
+            "dont-discover": []
+        }
     },
-    "dependencies": {
-        "@emotion/react": "^11.11.1",
-        "@emotion/styled": "^11.11.0",
-        "@mui/icons-material": "^5.14.3",
-        "@mui/material": "^5.14.3",
-        "@mui/x-date-pickers": "^6.10.1",
-        "leaflet": "^1.9.4",
-        "react": "^18.2.0",
-        "react-dom": "^18.2.0",
-        "react-hook-form": "^7.45.2",
-        "react-leaflet": "^4.2.1",
-        "react-query": "^3.39.3",
-        "react-router-dom": "^6.14.2"
-    }
+    "config": {
+        "optimize-autoloader": true,
+        "preferred-install": "dist",
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "php-http/discovery": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
 }
 ```
 
 
-### 3. 🗄️ Database Structure with UUID Primary Keys
+### Step 3: Environment Configuration
 
-#### 📝 Migration Files with UUID Support
+**.env**
 
-**🔧 Create UUID Trait**
+```env
+# ==================================================
+# APPLICATION CONFIGURATION
+# ==================================================
+APP_NAME="VISIT CARE"
+APP_ENV=local
+APP_KEY=base64:I7qdQ2C1rTm0Jo/oirVWkFJLyWREeQ+MQFYBR/S1LY4=
+APP_DEBUG=true
+APP_URL=http://localhost:8000
+APP_LOCALE=en
+APP_FALLBACK_LOCALE=en
+APP_FAKER_LOCALE=en_US
+APP_MAINTENANCE_DRIVER=file
+# APP_MAINTENANCE_STORE=database
+
+# ==================================================
+# SERVER CONFIGURATION
+# ==================================================
+PHP_CLI_SERVER_WORKERS=4
+
+# ==================================================
+# SECURITY & ENCRYPTION
+# ==================================================
+BCRYPT_ROUNDS=12
+
+# ==================================================
+# LOGGING CONFIGURATION
+# ==================================================
+LOG_CHANNEL=stack
+LOG_STACK=single
+LOG_DEPRECATIONS_CHANNEL=null
+LOG_LEVEL=debug
+
+# ==================================================
+# DATABASE CONFIGURATION
+# ==================================================
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=visit_care
+DB_USERNAME=root
+DB_PASSWORD=
+
+# ==================================================
+# SESSION CONFIGURATION
+# ==================================================
+SESSION_DRIVER=database
+SESSION_LIFETIME=120
+SESSION_ENCRYPT=false
+SESSION_PATH=/
+SESSION_DOMAIN=null
+
+# ==================================================
+# BROADCASTING & QUEUE CONFIGURATION
+# ==================================================
+BROADCAST_CONNECTION=log
+QUEUE_CONNECTION=database
+
+# ==================================================
+# CACHE & STORAGE CONFIGURATION
+# ==================================================
+CACHE_STORE=database
+# CACHE_PREFIX=
+FILESYSTEM_DISK=local
+
+# ==================================================
+# REDIS CONFIGURATION
+# ==================================================
+REDIS_CLIENT=phpredis
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=null
+REDIS_PORT=6379
+
+# ==================================================
+# MEMCACHED CONFIGURATION
+# ==================================================
+MEMCACHED_HOST=127.0.0.1
+
+# ==================================================
+# MAIL CONFIGURATION
+# ==================================================
+MAIL_MAILER=log
+MAIL_SCHEME=null
+MAIL_HOST=127.0.0.1
+MAIL_PORT=2525
+MAIL_USERNAME=null
+MAIL_PASSWORD=null
+MAIL_FROM_ADDRESS="hello@example.com"
+MAIL_FROM_NAME="${APP_NAME}"
+
+# ==================================================
+# AWS CONFIGURATION
+# ==================================================
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_DEFAULT_REGION=us-east-1
+AWS_BUCKET=
+AWS_USE_PATH_STYLE_ENDPOINT=false
+
+# ==================================================
+# FRONTEND CONFIGURATION (VITE)
+# ==================================================
+VITE_APP_NAME="${APP_NAME}"
+VITE_API_URL=http://localhost:8000/api
+VITE_GOOGLE_API_KEY=AIzaSyA9MaTVJlWIWpINjcgyJl5eS6JDhe60238
+
+# ==================================================
+# SANCTUM CONFIGURATION
+# ==================================================
+SANCTUM_STATEFUL_DOMAINS=localhost:8000
+
+# ==================================================
+# OAUTH PROVIDERS CONFIGURATION
+# ==================================================
+
+# Google OAuth
+GOOGLE_CLIENT_ID=894752065284-gsjf10uier6rlqgh7mg3lnc1g2t6n2sp.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=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
+
+# Facebook OAuth
+FACEBOOK_CLIENT_ID=your_facebook_app_id
+FACEBOOK_CLIENT_SECRET=your_facebook_app_secret
+
+# GitHub OAuth
+GITHUB_CLIENT_ID=Ov23liwfltZsOWcY91HX
+GITHUB_CLIENT_SECRET=cb956de8de15c763aec63940e340f62cfc38e5ed
+
+# Apple OAuth
+APPLE_CLIENT_ID=your_apple_service_id
+APPLE_CLIENT_SECRET=your_apple_client_secret
+```
+
+
+### Step 4: CORS Configuration
+
+**config/cors.php**
 
 ```php
-// app/Traits/HasUuid.php
+<?php
+
+return [
+    'paths' => ['api/*', 'sanctum/csrf-cookie'],
+    'allowed_methods' => ['*'],
+    'allowed_origins' => ['*'],
+    'allowed_origins_patterns' => [],
+    'allowed_headers' => ['*'],
+    'exposed_headers' => [],
+    'max_age' => 0,
+    'supports_credentials' => true,
+];
+```
+
+
+***
+
+## 🔧 Backend Implementation
+
+### Step 5: UUID Trait
+
+**app/Traits/HasUuid.php**
+
+```php
 <?php
 namespace App\Traits;
 
@@ -112,7 +394,7 @@ trait HasUuid
     {
         static::creating(function ($model) {
             if (empty($model->{$model->getKeyName()})) {
-                $model->{$model->getKeyName()} = Str::uuid()->toString();
+                $model->{$model->getKeyName()} = (string) Str::uuid();
             }
         });
     }
@@ -129,46 +411,165 @@ trait HasUuid
 }
 ```
 
-**👤 Users Migration (Enhanced with UUID)**
+
+### Step 6: Database Migrations
+
+**database/migrations/xxxx_create_users_table.php**
 
 ```php
-// database/migrations/xxxx_create_users_table.php
 <?php
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    public function up()
+    public function up(): void
     {
         Schema::create('users', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('name');
             $table->string('email')->unique();
             $table->string('phone')->nullable();
-            $table->enum('user_type', ['patient', 'doctor', 'admin']);
+            $table->enum('user_type', ['patient', 'doctor', 'healthcare','admin']);
             $table->timestamp('email_verified_at')->nullable();
-            $table->string('password');
+            $table->string('password')->nullable(); // Nullable for social users
             $table->string('avatar')->nullable();
             $table->text('address')->nullable();
             $table->decimal('latitude', 10, 8)->nullable();
             $table->decimal('longitude', 11, 8)->nullable();
+            $table->boolean('is_social_user')->default(false);
+            $table->timestamp('login_time')->nullable();
+            $table->timestamp('logout_time')->nullable();
             $table->rememberToken();
             $table->timestamps();
         });
+
+        Schema::create('password_reset_tokens', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->string('email')->index();
+            $table->string('token');
+            $table->timestamp('created_at')->nullable();
+            $table->timestamp('updated_at')->nullable();
+        });
+
+        Schema::create('sessions', function (Blueprint $table) {
+            $table->string('id')->primary();
+            $table->uuid('user_id')->nullable()->index();
+            $table->string('ip_address', 45)->nullable();
+            $table->text('user_agent')->nullable();
+            $table->longText('payload');
+            $table->integer('last_activity')->index();
+
+            $table->foreign('user_id')
+                ->references('id')->on('users')
+                ->onDelete('set null');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('sessions');
+        Schema::dropIfExists('password_reset_tokens');
+        Schema::dropIfExists('users');
     }
 };
 ```
 
-**🏥 Clinics Migration**
+**database/migrations/xxxx_social_providers.php**
 
 ```php
-// database/migrations/xxxx_create_clinics_table.php
 <?php
+// database/migrations/xxxx_xx_xx_create_social_providers_table.php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
 return new class extends Migration
 {
-    public function up()
+    public function up(): void
+    {
+        Schema::create('social_providers', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->uuid('user_id'); // Must match users.id type exactly
+            $table->string('provider'); // google, facebook, github, apple
+            $table->string('provider_id');
+            $table->string('avatar')->nullable();
+            $table->json('provider_data')->nullable();
+            $table->timestamps();
+
+            // Foreign key constraint
+            $table->foreign('user_id')
+                  ->references('id')
+                  ->on('users')
+                  ->onDelete('cascade');
+                  
+            // Unique constraint to prevent duplicate provider accounts
+            $table->unique(['provider', 'provider_id']);
+            
+            // Index for better performance
+            $table->index(['user_id', 'provider']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('social_providers');
+    }
+};
+```
+
+**database/migrations/xxxx_create_doctors_table.php**
+
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('doctors', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignUuid('user_id')->constrained('users')->onDelete('cascade');
+            $table->string('specialization');
+            $table->string('license_number')->unique();
+            $table->integer('experience_years');
+            $table->text('bio')->nullable();
+            $table->decimal('consultation_fee', 8, 2);
+            $table->text('qualification');
+            $table->json('languages')->nullable();
+            $table->decimal('rating', 3, 2)->default(0.00);
+            $table->integer('total_reviews')->default(0);
+            $table->boolean('is_verified')->default(false);
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('doctors');
+    }
+};
+```
+
+**database/migrations/xxxx_create_clinics_table.php**
+
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
     {
         Schema::create('clinics', function (Blueprint $table) {
             $table->uuid('id')->primary();
@@ -179,7 +580,7 @@ return new class extends Migration
             $table->decimal('longitude', 11, 8);
             $table->string('phone');
             $table->string('email')->nullable();
-            $table->json('facilities')->nullable(); // ["X-Ray", "Lab", "Pharmacy"]
+            $table->json('facilities')->nullable();
             $table->string('image')->nullable();
             $table->time('opening_time')->default('09:00');
             $table->time('closing_time')->default('18:00');
@@ -187,82 +588,69 @@ return new class extends Migration
             $table->timestamps();
         });
     }
-};
-```
 
-**👨⚕️ Doctors Migration**
-
-```php
-// database/migrations/xxxx_create_doctors_table.php
-<?php
-return new class extends Migration
-{
-    public function up()
+    public function down(): void
     {
-        Schema::create('doctors', function (Blueprint $table) {
-            $table->uuid('id')->primary();
-            $table->uuid('user_id');
-            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->string('specialization');
-            $table->string('license_number')->unique();
-            $table->integer('experience_years');
-            $table->text('bio')->nullable();
-            $table->decimal('consultation_fee', 8, 2);
-            $table->string('qualification');
-            $table->json('languages')->nullable(); // ["English", "Hindi"]
-            $table->decimal('rating', 2, 1)->default(0);
-            $table->integer('total_reviews')->default(0);
-            $table->boolean('is_verified')->default(false);
-            $table->timestamps();
-        });
+        Schema::dropIfExists('clinics');
     }
 };
 ```
 
-**🔗 Doctor-Clinic Relationship**
+**database/migrations/xxxx_create_clinic_doctor_table.php**
 
 ```php
-// database/migrations/xxxx_create_doctor_clinic_table.php
 <?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
 return new class extends Migration
 {
     public function up()
     {
-        Schema::create('doctor_clinic', function (Blueprint $table) {
-            $table->uuid('id')->primary();
+        Schema::create('clinic_doctor', function (Blueprint $table) {
             $table->uuid('doctor_id');
             $table->uuid('clinic_id');
             $table->foreign('doctor_id')->references('id')->on('doctors')->onDelete('cascade');
             $table->foreign('clinic_id')->references('id')->on('clinics')->onDelete('cascade');
-            $table->json('available_days'); // ["monday", "tuesday", "friday"]
+            $table->json('available_days');
             $table->time('start_time');
             $table->time('end_time');
-            $table->integer('slot_duration')->default(30); // minutes
+            $table->integer('slot_duration')->default(30);
             $table->boolean('is_active')->default(true);
             $table->timestamps();
+            
+            $table->primary(['doctor_id', 'clinic_id']);
         });
+    }
+
+    public function down()
+    {
+        Schema::dropIfExists('clinic_doctor');
     }
 };
 ```
 
-**📅 Appointments Migration**
+**database/migrations/xxxx_create_appointments_table.php**
 
 ```php
-// database/migrations/xxxx_create_appointments_table.php
 <?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
 return new class extends Migration
 {
-    public function up()
+    public function up(): void
     {
         Schema::create('appointments', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('appointment_number')->unique();
-            $table->uuid('patient_id');
-            $table->uuid('doctor_id');
-            $table->uuid('clinic_id');
-            $table->foreign('patient_id')->references('id')->on('users')->onDelete('cascade');
-            $table->foreign('doctor_id')->references('id')->on('doctors')->onDelete('cascade');
-            $table->foreign('clinic_id')->references('id')->on('clinics')->onDelete('cascade');
+            $table->foreignUuid('patient_id')->constrained('users')->onDelete('cascade');
+            $table->foreignUuid('doctor_id')->constrained('doctors')->onDelete('cascade');
+            $table->foreignUuid('clinic_id')->constrained('clinics')->onDelete('cascade');
             $table->date('appointment_date');
             $table->time('appointment_time');
             $table->enum('status', ['pending', 'confirmed', 'completed', 'cancelled'])->default('pending');
@@ -273,34 +661,170 @@ return new class extends Migration
             $table->timestamps();
         });
     }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('appointments');
+    }
+};
+```
+
+**database/migrations/xxxx_create_cache_table.php**
+
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('cache', function (Blueprint $table) {
+            $table->string('key')->primary();
+            $table->mediumText('value');
+            $table->integer('expiration');
+        });
+
+        Schema::create('cache_locks', function (Blueprint $table) {
+            $table->string('key')->primary();
+            $table->string('owner');
+            $table->integer('expiration');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('cache');
+        Schema::dropIfExists('cache_locks');
+    }
+};
+```
+
+**database/migrations/xxxx_create_jobs_table.php**
+
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('jobs', function (Blueprint $table) {
+            $table->id();
+            $table->string('queue')->index();
+            $table->longText('payload');
+            $table->unsignedTinyInteger('attempts');
+            $table->unsignedInteger('reserved_at')->nullable();
+            $table->unsignedInteger('available_at');
+            $table->unsignedInteger('created_at');
+        });
+
+        Schema::create('job_batches', function (Blueprint $table) {
+            $table->string('id')->primary();
+            $table->string('name');
+            $table->integer('total_jobs');
+            $table->integer('pending_jobs');
+            $table->integer('failed_jobs');
+            $table->longText('failed_job_ids');
+            $table->mediumText('options')->nullable();
+            $table->integer('cancelled_at')->nullable();
+            $table->integer('created_at');
+            $table->integer('finished_at')->nullable();
+        });
+
+        Schema::create('failed_jobs', function (Blueprint $table) {
+            $table->id();
+            $table->string('uuid')->unique();
+            $table->text('connection');
+            $table->text('queue');
+            $table->longText('payload');
+            $table->longText('exception');
+            $table->timestamp('failed_at')->useCurrent();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('jobs');
+        Schema::dropIfExists('job_batches');
+        Schema::dropIfExists('failed_jobs');
+    }
+};
+```
+
+**database/migrations/xxxx_create_personal_access_tokens_table.php**
+
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class () extends Migration {
+    public function up(): void
+    {
+        Schema::create('personal_access_tokens', function (Blueprint $table) {
+            $table->id();
+            $table->uuidMorphs('tokenable');
+            $table->string('name');
+            $table->string('token', 64)->unique();
+            $table->text('abilities')->nullable();
+            $table->timestamp('last_used_at')->nullable();
+            $table->timestamp('expires_at')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('personal_access_tokens');
+    }
 };
 ```
 
 
-### 4. 📊 Models with UUID Support
+### Step 7: Models Implementation
 
-**👤 User Model**
+**app/Models/User.php**
 
 ```php
-// app/Models/User.php
 <?php
+// app/Models/User.php
+
 namespace App\Models;
 
+use App\Traits\HasUuid;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
-use App\Traits\HasUuid;
 
 class User extends Authenticatable
 {
     use HasApiTokens, HasRoles, HasUuid;
 
     protected $fillable = [
-        'name', 'email', 'phone', 'user_type', 'password', 
-        'avatar', 'address', 'latitude', 'longitude'
+        'name', 'email', 'phone', 'user_type', 'password',
+        'avatar', 'address', 'latitude', 'longitude',
+        'login_time', 'logout_time', 'is_social_user'
     ];
 
     protected $hidden = ['password', 'remember_token'];
+
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+        'login_time' => 'datetime',
+        'logout_time' => 'datetime',
+        'is_social_user' => 'boolean'
+    ];
 
     public function doctor()
     {
@@ -311,18 +835,68 @@ class User extends Authenticatable
     {
         return $this->hasMany(Appointment::class, 'patient_id');
     }
+
+    public function socialProviders(): HasMany
+    {
+        return $this->hasMany(SocialProvider::class);
+    }
+
+    public function hasSocialProvider(string $provider): bool
+    {
+        return $this->socialProviders()->where('provider', $provider)->exists();
+    }
+
+    public function getSocialProvider(string $provider): ?SocialProvider
+    {
+        return $this->socialProviders()->where('provider', $provider)->first();
+    }
 }
 ```
 
-**👨⚕️ Doctor Model**
+**app/Models/SocialProvider.php**
 
 ```php
-// app/Models/Doctor.php
 <?php
+// app/Models/SocialProvider.php
+
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use App\Traits\HasUuid;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+class SocialProvider extends Model
+{
+    use HasUuid;
+
+    protected $fillable = [
+        'user_id',
+        'provider',
+        'provider_id',
+        'avatar',
+        'provider_data'
+    ];
+
+    protected $casts = [
+        'provider_data' => 'array'
+    ];
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+}
+```
+
+**app/Models/Doctor.php**
+
+```php
+<?php
+
+namespace App\Models;
+
+use App\Traits\HasUuid;
+use Illuminate\Database\Eloquent\Model;
 
 class Doctor extends Model
 {
@@ -330,14 +904,15 @@ class Doctor extends Model
 
     protected $fillable = [
         'user_id', 'specialization', 'license_number', 'experience_years',
-        'bio', 'consultation_fee', 'qualification', 'languages', 
+        'bio', 'consultation_fee', 'qualification', 'languages',
         'rating', 'total_reviews', 'is_verified'
     ];
 
     protected $casts = [
         'languages' => 'array',
         'consultation_fee' => 'decimal:2',
-        'rating' => 'decimal:1'
+        'rating' => 'decimal:1',
+        'is_verified' => 'boolean'
     ];
 
     public function user()
@@ -348,7 +923,8 @@ class Doctor extends Model
     public function clinics()
     {
         return $this->belongsToMany(Clinic::class)->withPivot([
-            'available_days', 'start_time', 'end_time', 'slot_duration', 'is_active'
+            'available_days', 'start_time', 'end_time', 
+            'slot_duration', 'is_active'
         ])->withTimestamps();
     }
 
@@ -359,15 +935,15 @@ class Doctor extends Model
 }
 ```
 
-**🏥 Clinic Model**
+**app/Models/Clinic.php**
 
 ```php
-// app/Models/Clinic.php
 <?php
+
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use App\Traits\HasUuid;
+use Illuminate\Database\Eloquent\Model;
 
 class Clinic extends Model
 {
@@ -375,20 +951,22 @@ class Clinic extends Model
 
     protected $fillable = [
         'name', 'description', 'address', 'latitude', 'longitude',
-        'phone', 'email', 'facilities', 'image', 'opening_time',
-        'closing_time', 'is_active'
+        'phone', 'email', 'facilities', 'image', 
+        'opening_time', 'closing_time', 'is_active'
     ];
 
     protected $casts = [
         'facilities' => 'array',
         'latitude' => 'decimal:8',
-        'longitude' => 'decimal:8'
+        'longitude' => 'decimal:8',
+        'is_active' => 'boolean'
     ];
 
     public function doctors()
     {
         return $this->belongsToMany(Doctor::class)->withPivot([
-            'available_days', 'start_time', 'end_time', 'slot_duration', 'is_active'
+            'available_days', 'start_time', 'end_time',
+            'slot_duration', 'is_active'
         ])->withTimestamps();
     }
 
@@ -399,15 +977,15 @@ class Clinic extends Model
 }
 ```
 
-**📅 Appointment Model**
+**app/Models/Appointment.php**
 
 ```php
-// app/Models/Appointment.php
 <?php
+
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use App\Traits\HasUuid;
+use Illuminate\Database\Eloquent\Model;
 
 class Appointment extends Model
 {
@@ -424,6 +1002,15 @@ class Appointment extends Model
         'amount' => 'decimal:2'
     ];
 
+    protected static function boot()
+    {
+        parent::boot();
+        
+        static::creating(function ($model) {
+            $model->appointment_number = 'APT' . str_pad(mt_rand(1, 99999), 5, '0', STR_PAD_LEFT);
+        });
+    }
+
     public function patient()
     {
         return $this->belongsTo(User::class, 'patient_id');
@@ -438,25 +1025,45 @@ class Appointment extends Model
     {
         return $this->belongsTo(Clinic::class);
     }
+}
+```
 
-    protected static function boot()
-    {
-        parent::boot();
-        static::creating(function ($appointment) {
-            $appointment->appointment_number = 'APT' . str_pad(mt_rand(1, 99999), 5, '0', STR_PAD_LEFT);
-        });
-    }
+**app/Models/ClinicDoctor.php**
+
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Relations\Pivot;
+use App\Traits\HasUuid;
+
+class ClinicDoctor extends Pivot
+{
+    use HasUuid;
+
+    protected $table = 'clinic_doctor';
+    
+    protected $fillable = [
+        'doctor_id', 'clinic_id', 'available_days', 'start_time', 
+        'end_time', 'slot_duration', 'is_active'
+    ];
+
+    protected $casts = [
+        'available_days' => 'array',
+        'is_active' => 'boolean'
+    ];
 }
 ```
 
 
-### 5. 🔌 API Controllers (Same as before, but with UUID support)
+### Step 8: API Controllers
 
-**🔐 Auth Controller**
+**app/Http/Controllers/Api/AuthController.php**
 
 ```php
-// app/Http/Controllers/Api/AuthController.php
 <?php
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -464,6 +1071,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Carbon\Carbon;
 
 class AuthController extends Controller
 {
@@ -485,12 +1093,14 @@ class AuthController extends Controller
             'user_type' => $request->user_type,
             'phone' => $request->phone,
             'address' => $request->address,
+            'login_time' => now(),
+            'is_social_user' => false
         ]);
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'user' => $user,
+            'user' => $user->load(['socialProviders']),
             'token' => $token,
             'token_type' => 'Bearer'
         ], 201);
@@ -511,10 +1121,13 @@ class AuthController extends Controller
             ]);
         }
 
+        // Update login time
+        $user->update(['login_time' => now()]);
+
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'user' => $user,
+            'user' => $user->load(['socialProviders']),
             'token' => $token,
             'token_type' => 'Bearer'
         ]);
@@ -522,118 +1135,350 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
+        // Update logout time
+        $request->user()->update(['logout_time' => Carbon::now()]);
+        
+        // Delete current token
         $request->user()->currentAccessToken()->delete();
+        
         return response()->json(['message' => 'Logged out successfully']);
+    }
+
+    public function user(Request $request)
+    {
+        return response()->json(
+            $request->user()->load(['doctor', 'socialProviders'])
+        );
     }
 }
 ```
 
-**👨⚕️ Doctor Controller**
+**app/Http/Controllers/Api/SocialAuthController.php**
 
 ```php
-// app/Http/Controllers/Api/DoctorController.php
 <?php
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Doctor;
+use App\Services\SocialAuthService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Laravel\Socialite\Facades\Socialite;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
-class DoctorController extends Controller
+class SocialAuthController extends Controller
 {
-    public function index(Request $request)
+    public function __construct(
+        protected SocialAuthService $socialAuthService
+    ) {}
+
+    public function getProviders(): JsonResponse
     {
-        $query = Doctor::with(['user', 'clinics'])
-                      ->where('is_verified', true);
-
-        // Search filters
-        if ($request->has('specialization')) {
-            $query->where('specialization', 'like', '%' . $request->specialization . '%');
-        }
-
-        if ($request->has('location') && $request->has('latitude') && $request->has('longitude')) {
-            $lat = $request->latitude;
-            $lng = $request->longitude;
-            $radius = $request->radius ?? 10; // km
-
-            $query->whereHas('clinics', function($q) use ($lat, $lng, $radius) {
-                $q->selectRaw("*, (6371 * acos(cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude)))) AS distance", [$lat, $lng, $lat])
-                  ->havingRaw('distance < ?', [$radius]);
-            });
-        }
-
-        if ($request->has('min_rating')) {
-            $query->where('rating', '>=', $request->min_rating);
-        }
-
-        $doctors = $query->paginate(10);
-
-        return response()->json($doctors);
+        return response()->json([
+            'providers' => $this->socialAuthService->getAllowedProviders(),
+            'message' => 'Available social authentication providers'
+        ]);
     }
 
-    public function show($id)
+    public function redirectToProvider(string $provider, Request $request): JsonResponse
     {
-        $doctor = Doctor::with(['user', 'clinics'])->findOrFail($id);
-        return response()->json($doctor);
+        if (!$this->socialAuthService->isProviderAllowed($provider)) {
+            return response()->json([
+                'error' => 'Provider not supported',
+                'supported_providers' => $this->socialAuthService->getAllowedProviders()
+            ], 400);
+        }
+
+        try {
+            // Get user type and mode from request
+            $userType = $request->get('user_type', 'patient');
+            $mode = $request->get('mode', 'login');
+
+            Log::info("OAuth redirect initiated", [
+                'provider' => $provider,
+                'user_type' => $userType,
+                'mode' => $mode
+            ]);
+
+            // Add proper scopes for GitHub
+            $driver = Socialite::driver($provider)->stateless();
+            
+            // Set specific scopes for different providers
+            if ($provider === 'github') {
+                $driver->scopes(['user:email', 'read:user']);
+            } elseif ($provider === 'google') {
+                $driver->scopes(['openid', 'email', 'profile']);
+            }
+
+            // Add state parameter with user type and mode - CRITICAL FIX
+            $state = base64_encode(json_encode([
+                'user_type' => $userType,
+                'mode' => $mode,
+                'timestamp' => time()
+            ]));
+            
+            $driver->with(['state' => $state]);
+
+            $redirectUrl = $driver->redirect()->getTargetUrl();
+
+            return response()->json([
+                'redirect_url' => $redirectUrl,
+                'provider' => $provider,
+                'user_type' => $userType,
+                'mode' => $mode
+            ]);
+        } catch (\Exception $e) {
+            Log::error("OAuth redirect error for {$provider}: " . $e->getMessage());
+            return response()->json([
+                'error' => 'Failed to generate redirect URL',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
-    public function getAvailability($doctorId, $clinicId, Request $request)
+    public function handleProviderCallback(string $provider, Request $request): JsonResponse|RedirectResponse
     {
-        $doctor = Doctor::findOrFail($doctorId);
-        $clinic = $doctor->clinics()->findOrFail($clinicId);
-        
-        $date = $request->date ?? now()->format('Y-m-d');
-        $dayOfWeek = strtolower(date('l', strtotime($date)));
-        
-        $schedule = $clinic->pivot;
-        $availableDays = $schedule->available_days;
-        
-        if (!in_array($dayOfWeek, $availableDays)) {
-            return response()->json(['available' => false, 'message' => 'Doctor not available on this day']);
+        if (!$this->socialAuthService->isProviderAllowed($provider)) {
+            return response()->json([
+                'error' => 'Provider not supported'
+            ], 400);
         }
 
-        // Generate time slots
-        $startTime = $schedule->start_time;
-        $endTime = $schedule->end_time;
-        $slotDuration = $schedule->slot_duration;
-        
-        $slots = [];
-        $current = strtotime($startTime);
-        $end = strtotime($endTime);
-        
-        while ($current < $end) {
-            $timeSlot = date('H:i', $current);
+        try {
+            // CRITICAL FIX: Extract user type from state parameter properly
+            $userType = 'patient'; // default
+            $mode = 'login'; // default
             
-            // Check if slot is already booked
-            $isBooked = $doctor->appointments()
-                             ->where('clinic_id', $clinicId)
-                             ->where('appointment_date', $date)
-                             ->where('appointment_time', $timeSlot)
-                             ->where('status', '!=', 'cancelled')
-                             ->exists();
+            $state = $request->get('state');
+            if ($state) {
+                try {
+                    $stateData = json_decode(base64_decode($state), true);
+                    if ($stateData && isset($stateData['user_type'])) {
+                        $userType = $stateData['user_type'];
+                        $mode = $stateData['mode'] ?? 'login';
+                    }
+                } catch (\Exception $e) {
+                    Log::warning("Failed to decode state parameter: " . $e->getMessage());
+                }
+            }
+
+            // ADDITIONAL FIX: Check URL parameters as fallback
+            if ($request->has('user_type')) {
+                $userType = $request->get('user_type');
+            }
+
+            Log::info("OAuth callback processing", [
+                'provider' => $provider,
+                'user_type' => $userType,
+                'mode' => $mode,
+                'state_decoded' => $state ? 'yes' : 'no'
+            ]);
+
+            // Add specific scopes during callback as well
+            $driver = Socialite::driver($provider)->stateless();
             
-            $slots[] = [
-                'time' => $timeSlot,
-                'available' => !$isBooked
-            ];
+            if ($provider === 'github') {
+                $driver->scopes(['user:email', 'read:user']);
+            } elseif ($provider === 'google') {
+                $driver->scopes(['openid', 'email', 'profile']);
+            }
+
+            $socialUser = $driver->user();
+
+            // Log successful authentication for debugging
+            Log::info("OAuth callback successful for {$provider}", [
+                'user_id' => $socialUser->getId(),
+                'email' => $socialUser->getEmail(),
+                'name' => $socialUser->getName(),
+                'selected_user_type' => $userType
+            ]);
+
+            // CRITICAL FIX: Properly merge user type into request
+            $request->merge([
+                'user_type' => $userType,
+                'stored_user_type' => $userType,
+                'auth_mode' => $mode
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error("OAuth callback error for {$provider}: " . $e->getMessage());
             
-            $current = strtotime('+' . $slotDuration . ' minutes', $current);
+            // Check if this is an API request
+            if (request()->expectsJson() || request()->header('Accept') === 'application/json') {
+                return response()->json([
+                    'error' => 'Authentication failed',
+                    'message' => 'Could not authenticate with ' . ucfirst($provider),
+                    'details' => $e->getMessage()
+                ], 400);
+            }
+
+            // For web requests, redirect to callback with error
+            $errorUrl = url('/auth/callback') . '?' . http_build_query([
+                'error' => 'auth_failed',
+                'message' => $e->getMessage()
+            ]);
+            return redirect($errorUrl);
         }
+
+        try {
+            // CRITICAL FIX: Pass user type to the service
+            $result = $this->socialAuthService->handleSocialUser($socialUser, $provider, $userType);
+            $token = $result['user']->createToken('auth_token')->plainTextToken;
+
+            // Log successful user creation/login
+            Log::info("Social user processed successfully", [
+                'user_id' => $result['user']->id,
+                'user_type' => $result['user']->user_type,
+                'is_new_user' => $result['is_new_user']
+            ]);
+
+            // Check if this is an API request (expects JSON)
+            if (request()->expectsJson() || request()->header('Accept') === 'application/json') {
+                return response()->json([
+                    'user' => $result['user'],
+                    'token' => $token,
+                    'token_type' => 'Bearer',
+                    'provider' => $provider,
+                    'is_new_user' => $result['is_new_user'],
+                    'message' => $result['is_new_user'] 
+                        ? 'Account created successfully via ' . ucfirst($provider)
+                        : 'Logged in successfully via ' . ucfirst($provider)
+                ]);
+            }
+
+            // For web requests, redirect to callback page with user type
+            $userData = urlencode(json_encode($result['user']));
+            $callbackUrl = url('/auth/callback') . '?' . http_build_query([
+                'token' => $token,
+                'user' => $userData,
+                'provider' => $provider,
+                'user_type' => $result['user']->user_type, // Pass the actual user type
+                'is_new_user' => $result['is_new_user'] ? 'true' : 'false'
+            ]);
+
+            return redirect($callbackUrl);
+
+        } catch (\Exception $e) {
+            Log::error("OAuth user processing error for {$provider}: " . $e->getMessage());
+            
+            // Check if this is an API request
+            if (request()->expectsJson() || request()->header('Accept') === 'application/json') {
+                return response()->json([
+                    'error' => 'Failed to process authentication',
+                    'message' => $e->getMessage()
+                ], 500);
+            }
+
+            // For web requests, redirect to callback with error
+            $errorUrl = url('/auth/callback') . '?' . http_build_query([
+                'error' => 'auth_failed',
+                'message' => $e->getMessage()
+            ]);
+
+            return redirect($errorUrl);
+        }
+    }
+
+    public function linkProvider(Request $request, string $provider): JsonResponse
+    {
+        $user = $request->user();
+        
+        if (!$this->socialAuthService->isProviderAllowed($provider)) {
+            return response()->json([
+                'error' => 'Provider not supported'
+            ], 400);
+        }
+
+        if ($user->hasSocialProvider($provider)) {
+            return response()->json([
+                'error' => 'Provider already linked',
+                'message' => ucfirst($provider) . ' is already linked to your account'
+            ], 400);
+        }
+
+        try {
+            $driver = Socialite::driver($provider)
+                ->stateless()
+                ->with(['state' => 'link_' . $user->id]);
+                
+            if ($provider === 'github') {
+                $driver->scopes(['user:email', 'read:user']);
+            }
+            
+            $redirectUrl = $driver->redirect()->getTargetUrl();
+
+            return response()->json([
+                'redirect_url' => $redirectUrl,
+                'provider' => $provider,
+                'action' => 'link'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Failed to generate link URL',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function unlinkProvider(Request $request, string $provider): JsonResponse
+    {
+        $user = $request->user();
+        
+        if (!$this->socialAuthService->isProviderAllowed($provider)) {
+            return response()->json([
+                'error' => 'Provider not supported'
+            ], 400);
+        }
+
+        $socialProvider = $user->getSocialProvider($provider);
+        
+        if (!$socialProvider) {
+            return response()->json([
+                'error' => 'Provider not linked',
+                'message' => ucfirst($provider) . ' is not linked to your account'
+            ], 400);
+        }
+
+        // Prevent unlinking if it's the only authentication method and no password
+        if ($user->is_social_user && !$user->password && $user->socialProviders()->count() === 1) {
+            return response()->json([
+                'error' => 'Cannot unlink',
+                'message' => 'Cannot unlink the only authentication method. Please set a password first.'
+            ], 400);
+        }
+
+        $socialProvider->delete();
 
         return response()->json([
-            'available' => true,
-            'date' => $date,
-            'slots' => $slots
+            'message' => ucfirst($provider) . ' unlinked successfully'
+        ]);
+    }
+
+    public function getUserProviders(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        
+        $providers = $user->socialProviders()
+            ->select('provider', 'avatar', 'created_at')
+            ->get()
+            ->keyBy('provider');
+
+        return response()->json([
+            'linked_providers' => $providers,
+            'available_providers' => $this->socialAuthService->getAllowedProviders(),
+            'has_password' => !is_null($user->password)
         ]);
     }
 }
 ```
 
-**🏥 Clinic Controller**
+**app/Http/Controllers/Api/ClinicController.php**
 
 ```php
-// app/Http/Controllers/Api/ClinicController.php
 <?php
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -646,18 +1491,16 @@ class ClinicController extends Controller
     {
         $query = Clinic::with('doctors.user')->where('is_active', true);
 
-        // Location-based search
         if ($request->has('latitude') && $request->has('longitude')) {
             $lat = $request->latitude;
             $lng = $request->longitude;
-            $radius = $request->radius ?? 10; // km
+            $radius = $request->radius ?? 10;
 
             $query->selectRaw("*, (6371 * acos(cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude)))) AS distance", [$lat, $lng, $lat])
                   ->havingRaw('distance < ?', [$radius])
                   ->orderBy('distance');
         }
 
-        // Search by name or facilities
         if ($request->has('search')) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
@@ -668,7 +1511,6 @@ class ClinicController extends Controller
         }
 
         $clinics = $query->paginate(10);
-
         return response()->json($clinics);
     }
 
@@ -682,17 +1524,16 @@ class ClinicController extends Controller
     {
         $clinic = Clinic::findOrFail($id);
         $doctors = $clinic->doctors()->with('user')->get();
-        
         return response()->json($doctors);
     }
 }
 ```
 
-**📅 Appointment Controller**
+**app/Http/Controllers/Api/AppointmentController.php**
 
 ```php
-// app/Http/Controllers/Api/AppointmentController.php
 <?php
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -711,7 +1552,6 @@ class AppointmentController extends Controller
             'symptoms' => 'nullable|string',
         ]);
 
-        // Check if slot is available
         $existingAppointment = Appointment::where([
             'doctor_id' => $request->doctor_id,
             'clinic_id' => $request->clinic_id,
@@ -755,7 +1595,6 @@ class AppointmentController extends Controller
         $appointment = Appointment::with(['doctor.user', 'clinic', 'patient'])
                                  ->findOrFail($id);
         
-        // Ensure user can only see their own appointments or if they're the doctor
         if ($appointment->patient_id !== auth()->id() && 
             $appointment->doctor->user_id !== auth()->id()) {
             return response()->json(['message' => 'Unauthorized'], 403);
@@ -777,27 +1616,293 @@ class AppointmentController extends Controller
         }
 
         $appointment->update(['status' => 'cancelled']);
-
         return response()->json(['message' => 'Appointment cancelled successfully']);
     }
 }
 ```
 
+### Step 8.1: Services class
 
-### 6. 🛤️ API Routes
+**app/Services/SocialAuthService.php**
 
 ```php
-// routes/api.php
 <?php
+
+namespace App\Services;
+
+use App\Models\User;
+use App\Models\SocialProvider;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Laravel\Socialite\Contracts\User as SocialiteUser;
+use Illuminate\Support\Facades\Log;
+
+class SocialAuthService
+{
+    protected array $allowedProviders = ['google', 'facebook', 'github', 'apple'];
+
+    public function isProviderAllowed(string $provider): bool
+    {
+        return in_array($provider, $this->allowedProviders);
+    }
+
+    // CRITICAL FIX: Added user type parameter
+    public function handleSocialUser(SocialiteUser $socialUser, string $provider, string $userType = null): array
+    {
+        return DB::transaction(function () use ($socialUser, $provider, $userType) {
+            // Validate required data
+            if (!$socialUser->getEmail()) {
+                throw new \Exception('Email is required but not provided by ' . ucfirst($provider));
+            }
+
+            // CRITICAL FIX: Use passed user type or get from request
+            $finalUserType = $userType ?: $this->getUserTypeFromRequest();
+
+            Log::info("Processing social user", [
+                'provider' => $provider,
+                'email' => $socialUser->getEmail(),
+                'passed_user_type' => $userType,
+                'final_user_type' => $finalUserType
+            ]);
+
+            // First, check if this social account already exists
+            $socialProvider = SocialProvider::where('provider', $provider)
+                ->where('provider_id', $socialUser->getId())
+                ->first();
+
+            if ($socialProvider) {
+                // Update existing social provider data
+                $socialProvider->update([
+                    'avatar' => $socialUser->getAvatar(),
+                    'provider_data' => $this->extractProviderData($socialUser, $provider)
+                ]);
+
+                $user = $socialProvider->user;
+                $isNewUser = false;
+
+                Log::info("Found existing social provider", [
+                    'user_id' => $user->id,
+                    'user_type' => $user->user_type
+                ]);
+            } else {
+                // Check if user exists with this email
+                $user = User::where('email', $socialUser->getEmail())->first();
+
+                if ($user) {
+                    // Link existing user with social provider
+                    $this->createSocialProvider($user, $socialUser, $provider);
+                    $isNewUser = false;
+
+                    Log::info("Linked social provider to existing user", [
+                        'user_id' => $user->id,
+                        'user_type' => $user->user_type
+                    ]);
+                } else {
+                    // CRITICAL FIX: Create new user with proper user type
+                    $user = $this->createUserFromSocial($socialUser, $provider, $finalUserType);
+                    $this->createSocialProvider($user, $socialUser, $provider);
+                    $isNewUser = true;
+
+                    Log::info("Created new social user", [
+                        'user_id' => $user->id,
+                        'user_type' => $user->user_type,
+                        'requested_user_type' => $finalUserType
+                    ]);
+                }
+            }
+
+            // Update login time
+            $user->update(['login_time' => now()]);
+
+            return [
+                'user' => $user->fresh()->load(['doctor', 'socialProviders']),
+                'is_new_user' => $isNewUser
+            ];
+        });
+    }
+
+    protected function getUserTypeFromRequest(): string
+    {
+        // CRITICAL FIX: Enhanced user type detection
+        $userType = null;
+
+        // Try to get from request parameters
+        $userType = request()->get('user_type') ?: request()->get('stored_user_type');
+        
+        // Try to get from merged request data
+        if (!$userType && request()->has('user_type')) {
+            $userType = request()->input('user_type');
+        }
+
+        // Try to get from session or other sources if needed
+        if (!$userType) {
+            $userType = session('selected_user_type');
+        }
+
+        Log::info("User type detection", [
+            'from_request' => request()->get('user_type'),
+            'from_stored' => request()->get('stored_user_type'),
+            'from_input' => request()->input('user_type'),
+            'final_user_type' => $userType
+        ]);
+        
+        // Validate user type
+        $validTypes = ['patient', 'doctor', 'healthcare', 'admin'];
+        if (!$userType || !in_array($userType, $validTypes)) {
+            Log::warning("Invalid or missing user type, defaulting to patient", [
+                'provided_user_type' => $userType
+            ]);
+            $userType = 'patient'; // Default fallback
+        }
+
+        return $userType;
+    }
+
+    protected function createUserFromSocial(SocialiteUser $socialUser, string $provider, string $userType = 'patient'): User
+    {
+        Log::info("Creating user from social", [
+            'email' => $socialUser->getEmail(),
+            'user_type' => $userType,
+            'provider' => $provider
+        ]);
+
+        return User::create([
+            'name' => $socialUser->getName() ?: $this->generateNameFromEmail($socialUser->getEmail()),
+            'email' => $socialUser->getEmail(),
+            'avatar' => $socialUser->getAvatar(),
+            'email_verified_at' => now(),
+            'user_type' => $userType, // CRITICAL FIX: Use the passed user type
+            'is_social_user' => true,
+            'password' => null
+        ]);
+    }
+
+    protected function createSocialProvider(User $user, SocialiteUser $socialUser, string $provider): SocialProvider
+    {
+        return $user->socialProviders()->create([
+            'provider' => $provider,
+            'provider_id' => $socialUser->getId(),
+            'avatar' => $socialUser->getAvatar(),
+            'provider_data' => $this->extractProviderData($socialUser, $provider)
+        ]);
+    }
+
+    protected function extractProviderData(SocialiteUser $socialUser, string $provider): array
+    {
+        $baseData = [
+            'name' => $socialUser->getName(),
+            'email' => $socialUser->getEmail(),
+            'avatar' => $socialUser->getAvatar(),
+        ];
+
+        // Provider-specific data extraction
+        switch ($provider) {
+            case 'google':
+                return array_merge($baseData, [
+                    'email_verified' => $socialUser->user['email_verified'] ?? false,
+                    'locale' => $socialUser->user['locale'] ?? null,
+                ]);
+
+            case 'facebook':
+                return array_merge($baseData, [
+                    'first_name' => $socialUser->user['first_name'] ?? null,
+                    'last_name' => $socialUser->user['last_name'] ?? null,
+                ]);
+
+            case 'github':
+                return array_merge($baseData, [
+                    'username' => $socialUser->getNickname(),
+                    'bio' => $socialUser->user['bio'] ?? null,
+                    'company' => $socialUser->user['company'] ?? null,
+                    'location' => $socialUser->user['location'] ?? null,
+                    'blog' => $socialUser->user['blog'] ?? null,
+                ]);
+
+            case 'apple':
+                return array_merge($baseData, [
+                    'is_private_email' => $socialUser->user['is_private_email'] ?? false,
+                ]);
+
+            default:
+                return $baseData;
+        }
+    }
+
+    protected function generateNameFromEmail(string $email): string
+    {
+        return Str::title(Str::before($email, '@'));
+    }
+
+    public function getAllowedProviders(): array
+    {
+        return $this->allowedProviders;
+    }
+}
+```
+
+### Step 9:  Routes
+
+**routes/web.php**
+
+```php
+<?php
+
+use Illuminate\Support\Facades\Route;
+
+Route::get('/', function () {
+    return view('welcome');
+});
+
+// Catch-all route for React Router
+Route::get('/{any}', function () {
+    return view('welcome');
+})->where('any', '.*');
+```
+
+**routes/api.php**
+
+```php
+<?php
+// routes/api.php
+
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DoctorController;
 use App\Http\Controllers\Api\ClinicController;
 use App\Http\Controllers\Api\AppointmentController;
+use App\Http\Controllers\Api\SocialAuthController;
 
 // Authentication routes
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+
+// Social Authentication Feature Routes
+Route::prefix('auth/social')->group(function () {
+    // Get available providers
+    Route::get('/providers', [SocialAuthController::class, 'getProviders']);
+    
+    // Initiate social auth for any provider
+    Route::get('/{provider}', [SocialAuthController::class, 'redirectToProvider'])
+        ->where('provider', 'google|facebook|github|apple');
+    
+    // Handle callbacks for any provider
+    Route::get('/{provider}/callback', [SocialAuthController::class, 'handleProviderCallback'])
+        ->where('provider', 'google|facebook|github|apple');
+});
+
+// Protected Social Auth routes
+Route::middleware('auth:sanctum')->prefix('auth/social')->group(function () {
+    // Get user's linked providers
+    Route::get('/user/providers', [SocialAuthController::class, 'getUserProviders']);
+    
+    // Link a new provider to existing account
+    Route::post('/link/{provider}', [SocialAuthController::class, 'linkProvider'])
+        ->where('provider', 'google|facebook|github|apple');
+    
+    // Unlink a provider from account
+    Route::delete('/unlink/{provider}', [SocialAuthController::class, 'unlinkProvider'])
+        ->where('provider', 'google|facebook|github|apple');
+});
 
 // Public routes
 Route::get('/doctors', [DoctorController::class, 'index']);
@@ -810,6 +1915,7 @@ Route::get('/clinics/{id}/doctors', [ClinicController::class, 'getDoctors']);
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/user', [AuthController::class, 'user']);
     
     // Appointments
     Route::get('/appointments', [AppointmentController::class, 'index']);
@@ -820,1756 +1926,7663 @@ Route::middleware('auth:sanctum')->group(function () {
 ```
 
 
-### 7. 🎨 Laravel Blade Layout for React Integration
+***
 
-**📄 Main Layout**
+## 🎨 Frontend Implementation
+
+### Step 10: Frontend Package Configuration
+
+**package.json**
+
+```json
+{
+    "$schema": "https://json.schemastore.org/package.json",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "vite build",
+        "dev": "vite"
+    },
+    "devDependencies": {
+        "@laravel/echo-react": "^2.1.6",
+        "@tailwindcss/vite": "^4.0.0",
+        "@vitejs/plugin-react": "^4.3.4",
+        "axios": "^1.9.0",
+        "concurrently": "^9.0.1",
+        "laravel-echo": "^2.1.6",
+        "laravel-vite-plugin": "^1.2.0",
+        "pusher-js": "^8.4.0",
+        "tailwindcss": "^4.0.0",
+        "terser": "^5.43.1",
+        "vite": "^6.2.4",
+        "vite-plugin-compression": "^0.5.1"
+    },
+    "dependencies": {
+        "@emotion/react": "^11.14.0",
+        "@emotion/styled": "^11.14.0",
+        "@mui/icons-material": "^6.4.4",
+        "@mui/material": "^6.4.4",
+        "@mui/x-charts": "^7.26.0",
+        "@react-google-maps/api": "^2.20.6",
+        "@socket.io/redis-adapter": "^8.2.1",
+        "@vitejs/plugin-react": "^4.5.0",
+        "cors": "^2.8.5",
+        "date-fns": "^4.1.0",
+        "dotenv": "^16.4.5",
+        "express": "^4.19.2",
+        "ioredis": "^5.3.2",
+        "leaflet": "^1.9.4",
+        "qs": "^6.14.0",
+        "react": "^18.2.0",
+        "react-countup": "^6.5.3",
+        "react-dom": "^18.2.0",
+        "react-leaflet": "^4.2.1",
+        "react-router-dom": "^7.1.5",
+        "socket.io": "^4.7.5",
+        "socket.io-client": "^4.7.5",
+        "styled-components": "^6.1.15",
+        "styled-jsx": "^5.1.7",
+        "validate-upi-id": "^1.0.1"
+    }
+}
+```
+
+
+### Step 11: Vite Configuration
+
+**vite.config.js**
+
+```javascript
+import { defineConfig } from 'vite';
+import laravel from 'laravel-vite-plugin';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+    plugins: [
+        react({
+            babel: {
+                plugins: ['styled-jsx/babel']
+            }
+        }),
+        laravel({
+            input: ['resources/css/app.css', 'resources/js/app.jsx'],
+            refresh: true,
+        }),
+    ],
+    build: {
+        assetsInlineLimit: 0,
+        rollupOptions: {
+            output: {
+                manualChunks: {
+                    vendor: ['react', 'react-dom'],
+                    mui: ['@mui/material', '@mui/icons-material'],
+                },
+            },
+        },
+        minify: 'terser',
+        terserOptions: {
+            compress: {
+                drop_console: true,
+                drop_debugger: true,
+            },
+        },
+        sourcemap: false,
+        chunkSizeWarningLimit: 1600,
+    },
+    server: {
+        hmr: {
+            host: 'localhost',
+        },
+    },
+    esbuild: {
+        drop: process.env.NODE_ENV === 'production' ? ['console', 'debugger'] : [],
+    },
+});
+```
+
+
+### Step 12: Bootstrap Configuration
+
+**resources/js/bootstrap.js**
+
+```javascript
+import axios from 'axios';
+window.axios = axios;
+window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
+```
+
+
+### Step 13: Welcome Blade Template
+
+**resources/views/welcome.blade.php**
 
 ```php
-// resources/views/layouts/app.blade.php
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="csrf-token" content="{{ csrf_token() }}">
-        
-        <title>{{ config('app.name', 'Doctor Clinic App') }}</title>
-        
-        <!-- Favicon -->
-        <link rel="icon" href="{{ asset('favicon.ico') }}">
-        
-        <!-- Leaflet CSS -->
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Visit Care - Healthcare Booking Platform</title>
+    <meta name="description" content="Find and book appointments with verified doctors and top-rated clinics near you. Your trusted healthcare companion.">
+    <meta name="keywords" content="healthcare, doctors, clinics, appointments, medical booking, telemedicine">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    
+    <!-- Favicon -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="Visit Care - Healthcare Booking Platform">
+    <meta property="og:description" content="Find and book appointments with verified doctors and clinics near you">
+    <meta property="og:image" content="/og-image.jpg">
+    <meta property="og:url" content="{{ url('/') }}">
+    <meta property="og:type" content="website">
+    
+    <!-- Twitter Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Visit Care - Healthcare Booking Platform">
+    <meta name="twitter:description" content="Find and book appointments with verified doctors and clinics near you">
+    <meta name="twitter:image" content="/twitter-image.jpg">
+    
+    <!-- Preload critical resources -->
+    <link rel="preload" href="{{ Vite::asset('resources/css/app.css') }}" as="style">
+    <link rel="preload" href="{{ Vite::asset('resources/js/app.jsx') }}" as="script" crossorigin>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
               integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
               crossorigin=""/>
-        
-        <!-- Fonts -->
-        <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=roboto:300,400,500,700" rel="stylesheet" />
-        
-        <!-- Vite CSS -->
-        @vite(['resources/css/app.css'])
-    </head>
-    <body>
-        <div id="root"></div>
-        
-        <!-- Vite JS -->
-        @vite(['resources/js/app.jsx'])
-    </body>
+
+    @viteReactRefresh
+    @vite(['resources/css/app.css', 'resources/js/app.jsx'])
+</head>
+
+<body>
+    <div id="app"></div>
+</body>
+
 </html>
 ```
 
-**🎯 Web Route for SPA**
 
-```php
-// routes/web.php
-<?php
+### Step 14: Main App Component
 
-use Illuminate\Support\Facades\Route;
+**resources/js/app.jsx**
 
-// Single route to serve the React SPA
-Route::get('/{any}', function () {
-    return view('layouts.app');
-})->where('any', '.*');
-```
-
-
-### 8. ⚛️ React Frontend Structure (Integrated with Laravel)
-
-**📁 Project Structure**
-
-```
-resources/
-├── js/
-│   ├── components/
-│   │   ├── common/
-│   │   │   ├── Header.jsx
-│   │   │   ├── Footer.jsx
-│   │   │   └── LoadingSpinner.jsx
-│   │   ├── auth/
-│   │   │   ├── LoginForm.jsx
-│   │   │   └── RegisterForm.jsx
-│   │   ├── doctors/
-│   │   │   ├── DoctorList.jsx
-│   │   │   ├── DoctorCard.jsx
-│   │   │   └── DoctorProfile.jsx
-│   │   ├── clinics/
-│   │   │   ├── ClinicList.jsx
-│   │   │   ├── ClinicCard.jsx
-│   │   │   └── ClinicMap.jsx
-│   │   └── appointments/
-│   │       ├── BookingForm.jsx
-│   │       ├── AppointmentList.jsx
-│   │       └── AppointmentCard.jsx
-│   ├── pages/
-│   │   ├── Home.jsx
-│   │   ├── SearchResults.jsx
-│   │   ├── DoctorDetails.jsx
-│   │   ├── ClinicDetails.jsx
-│   │   ├── BookAppointment.jsx
-│   │   └── MyAppointments.jsx
-│   ├── services/
-│   │   └── api.js
-│   ├── contexts/
-│   │   └── AuthContext.jsx
-│   ├── utils/
-│   │   └── constants.js
-│   └── app.jsx
-└── css/
-    └── app.css
-```
-
-**🚀 Main React App File**
-
-```javascript
-// resources/js/app.jsx
+```jsx
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from 'react-query';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
-import { CssBaseline } from '@mui/material';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-
-import AuthProvider from './contexts/AuthContext';
-import Header from './components/common/Header';
-import Footer from './components/common/Footer';
-import Home from './pages/Home';
-import SearchResults from './pages/SearchResults';
-import DoctorDetails from './pages/DoctorDetails';
-import ClinicDetails from './pages/ClinicDetails';
-import BookAppointment from './pages/BookAppointment';
-import MyAppointments from './pages/MyAppointments';
-
-// Create React Query client
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: 1,
-    },
-  },
-});
-
-// Create Material-UI theme
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#1976d2',
-    },
-    secondary: {
-      main: '#dc004e',
-    },
-  },
-  typography: {
-    fontFamily: 'Roboto, Arial, sans-serif',
-  },
-});
+import { ThemeProvider } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
+import theme from './theme/theme';
+import HomePage from './pages/HomePage';
+import DoctorDashboard from './pages/doctor/DoctorDashboard';
+import HealthcareDashboard from './pages/healthcare/HealthcareDashboard';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AuthCallback from './components/auth/AuthCallback';
+import '../css/app.css';
+import './bootstrap';
 
 function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider theme={theme}>
-        <LocalizationProvider dateAdapter={AdapterDayjs}>
-          <CssBaseline />
-          <AuthProvider>
+    return (
+        <ThemeProvider theme={theme}>
+            <CssBaseline />
             <Router>
-              <div className="app">
-                <Header />
-                <main style={{ minHeight: 'calc(100vh - 140px)' }}>
-                  <Routes>
-                    <Route path="/" element={<Home />} />
-                    <Route path="/search" element={<SearchResults />} />
-                    <Route path="/doctors/:id" element={<DoctorDetails />} />
-                    <Route path="/clinics/:id" element={<ClinicDetails />} />
-                    <Route path="/book/:doctorId" element={<BookAppointment />} />
-                    <Route path="/my-appointments" element={<MyAppointments />} />
-                  </Routes>
-                </main>
-                <Footer />
-              </div>
+                <Routes>
+                    {/* Public Routes */}
+                    <Route path="/" element={<HomePage />} />
+                    
+                    {/* Auth Callback Route */}
+                    <Route path="/auth/callback" element={<AuthCallback />} />
+                    
+                    {/* Role-based Dashboard Routes */}
+                    <Route path="/doctor/dashboard" element={<DoctorDashboard />} />
+                    <Route path="/healthcare/dashboard" element={<HealthcareDashboard />} />
+                    <Route path="/admin/dashboard" element={<AdminDashboard />} />
+                    
+                    {/* Fallback Route */}
+                    <Route path="*" element={<HomePage />} />
+                </Routes>
             </Router>
-          </AuthProvider>
-        </LocalizationProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
-  );
+        </ThemeProvider>
+    );
 }
 
-// Mount the app
-const container = document.getElementById('root');
+const container = document.getElementById('app');
 const root = createRoot(container);
 root.render(<App />);
 ```
 
-**🔌 API Service (Updated for Laravel integration)**
+
+### Step 15: Material-UI Theme with Enhanced Icons
+
+**resources/js/theme/theme.js**
 
 ```javascript
-// resources/js/services/api.js
-import axios from 'axios';
+import { createTheme } from '@mui/material/styles';
+import "./theme.css";
 
-// Use relative paths since we're integrated with Laravel
-const API_BASE_URL = '/api';
-
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-    'X-Requested-With': 'XMLHttpRequest',
+const theme = createTheme({
+  palette: {
+    primary: {
+      main: '#10d915',    
+      light: '#4de352',   
+      dark: '#0cb010',    
+    },
+    secondary: {
+      main: '#dc004e',
+      light: '#ff5983',
+      dark: '#9a0036',
+    },
+    success: {
+      main: '#10d915',
+    },
+    error: {
+      main: '#f27474',
+    },
+    warning: {
+      main: '#f7e119',
+    },
+    info: {
+      main: '#2196f3',
+    },
+    background: {
+      default: '#f5f5f5',
+      paper: '#ffffff',
+    },
+  },
+  typography: {
+    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+    h1: {
+      fontSize: '2.5rem',
+      fontWeight: 700,
+    },
+    h2: {
+      fontSize: '2rem',
+      fontWeight: 600,
+    },
+    h3: {
+      fontSize: '1.5rem',
+      fontWeight: 600,
+    },
+  },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          borderRadius: 8,
+          textTransform: 'none',
+          fontWeight: 600,
+        },
+      },
+    },
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          borderRadius: 12,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+          '&:hover': {
+            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+            transform: 'translateY(-2px)',
+          },
+          transition: 'all 0.3s ease-in-out',
+        },
+      },
+    },
   },
 });
 
-// Add CSRF token for Laravel
-const token = document.head.querySelector('meta[name="csrf-token"]');
-if (token) {
-    api.defaults.headers.common['X-CSRF-TOKEN'] = token.content;
+export default theme;
+```
+
+**resources/js/theme/theme.css**
+
+```css
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@200;300;400;500;600&display=swap');
+
+* {
+  font-family: 'Poppins', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
-
-// Add auth token to requests
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('auth_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
-export const authAPI = {
-  login: (credentials) => api.post('/login', credentials),
-  register: (userData) => api.post('/register', userData),
-  logout: () => api.post('/logout'),
-};
-
-export const doctorAPI = {
-  getDoctors: (params) => api.get('/doctors', { params }),
-  getDoctor: (id) => api.get(`/doctors/${id}`),
-  getAvailability: (doctorId, clinicId, date) => 
-    api.get(`/doctors/${doctorId}/availability/${clinicId}`, { params: { date } }),
-};
-
-export const clinicAPI = {
-  getClinics: (params) => api.get('/clinics', { params }),
-  getClinic: (id) => api.get(`/clinics/${id}`),
-  getClinicDoctors: (id) => api.get(`/clinics/${id}/doctors`),
-};
-
-export const appointmentAPI = {
-  getAppointments: () => api.get('/appointments'),
-  bookAppointment: (data) => api.post('/appointments', data),
-  getAppointment: (id) => api.get(`/appointments/${id}`),
-  cancelAppointment: (id) => api.put(`/appointments/${id}/cancel`),
-};
-
-export default api;
 ```
 
-**🔐 Auth Context**
+
+### Step 16: Enhanced Dummy Data with Icons
+
+**resources/js/data/dummyData.js**
 
 ```javascript
-// resources/js/contexts/AuthContext.jsx
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { authAPI } from '../services/api';
+export const specialties = [
+    'General Medicine', 'Cardiology', 'Dermatology', 'Orthopedics',
+    'Pediatrics', 'Neurology', 'Dentistry', 'Gynecology', 'Psychiatry', 'Oncology'
+];
 
-const AuthContext = createContext();
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
-
-const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  useEffect(() => {
-    const token = localStorage.getItem('auth_token');
-    const userData = localStorage.getItem('user_data');
-    
-    if (token && userData) {
-      try {
-        setUser(JSON.parse(userData));
-        setIsAuthenticated(true);
-      } catch (error) {
-        console.error('Error parsing user data:', error);
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('user_data');
-      }
+export const clinics = [
+    {
+        id: 1,
+        name: 'City Medical Center',
+        address: '123 Health Street, Downtown, NY 10001',
+        distance: '0.5 km',
+        rating: 4.8,
+        reviewCount: 234,
+        facilities: ['🩻 X-Ray', '🔬 Lab', '💊 Pharmacy', '🚨 Emergency'],
+        image: 'https://images.unsplash.com/photo-1551190822-a9333d879b1f?w=400&h=300&fit=crop',
+        openTime: '08:00',
+        closeTime: '20:00',
+        isOpen: true
+    },
+    {
+        id: 2,
+        name: 'Green Valley Clinic',
+        address: '456 Wellness Ave, Midtown, NY 10002',
+        distance: '1.2 km',
+        rating: 4.6,
+        reviewCount: 187,
+        facilities: ['🔬 Lab', '💊 Pharmacy', '❤️ Cardiology', '🔍 Radiology'],
+        image: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=400&h=300&fit=crop',
+        openTime: '09:00',
+        closeTime: '18:00',
+        isOpen: true
+    },
+    {
+        id: 3,
+        name: 'Metro Health Hub',
+        address: '789 Care Road, Uptown, NY 10003',
+        distance: '2.1 km',
+        rating: 4.7,
+        reviewCount: 156,
+        facilities: ['🩻 X-Ray', '🧲 MRI', '🔬 Lab', '💊 Pharmacy', '⚕️ Surgery'],
+        image: 'https://images.unsplash.com/photo-1504813184591-01572f98c85f?w=400&h=300&fit=crop',
+        openTime: '24/7',
+        closeTime: '24/7',
+        isOpen: true
+    },
+    {
+        id: 4,
+        name: 'Riverside Medical',
+        address: '321 River Lane, Brooklyn, NY 11201',
+        distance: '3.5 km',
+        rating: 4.5,
+        reviewCount: 298,
+        facilities: ['🚨 Emergency', '🏥 ICU', '🔬 Lab', '💊 Pharmacy'],
+        image: 'https://images.unsplash.com/photo-1586773860418-d37222d8eeb4?w=400&h=300&fit=crop',
+        openTime: '06:00',
+        closeTime: '22:00',
+        isOpen: true
     }
-    
-    setIsLoading(false);
-  }, []);
+];
 
-  const login = async (credentials) => {
-    try {
-      const response = await authAPI.login(credentials);
-      const { user, token } = response.data;
-      
-      localStorage.setItem('auth_token', token);
-      localStorage.setItem('user_data', JSON.stringify(user));
-      
-      setUser(user);
-      setIsAuthenticated(true);
-      
-      return { success: true };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error.response?.data?.message || 'Login failed' 
-      };
+export const doctors = [
+    {
+        id: 1,
+        name: 'Dr. Sarah Johnson',
+        specialty: '❤️ Cardiology',
+        experience: 12,
+        rating: 4.9,
+        reviewCount: 145,
+        fee: 150,
+        isVerified: true,
+        nextAvailable: 'Today 2:30 PM',
+        languages: ['🇺🇸 English', '🇪🇸 Spanish'],
+        image: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150&h=150&fit=crop&crop=face',
+        clinicName: 'City Medical Center'
+    },
+    {
+        id: 2,
+        name: 'Dr. Michael Chen',
+        specialty: '🩺 General Medicine',
+        experience: 8,
+        rating: 4.7,
+        reviewCount: 89,
+        fee: 100,
+        isVerified: true,
+        nextAvailable: 'Tomorrow 9:00 AM',
+        languages: ['🇺🇸 English', '🇨🇳 Mandarin'],
+        image: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=150&h=150&fit=crop&crop=face',
+        clinicName: 'Green Valley Clinic'
+    },
+    {
+        id: 3,
+        name: 'Dr. Emily Rodriguez',
+        specialty: '🌟 Dermatology',
+        experience: 10,
+        rating: 4.8,
+        reviewCount: 123,
+        fee: 120,
+        isVerified: true,
+        nextAvailable: 'Today 4:00 PM',
+        languages: ['🇺🇸 English', '🇪🇸 Spanish'],
+        image: 'https://images.unsplash.com/photo-1594824280438-29ed7265034c?w=150&h=150&fit=crop&crop=face',
+        clinicName: 'Metro Health Hub'
+    },
+    {
+        id: 4,
+        name: 'Dr. James Wilson',
+        specialty: '🦴 Orthopedics',
+        experience: 15,
+        rating: 4.9,
+        reviewCount: 167,
+        fee: 180,
+        isVerified: true,
+        nextAvailable: 'Tomorrow 11:30 AM',
+        languages: ['🇺🇸 English'],
+        image: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&h=150&fit=crop&crop=face',
+        clinicName: 'Riverside Medical'
+    },
+    {
+        id: 5,
+        name: 'Dr. Lisa Anderson',
+        specialty: '👶 Pediatrics',
+        experience: 9,
+        rating: 4.8,
+        reviewCount: 201,
+        fee: 110,
+        isVerified: true,
+        nextAvailable: 'Today 3:15 PM',
+        languages: ['🇺🇸 English', '🇫🇷 French'],
+        image: 'https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=150&h=150&fit=crop&crop=face',
+        clinicName: 'City Medical Center'
+    },
+    {
+        id: 6,
+        name: 'Dr. Robert Kumar',
+        specialty: '🧠 Neurology',
+        experience: 14,
+        rating: 4.7,
+        reviewCount: 134,
+        fee: 200,
+        isVerified: true,
+        nextAvailable: 'Tomorrow 2:00 PM',
+        languages: ['🇺🇸 English', '🇮🇳 Hindi'],
+        image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=150&h=150&fit=crop&crop=face',
+        clinicName: 'Metro Health Hub'
     }
-  };
+];
 
-  const register = async (userData) => {
-    try {
-      const response = await authAPI.register(userData);
-      const { user, token } = response.data;
-      
-      localStorage.setItem('auth_token', token);
-      localStorage.setItem('user_data', JSON.stringify(user));
-      
-      setUser(user);
-      setIsAuthenticated(true);
-      
-      return { success: true };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error.response?.data?.message || 'Registration failed' 
-      };
+export const testimonials = [
+    {
+        id: 1,
+        name: 'Alice Thompson',
+        rating: 5,
+        comment: 'Amazing experience! Found the perfect doctor near me within minutes. The booking process was seamless.',
+        avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b977?w=60&h=60&fit=crop&crop=face',
+        location: 'Manhattan, NY'
+    },
+    {
+        id: 2,
+        name: 'David Kumar',
+        rating: 5,
+        comment: 'The app made booking so easy. Great selection of verified doctors with real reviews from patients.',
+        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=60&h=60&fit=crop&crop=face',
+        location: 'Brooklyn, NY'
+    },
+    {
+        id: 3,
+        name: 'Maria Garcia',
+        rating: 4,
+        comment: 'Love the location-based search. Found excellent healthcare nearby and saved so much time.',
+        avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=60&h=60&fit=crop&crop=face',
+        location: 'Queens, NY'
+    },
+    {
+        id: 4,
+        name: 'John Smith',
+        rating: 5,
+        comment: 'Professional service and verified doctors. The reminders feature is incredibly helpful.',
+        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=60&h=60&fit=crop&crop=face',
+        location: 'Bronx, NY'
     }
-  };
+];
 
-  const logout = async () => {
-    try {
-      await authAPI.logout();
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('user_data');
-      setUser(null);
-      setIsAuthenticated(false);
+export const whyChooseFeatures = [
+    {
+        icon: 'LocationOn',
+        title: '📍 Smart Location Search',
+        description: 'Find doctors and clinics near you with precise GPS-based location search and distance tracking.'
+    },
+    {
+        icon: 'Schedule',
+        title: '⏰ Real Time Booking',
+        description: 'Book appointments instantly with live availability updates and immediate confirmation.'
+    },
+    {
+        icon: 'VerifiedUser',
+        title: '✅ Verified Doctors',
+        description: 'All our healthcare providers are thoroughly verified with proven credentials and licenses.'
+    },
+    {
+        icon: 'PhoneIphone',
+        title: '📱 Mobile Optimized',
+        description: 'Perfect experience across all devices with our responsive and intuitive design.'
+    },
+    {
+        icon: 'Security',
+        title: '🔒 Secure & Private',
+        description: 'Your health information is protected with bank-level encryption and privacy controls.'
+    },
+    {
+        icon: 'NotificationImportant',
+        title: '🔔 Smart Reminders',
+        description: 'Never miss appointments with personalized reminders and health notifications.'
     }
-  };
-
-  const value = {
-    user,
-    isAuthenticated,
-    isLoading,
-    login,
-    register,
-    logout
-  };
-
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
-};
-
-export default AuthProvider;
+];
 ```
 
-**📱 Header Component with Auth**
 
-```javascript
-// resources/js/components/common/Header.jsx
-import React, { useState } from 'react';
+### Step 17: Layout Components
+
+**resources/js/components/layout/MainLayout.jsx**
+
+```jsx
+import React from 'react';
+import { Box } from '@mui/material';
+import Header from '../common/Header';
+import Footer from '../common/Footer';
+
+const MainLayout = ({ children }) => {
+    return (
+        <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+            <Header />
+            <Box component="main" sx={{ flexGrow: 1 }}>
+                {children}
+            </Box>
+            <Footer />
+        </Box>
+    );
+};
+
+export default MainLayout;
+```
+
+
+### Step 18: Enhanced Header Component
+
+**resources/js/components/common/Header.jsx**
+
+```jsx
+import React, { useState, useEffect } from "react";
 import {
-  AppBar,
-  Toolbar,
-  Typography,
-  Button,
-  IconButton,
-  Menu,
-  MenuItem,
-  Box,
-  Avatar
-} from '@mui/material';
-import { AccountCircle, LocalHospital } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
-import LoginForm from '../auth/LoginForm';
-import RegisterForm from '../auth/RegisterForm';
+    AppBar,
+    Toolbar,
+    Typography,
+    Box,
+    Button,
+    IconButton,
+    Avatar,
+    Menu,
+    MenuItem,
+    Chip,
+    CircularProgress,
+    useMediaQuery,
+    useTheme,
+    Divider,
+} from "@mui/material";
+import {
+    LocationOn,
+    AccountCircle,
+    Menu as MenuIcon,
+    MyLocation,
+    Search,
+    Logout,
+} from "@mui/icons-material";
+import LocationMap from "../home/LocationMap";
+import LoginModal from "../auth/LoginModal";
 
 const Header = () => {
-  const navigate = useNavigate();
-  const { user, isAuthenticated, logout } = useAuth();
-  const [anchorEl, setAnchorEl] = useState(null);
-  const [loginOpen, setLoginOpen] = useState(false);
-  const [registerOpen, setRegisterOpen] = useState(false);
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+    const [anchorEl, setAnchorEl] = useState(null);
+    const [showLocationMap, setShowLocationMap] = useState(false);
+    const [showLoginModal, setShowLoginModal] = useState(false);
+    const [currentLocation, setCurrentLocation] = useState(
+        "Getting location..."
+    );
+    const [currentCoords, setCurrentCoords] = useState([20.2961, 85.8245]); // Default to Bhubaneswar, Odisha
+    const [locationLoading, setLocationLoading] = useState(true);
+    const [user, setUser] = useState(null);
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  const handleMenuOpen = (event) => {
-    setAnchorEl(event.currentTarget);
+    useEffect(() => {
+        // Check if user is authenticated on component mount
+        checkAuthStatus();
+        // Try to get user's current location on component mount
+        getCurrentLocation();
+    }, []);
+
+    const checkAuthStatus = () => {
+        const token = localStorage.getItem("auth_token");
+        const userData = localStorage.getItem("user");
+
+        if (token && userData) {
+            try {
+                const parsedUser = JSON.parse(userData);
+                setUser(parsedUser);
+                setIsAuthenticated(true);
+            } catch (error) {
+                console.error("Error parsing user data:", error);
+                // Clear invalid data
+                localStorage.removeItem("auth_token");
+                localStorage.removeItem("user");
+                setIsAuthenticated(false);
+                setUser(null);
+            }
+        } else {
+            setIsAuthenticated(false);
+            setUser(null);
+        }
+    };
+
+    const getCurrentLocation = () => {
+        setLocationLoading(true);
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                    const { latitude, longitude } = position.coords;
+                    const coords = [latitude, longitude];
+
+                    try {
+                        const address = await reverseGeocodeGoogle(
+                            latitude,
+                            longitude
+                        );
+                        setCurrentLocation(address);
+                        setCurrentCoords(coords);
+                    } catch (error) {
+                        console.error("Error getting address:", error);
+                        setCurrentLocation("Bhubaneswar, Odisha, India");
+                        setCurrentCoords(coords);
+                    } finally {
+                        setLocationLoading(false);
+                    }
+                },
+                (error) => {
+                    console.error("Geolocation error:", error);
+                    setCurrentLocation("Bhubaneswar, Odisha, India");
+                    setCurrentCoords([20.2961, 85.8245]); // Bhubaneswar fallback
+                    setLocationLoading(false);
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 300000, // 5 minutes
+                }
+            );
+        } else {
+            setCurrentLocation("Bhubaneswar, Odisha, India");
+            setCurrentCoords([20.2961, 85.8245]); // Bhubaneswar fallback
+            setLocationLoading(false);
+        }
+    };
+
+    // Google Maps Reverse Geocoding
+    const reverseGeocodeGoogle = async (lat, lng) => {
+        try {
+            // Check if Google Maps is available
+            if (
+                window.google &&
+                window.google.maps &&
+                window.google.maps.Geocoder
+            ) {
+                return new Promise((resolve) => {
+                    const geocoder = new window.google.maps.Geocoder();
+                    geocoder.geocode(
+                        { location: { lat: Number(lat), lng: Number(lng) } },
+                        (results, status) => {
+                            if (status === "OK" && results && results[0]) {
+                                const address = results[0].formatted_address;
+                                if (typeof address === "string") {
+                                    // Extract meaningful parts of the address
+                                    const parts = address
+                                        .split(",")
+                                        .slice(0, 3);
+                                    resolve(parts.join(",").trim());
+                                } else {
+                                    resolve("Location found");
+                                }
+                            } else {
+                                console.warn(
+                                    "Google geocoding failed:",
+                                    status
+                                );
+                                resolve("Bhubaneswar, Odisha, India");
+                            }
+                        }
+                    );
+                });
+            } else {
+                // Fallback to Google Geocoding API if Maps JS API is not available
+                const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+                if (!apiKey) {
+                    throw new Error("Google API key not available");
+                }
+
+                const response = await fetch(
+                    `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}&language=en&region=in`
+                );
+
+                if (!response.ok) {
+                    throw new Error("Network response was not ok");
+                }
+
+                const data = await response.json();
+
+                if (data.status === "OK" && data.results && data.results[0]) {
+                    const address = data.results[0].formatted_address;
+                    // Extract meaningful parts of the address (city, state, country)
+                    const parts = address.split(",").slice(0, 3);
+                    return parts.join(",").trim();
+                } else {
+                    throw new Error("No results found");
+                }
+            }
+        } catch (error) {
+            console.error("Google reverse geocoding error:", error);
+            return "Bhubaneswar, Odisha, India";
+        }
+    };
+
+    // COMMENTED OUT: OpenStreetMap reverse geocoding (keeping for reference)
+    /*
+  const reverseGeocode = async (lat, lng) => {
+    try {
+      const response = await fetch(
+        `https://api.allorigins.win/get?url=${encodeURIComponent(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
+        )}`
+      );
+
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+
+      const proxyData = await response.json();
+      const data = JSON.parse(proxyData.contents);
+
+      if (data.display_name) {
+        const address = data.address;
+        if (address) {
+          const parts = [];
+          if (address.house_number && address.road) {
+            parts.push(`${address.house_number} ${address.road}`);
+          } else if (address.road) {
+            parts.push(address.road);
+          }
+          if (address.city || address.town || address.village) {
+            parts.push(address.city || address.town || address.village);
+          }
+          if (address.state) {
+            parts.push(address.state);
+          }
+          if (address.postcode) {
+            parts.push(address.postcode);
+          }
+
+          if (parts.length > 0) {
+            return parts.join(', ');
+          }
+        }
+        return data.display_name.split(',').slice(0, 3).join(',');
+      } else {
+        return 'Location not found';
+      }
+    } catch (error) {
+      console.error('Reverse geocoding error:', error);
+      return 'Location not found';
+    }
   };
+  */
 
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  };
+    const handleProfileMenuOpen = (event) => {
+        if (!isAuthenticated) {
+            // Show login modal if user is not authenticated
+            setShowLoginModal(true);
+        } else {
+            // Show profile menu if user is authenticated
+            setAnchorEl(event.currentTarget);
+        }
+    };
 
-  const handleLogout = async () => {
-    await logout();
-    handleMenuClose();
-    navigate('/');
-  };
+    const handleMenuClose = () => {
+        setAnchorEl(null);
+    };
 
-  return (
-    <>
-      <AppBar position="static">
-        <Toolbar>
-          <IconButton
-            edge="start"
-            color="inherit"
-            onClick={() => navigate('/')}
-          >
-            <LocalHospital />
-          </IconButton>
-          
-          <Typography 
-            variant="h6" 
-            component="div" 
-            sx={{ flexGrow: 1, cursor: 'pointer' }}
-            onClick={() => navigate('/')}
-          >
-            Doctor Clinic App
-          </Typography>
+    const handleLocationUpdate = (newLocation, newCoords) => {
+        setCurrentLocation(newLocation);
+        setCurrentCoords(newCoords);
+        setShowLocationMap(false);
+    };
 
-          {isAuthenticated ? (
-            <Box display="flex" alignItems="center">
-              <Button 
-                color="inherit" 
-                onClick={() => navigate('/my-appointments')}
-              >
-                My Appointments
-              </Button>
-              
-              <IconButton
-                edge="end"
-                color="inherit"
-                onClick={handleMenuOpen}
-              >
-                {user?.avatar ? (
-                  <Avatar src={user.avatar} sx={{ width: 32, height: 32 }} />
+    const handleMenuItemClick = (action) => {
+        handleMenuClose();
+        if (action === "changeLocation") {
+            setShowLocationMap(true);
+        } else if (action === "logout") {
+            handleLogout();
+        }
+        // Add other menu actions here as needed
+    };
+
+    const handleLoginSuccess = (userData, token) => {
+        setUser(userData);
+        setIsAuthenticated(true);
+        setShowLoginModal(false);
+
+        // Role-based redirection after login
+        const redirectBasedOnRole = (role) => {
+            switch (role) {
+                case "patient":
+                    // Stay on current page
+                    break;
+                case "doctor":
+                    window.location.href = "/doctor/dashboard";
+                    break;
+                case "healthcare":
+                    window.location.href = "/healthcare/dashboard";
+                    break;
+                case "admin":
+                    window.location.href = "/admin/dashboard";
+                    break;
+                default:
+                // Stay on current page
+            }
+        };
+
+        redirectBasedOnRole(userData.user_type);
+    };
+
+    const handleLogout = () => {
+        // Clear authentication data
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("user");
+        setUser(null);
+        setIsAuthenticated(false);
+        // Optionally redirect to home page or show a success message
+    };
+
+    const LocationButton = () => (
+        <Button
+            startIcon={
+                locationLoading ? (
+                    <CircularProgress size={16} />
                 ) : (
-                  <AccountCircle />
-                )}
-              </IconButton>
-              
-              <Menu
-                anchorEl={anchorEl}
-                open={Boolean(anchorEl)}
-                onClose={handleMenuClose}
-              >
-                <MenuItem>
-                  <Typography variant="body2">
-                    {user?.name}
-                  </Typography>
-                </MenuItem>
-                <MenuItem onClick={handleLogout}>Logout</MenuItem>
-              </Menu>
+                    <LocationOn />
+                )
+            }
+            onClick={() => setShowLocationMap(!showLocationMap)}
+            sx={{
+                color: "var(--text-primary)",
+                textTransform: "none",
+                "&:hover": {
+                    backgroundColor: "rgba(255,255,255,0.1)",
+                },
+                minWidth: isMobile ? "auto" : "200px",
+            }}
+        >
+            <Box
+                sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-start",
+                }}
+            >
+                <Typography
+                    variant="caption"
+                    sx={{ opacity: 0.8, fontSize: "0.7rem" }}
+                >
+                    Current Location
+                </Typography>
+                <Typography
+                    variant="body2"
+                    sx={{
+                        fontWeight: 500,
+                        maxWidth: isMobile ? "150px" : "180px",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                    }}
+                >
+                    {currentLocation}
+                </Typography>
             </Box>
-          ) : (
-            <Box>
-              <Button 
-                color="inherit" 
-                onClick={() => setLoginOpen(true)}
-              >
-                Login
-              </Button>
-              <Button 
-                color="inherit" 
-                onClick={() => setRegisterOpen(true)}
-              >
-                Register
-              </Button>
-            </Box>
-          )}
-        </Toolbar>
-      </AppBar>
+        </Button>
+    );
 
-      <LoginForm 
-        open={loginOpen} 
-        onClose={() => setLoginOpen(false)}
-        onRegisterClick={() => {
-          setLoginOpen(false);
-          setRegisterOpen(true);
-        }}
-      />
-      
-      <RegisterForm 
-        open={registerOpen} 
-        onClose={() => setRegisterOpen(false)}
-        onLoginClick={() => {
-          setRegisterOpen(false);
-          setLoginOpen(true);
-        }}
-      />
-    </>
-  );
+    return (
+        <>
+            <AppBar
+                position="fixed"
+                color="transparent"
+                elevation={0}
+                sx={{
+                    zIndex: 1201,
+                    boxShadow: "0 6px 10px rgba(0, 0, 0, 0.3)",
+                    backdropFilter: "blur(15px)",
+                    borderBottomLeftRadius: "10px",
+                    borderBottomRightRadius: "10px",
+                    backgroundColor: "var(--appbar-bg)",
+                    color: "var(--text-primary)",
+                }}
+            >
+                <Toolbar>
+                    {/* Logo and Location Button for Desktop */}
+                    <Box
+                        sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: isMobile ? 0 : 3,
+                        }}
+                    >
+                        <Typography
+                            variant="h6"
+                            component="div"
+                            sx={{
+                                fontWeight: "bold",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                            }}
+                        >
+                            <img
+                                src="/images/common/visit_care_logo.webp"
+                                alt="Visit Care"
+                                style={{
+                                    height: isMobile ? "45px" : "45px",
+                                    width: "auto",
+                                    objectFit: "contain",
+                                }}
+                                onError={(e) => {
+                                    console.error("Logo failed to load");
+                                    e.target.style.display = "none";
+                                    e.target.nextSibling.style.display =
+                                        "inline";
+                                }}
+                            />
+                        </Typography>
+
+                        {/* Desktop Location Button - placed next to logo */}
+                        {!isMobile && <LocationButton />}
+                    </Box>
+
+                    {/* Spacer for desktop */}
+                    <Box sx={{ flexGrow: 1 }} />
+
+                    {/* Profile Menu */}
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        {!isMobile && isAuthenticated && (
+                            <Chip
+                                label="Patient"
+                                size="small"
+                                variant="outlined"
+                                sx={{
+                                    color: "green",
+                                    borderColor: "rgba(58, 187, 7, 0.5)",
+                                }}
+                            />
+                        )}
+                        <IconButton
+                            edge="end"
+                            onClick={handleProfileMenuOpen}
+                            sx={{ color: "var(--text-primary)" }}
+                        >
+                            <Avatar
+                                src={
+                                    isAuthenticated && user?.avatar
+                                        ? user.avatar
+                                        : "/images/common/avatar.webp"
+                                }
+                                sx={{ width: 40, height: 40 }}
+                            />
+                        </IconButton>
+                    </Box>
+                </Toolbar>
+
+                {/* Mobile Location Bar */}
+                {isMobile && (
+                    <Box
+                        sx={{
+                            px: 2,
+                            pb: 1,
+                            borderTop: "1px solid rgba(255,255,255,0.1)",
+                        }}
+                    >
+                        <LocationButton />
+                    </Box>
+                )}
+            </AppBar>
+
+            {/* Enhanced Profile Menu - Only shown when authenticated */}
+            {isAuthenticated && (
+                <Menu
+                    anchorEl={anchorEl}
+                    open={Boolean(anchorEl)}
+                    onClose={handleMenuClose}
+                    anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                    transformOrigin={{ vertical: "top", horizontal: "right" }}
+                    sx={{
+                        "& .MuiPaper-root": {
+                            minWidth: isMobile ? "250px" : "200px",
+                            mt: 1,
+                        },
+                    }}
+                >
+                    {/* User Info Section */}
+                    <Box
+                        sx={{
+                            px: 2,
+                            py: 1,
+                            borderBottom: "1px solid rgba(0,0,0,0.1)",
+                        }}
+                    >
+                        <Typography
+                            variant="subtitle2"
+                            sx={{ fontWeight: "bold" }}
+                        >
+                            {user?.name || "User"}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                            {user?.email || "user@example.com"}
+                        </Typography>
+                    </Box>
+
+                    {/* Profile Section */}
+                    <MenuItem onClick={() => handleMenuItemClick("profile")}>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                width: "100%",
+                            }}
+                        >
+                            <AccountCircle />
+                            <Typography>My Profile</Typography>
+                        </Box>
+                    </MenuItem>
+
+                    <MenuItem
+                        onClick={() => handleMenuItemClick("appointments")}
+                    >
+                        <Box
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                width: "100%",
+                            }}
+                        >
+                            <Search />
+                            <Typography>My Appointments</Typography>
+                        </Box>
+                    </MenuItem>
+
+                    {/* Divider to separate profile options from navigation options */}
+                    <Divider sx={{ my: 1 }} />
+
+                    {/* Navigation Options */}
+                    <MenuItem
+                        onClick={() => handleMenuItemClick("findDoctors")}
+                    >
+                        <Box
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                width: "100%",
+                            }}
+                        >
+                            <Search />
+                            <Typography>Find Doctors</Typography>
+                        </Box>
+                    </MenuItem>
+
+                    <MenuItem
+                        onClick={() => handleMenuItemClick("findClinics")}
+                    >
+                        <Box
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                width: "100%",
+                            }}
+                        >
+                            <LocationOn />
+                            <Typography>Find Clinics</Typography>
+                        </Box>
+                    </MenuItem>
+
+                    <MenuItem
+                        onClick={() => handleMenuItemClick("changeLocation")}
+                    >
+                        <Box
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                width: "100%",
+                            }}
+                        >
+                            <MyLocation />
+                            <Typography>Change Location</Typography>
+                        </Box>
+                    </MenuItem>
+
+                    {/* Divider before logout */}
+                    <Divider sx={{ my: 1 }} />
+
+                    <MenuItem onClick={() => handleMenuItemClick("logout")}>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                width: "100%",
+                            }}
+                        >
+                            <Logout />
+                            <Typography>Logout</Typography>
+                        </Box>
+                    </MenuItem>
+                </Menu>
+            )}
+
+            {/* Login Modal */}
+            <LoginModal
+                open={showLoginModal}
+                onClose={() => setShowLoginModal(false)}
+                onLoginSuccess={handleLoginSuccess}
+            />
+
+            {/* Location Map Modal */}
+            {showLocationMap && (
+                <LocationMap
+                    open={showLocationMap}
+                    onClose={() => setShowLocationMap(false)}
+                    currentLocation={currentLocation}
+                    currentCoords={currentCoords}
+                    onLocationUpdate={handleLocationUpdate}
+                />
+            )}
+        </>
+    );
 };
 
 export default Header;
 ```
 
-**🔑 Login Form Component**
 
-```javascript
-// resources/js/components/auth/LoginForm.jsx
-import React, { useState } from 'react';
+### Step 19: Enhanced Footer Component
+
+**resources/js/components/common/Footer.jsx**
+
+```jsx
+import React from 'react';
 import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  Button,
-  Alert,
-  Link,
-  Typography
+    Box,
+    Container,
+    Grid,
+    Typography,
+    Link,
+    IconButton,
+    Divider,
+    List,
+    ListItem,
+    ListItemIcon,
+    ListItemText,
 } from '@mui/material';
-import { useAuth } from '../../contexts/AuthContext';
-
-const LoginForm = ({ open, onClose, onRegisterClick }) => {
-  const { login } = useAuth();
-  const [formData, setFormData] = useState({
-    email: '',
-    password: ''
-  });
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-
-    const result = await login(formData);
-    
-    if (result.success) {
-      onClose();
-      setFormData({ email: '', password: '' });
-    } else {
-      setError(result.error);
-    }
-    
-    setLoading(false);
-  };
-
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Login</DialogTitle>
-      
-      <form onSubmit={handleSubmit}>
-        <DialogContent>
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-
-          <TextField
-            fullWidth
-            label="Email"
-            name="email"
-            type="email"
-            value={formData.email}
-            onChange={handleChange}
-            required
-            margin="normal"
-          />
-
-          <TextField
-            fullWidth
-            label="Password"
-            name="password"
-            type="password"
-            value={formData.password}
-            onChange={handleChange}
-            required
-            margin="normal"
-          />
-
-          <Typography variant="body2" sx={{ mt: 2 }}>
-            Don't have an account?{' '}
-            <Link 
-              component="button" 
-              type="button"
-              onClick={onRegisterClick}
-              underline="hover"
-            >
-              Register here
-            </Link>
-          </Typography>
-        </DialogContent>
-
-        <DialogActions>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button 
-            type="submit" 
-            variant="contained" 
-            disabled={loading}
-          >
-            {loading ? 'Logging in...' : 'Login'}
-          </Button>
-        </DialogActions>
-      </form>
-    </Dialog>
-  );
-};
-
-export default LoginForm;
-```
-
-**📝 Register Form Component**
-
-```javascript
-// resources/js/components/auth/RegisterForm.jsx
-import React, { useState } from 'react';
 import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  Button,
-  Alert,
-  Link,
-  Typography,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Grid
-} from '@mui/material';
-import { useAuth } from '../../contexts/AuthContext';
+    Phone,
+    Email,
+    LocationOn,
+    Schedule,
+    Facebook,
+    Twitter,
+    Instagram,
+    LinkedIn,
+    LocalHospital,
+} from '@mui/icons-material';
 
-const RegisterForm = ({ open, onClose, onLoginClick }) => {
-  const { register } = useAuth();
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    password_confirmation: '',
-    user_type: 'patient',
-    phone: '',
-    address: ''
-  });
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+const Footer = () => {
+    const footerLinks = {
+        services: [
+            '🔍 Find Doctors',
+            '📅 Book Appointments', 
+            '🏥 Find Clinics',
+            '📋 Health Records',
+            '💻 Telemedicine',
+            '🚨 Emergency Care'
+        ],
+        support: [
+            '❓ Help Center',
+            '📞 Contact Us',
+            '💬 FAQ',
+            '🔐 Privacy Policy',
+            '📜 Terms of Service',
+            '♿ Accessibility'
+        ],
+        company: [
+            'ℹ️ About Us',
+            '💼 Careers',
+            '📰 Press',
+            '🤝 Partners',
+            '💰 Investors',
+            '📝 Blog'
+        ]
+    };
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
+    const contactInfo = [
+        { icon: <Phone />, text: '📞 +1 (555) 123-4567' },
+        { icon: <Email />, text: '📧 support@visitcare.com' },
+        { icon: <LocationOn />, text: '📍 123 Healthcare Ave, New York, NY 10001' },
+        { icon: <Schedule />, text: '🕐 24/7 Customer Support' }
+    ];
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
+    const socialIcons = [
+        { icon: <Facebook />, link: '#', color: '#1877F2', name: 'Facebook' },
+        { icon: <Twitter />, link: '#', color: '#1DA1F2', name: 'Twitter' },
+        { icon: <Instagram />, link: '#', color: '#E4405F', name: 'Instagram' },
+        { icon: <LinkedIn />, link: '#', color: '#0A66C2', name: 'LinkedIn' }
+    ];
 
-    if (formData.password !== formData.password_confirmation) {
-      setError('Passwords do not match');
-      return;
-    }
-
-    setLoading(true);
-
-    const result = await register(formData);
-    
-    if (result.success) {
-      onClose();
-      setFormData({
-        name: '',
-        email: '',
-        password: '',
-        password_confirmation: '',
-        user_type: 'patient',
-        phone: '',
-        address: ''
-      });
-    } else {
-      setError(result.error);
-    }
-    
-    setLoading(false);
-  };
-
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>Register</DialogTitle>
-      
-      <form onSubmit={handleSubmit}>
-        <DialogContent>
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Full Name"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                required
-                margin="normal"
-              />
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                margin="normal"
-              />
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Password"
-                name="password"
-                type="password"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                margin="normal"
-              />
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Confirm Password"
-                name="password_confirmation"
-                type="password"
-                value={formData.password_confirmation}
-                onChange={handleChange}
-                required
-                margin="normal"
-              />
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <FormControl fullWidth margin="normal" required>
-                <InputLabel>User Type</InputLabel>
-                <Select
-                  name="user_type"
-                  value={formData.user_type}
-                  onChange={handleChange}
-                >
-                  <MenuItem value="patient">Patient</MenuItem>
-                  <MenuItem value="doctor">Doctor</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Phone Number"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                margin="normal"
-              />
-            </Grid>
-
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Address"
-                name="address"
-                value={formData.address}
-                onChange={handleChange}
-                margin="normal"
-                multiline
-                rows={2}
-              />
-            </Grid>
-          </Grid>
-
-          <Typography variant="body2" sx={{ mt: 2 }}>
-            Already have an account?{' '}
-            <Link 
-              component="button" 
-              type="button"
-              onClick={onLoginClick}
-              underline="hover"
-            >
-              Login here
-            </Link>
-          </Typography>
-        </DialogContent>
-
-        <DialogActions>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button 
-            type="submit" 
-            variant="contained" 
-            disabled={loading}
-          >
-            {loading ? 'Registering...' : 'Register'}
-          </Button>
-        </DialogActions>
-      </form>
-    </Dialog>
-  );
-};
-
-export default RegisterForm;
-```
-
-
-### 9. 🗺️ Map Component with Clinic Locations
-
-```javascript
-// resources/js/components/clinics/ClinicMap.jsx
-import React, { useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import L from 'leaflet';
-
-// Fix for default markers in react-leaflet
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
-
-const ClinicMap = ({ clinics, center, zoom = 13, onClinicSelect }) => {
-  return (
-    <MapContainer 
-      center={center || [12.9716, 77.5946]} // Default to Bangalore
-      zoom={zoom} 
-      style={{ height: '400px', width: '100%' }}
-    >
-      <TileLayer
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-      />
-      {clinics.map((clinic) => (
-        <Marker 
-          key={clinic.id}
-          position={[clinic.latitude, clinic.longitude]}
-          eventHandlers={{
-            click: () => onClinicSelect && onClinicSelect(clinic),
-          }}
+    return (
+        <Box
+            component="footer"
+            sx={{
+                bgcolor: 'grey.900',
+                color: 'white',
+                pt: 3,
+                pb: 2,
+                mt: 'auto',
+                width: '100%'
+            }}
         >
-          <Popup>
-            <div>
-              <h3>{clinic.name}</h3>
-              <p>{clinic.address}</p>
-              <p>Phone: {clinic.phone}</p>
-              {clinic.facilities && (
-                <p>Facilities: {clinic.facilities.join(', ')}</p>
-              )}
-            </div>
-          </Popup>
-        </Marker>
-      ))}
-    </MapContainer>
-  );
+            <Container maxWidth="lg" sx={{ px: { xs: 1, sm: 2, md: 2 } }}>
+                <Grid container spacing={2}>
+                    <Grid item xs={12} md={4}>
+                        <Box sx={{ mb: 2 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                                <LocalHospital 
+                                    sx={{ 
+                                        color: 'primary.main', 
+                                        fontSize: '2rem',
+                                        mr: 1
+                                    }} 
+                                />
+                                <Typography 
+                                    variant="h5" 
+                                    sx={{ 
+                                        fontWeight: 'bold',
+                                        background: 'linear-gradient(45deg, #10d915 30%, #21CBF3 90%)',
+                                        backgroundClip: 'text',
+                                        WebkitBackgroundClip: 'text',
+                                        WebkitTextFillColor: 'transparent',
+                                    }}
+                                >
+                                    Visit Care
+                                </Typography>
+                            </Box>
+                            
+                            <Typography 
+                                variant="body2" 
+                                sx={{ 
+                                    color: 'grey.400', 
+                                    mb: 2, 
+                                    lineHeight: 1.7,
+                                    fontSize: '0.9rem'
+                                }}
+                            >
+                                🩺 Your trusted healthcare companion – easily find, book, and manage appointments with top providers near you.
+                            </Typography>
+                            
+                            <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                                {socialIcons.map((social, index) => (
+                                    <IconButton
+                                        key={index}
+                                        component="a"
+                                        href={social.link}
+                                        title={social.name}
+                                        sx={{
+                                            color: 'grey.400',
+                                            bgcolor: 'rgba(255, 255, 255, 0.05)',
+                                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                                            width: 40,
+                                            height: 40,
+                                            transition: 'all 0.3s ease',
+                                            '&:hover': {
+                                                color: social.color,
+                                                bgcolor: 'rgba(255, 255, 255, 0.1)',
+                                                transform: 'translateY(-2px)',
+                                                boxShadow: '0 4px 15px rgba(0, 0, 0, 0.3)'
+                                            }
+                                        }}
+                                    >
+                                        {social.icon}
+                                    </IconButton>
+                                ))}
+                            </Box>
+
+                            <Box>
+                                <Typography 
+                                    variant="body2" 
+                                    sx={{ 
+                                        mb: 2, 
+                                        color: 'white',
+                                        fontWeight: 500,
+                                        fontSize: '1rem'
+                                    }}
+                                >
+                                    📱 Download Our App
+                                </Typography>
+                                <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                                    <Box
+                                        component="img"
+                                        src="/images/common/apple_app_store.webp"
+                                        alt="Download on App Store"
+                                        sx={{ 
+                                            height: 40, 
+                                            width: 'auto',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.3s ease',
+                                            borderRadius: 1,
+                                            '&:hover': {
+                                                transform: 'scale(1.05) translateY(-2px)',
+                                                boxShadow: '0 6px 20px rgba(0, 0, 0, 0.3)'
+                                            }
+                                        }}
+                                    />
+                                    <Box
+                                        component="img" 
+                                        src="/images/common/google_play_store.webp"
+                                        alt="Get it on Google Play"
+                                        sx={{ 
+                                            height: 40, 
+                                            width: 'auto',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.3s ease',
+                                            borderRadius: 1,
+                                            '&:hover': {
+                                                transform: 'scale(1.05) translateY(-2px)',
+                                                boxShadow: '0 6px 20px rgba(0, 0, 0, 0.3)'
+                                            }
+                                        }}
+                                    />
+                                </Box>
+                            </Box>
+                        </Box>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6} md={2}>
+                        <Typography 
+                            variant="h6" 
+                            sx={{ 
+                                mb: 2, 
+                                fontWeight: 'bold',
+                                color: 'white',
+                                fontSize: '1.1rem'
+                            }}
+                        >
+                            🛠️ Services
+                        </Typography>
+                        <Box>
+                            {footerLinks.services.map((service, index) => (
+                                <Link
+                                    key={index}
+                                    href="#"
+                                    sx={{
+                                        display: 'block',
+                                        color: 'grey.400',
+                                        textDecoration: 'none',
+                                        mb: 1.2,
+                                        fontSize: '0.9rem',
+                                        transition: 'all 0.3s ease',
+                                        '&:hover': {
+                                            color: 'white',
+                                            textDecoration: 'none',
+                                            transform: 'translateX(5px)'
+                                        }
+                                    }}
+                                >
+                                    {service}
+                                </Link>
+                            ))}
+                        </Box>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6} md={2}>
+                        <Typography 
+                            variant="h6" 
+                            sx={{ 
+                                mb: 2, 
+                                fontWeight: 'bold',
+                                color: 'white',
+                                fontSize: '1.1rem'
+                            }}
+                        >
+                            💬 Support
+                        </Typography>
+                        <Box>
+                            {footerLinks.support.map((support, index) => (
+                                <Link
+                                    key={index}
+                                    href="#"
+                                    sx={{
+                                        display: 'block',
+                                        color: 'grey.400',
+                                        textDecoration: 'none',
+                                        mb: 1.2,
+                                        fontSize: '0.9rem',
+                                        transition: 'all 0.3s ease',
+                                        '&:hover': {
+                                            color: 'white',
+                                            textDecoration: 'none',
+                                            transform: 'translateX(5px)'
+                                        }
+                                    }}
+                                >
+                                    {support}
+                                </Link>
+                            ))}
+                        </Box>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6} md={2}>
+                        <Typography 
+                            variant="h6" 
+                            sx={{ 
+                                mb: 2, 
+                                fontWeight: 'bold',
+                                color: 'white',
+                                fontSize: '1.1rem'
+                            }}
+                        >
+                            🏢 Company
+                        </Typography>
+                        <Box>
+                            {footerLinks.company.map((company, index) => (
+                                <Link
+                                    key={index}
+                                    href="#"
+                                    sx={{
+                                        display: 'block',
+                                        color: 'grey.400',
+                                        textDecoration: 'none',
+                                        mb: 1.2,
+                                        fontSize: '0.9rem',
+                                        transition: 'all 0.3s ease',
+                                        '&:hover': {
+                                            color: 'white',
+                                            textDecoration: 'none',
+                                            transform: 'translateX(5px)'
+                                        }
+                                    }}
+                                >
+                                    {company}
+                                </Link>
+                            ))}
+                        </Box>
+                    </Grid>
+
+                    <Grid item xs={12} md={2}>
+                        <Typography 
+                            variant="h6" 
+                            sx={{ 
+                                mb: 2, 
+                                fontWeight: 'bold',
+                                color: 'white',
+                                fontSize: '1.1rem'
+                            }}
+                        >
+                            📞 Contact Info
+                        </Typography>
+                        <List dense>
+                            {contactInfo.map((contact, index) => (
+                                <ListItem key={index} disableGutters sx={{ py: 0.5 }}>
+                                    <ListItemIcon 
+                                        sx={{ 
+                                            minWidth: 36, 
+                                            color: 'primary.main',
+                                            '& .MuiSvgIcon-root': {
+                                                fontSize: '1.1rem'
+                                            }
+                                        }}
+                                    >
+                                        {contact.icon}
+                                    </ListItemIcon>
+                                    <ListItemText 
+                                        primary={contact.text}
+                                        primaryTypographyProps={{
+                                            variant: 'body2',
+                                            color: 'grey.400',
+                                            fontSize: '0.85rem',
+                                            lineHeight: 1.4
+                                        }}
+                                    />
+                                </ListItem>
+                            ))}
+                        </List>
+                    </Grid>
+                </Grid>
+
+                <Divider sx={{ my: 4, bgcolor: 'grey.700' }} />
+
+                <Box
+                    sx={{
+                        display: 'flex',
+                        flexDirection: { xs: 'column', sm: 'row' },
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: 2
+                    }}
+                >
+                    <Typography 
+                        variant="body2" 
+                        sx={{ 
+                            color: 'grey.400',
+                            fontSize: '0.9rem'
+                        }}
+                    >
+                        © 2025 Visit Care. All rights reserved. Made with ❤️ for better healthcare.
+                    </Typography>
+                    
+                    <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                        {['🔐 Privacy Policy', '📜 Terms of Service', '🍪 Cookie Policy', '♿ Accessibility'].map((link) => (
+                            <Link
+                                key={link}
+                                href="#"
+                                sx={{
+                                    color: 'grey.400',
+                                    textDecoration: 'none',
+                                    fontSize: '0.875rem',
+                                    transition: 'all 0.3s ease',
+                                    '&:hover': {
+                                        color: 'white',
+                                        textDecoration: 'underline'
+                                    }
+                                }}
+                            >
+                                {link}
+                            </Link>
+                        ))}
+                    </Box>
+                </Box>
+            </Container>
+        </Box>
+    );
 };
 
-export default ClinicMap;
+export default Footer;
 ```
 
 
-### 10. 🔍 Doctor List Component
+### Step 20: Home Page Component
 
-```javascript
-// resources/js/components/doctors/DoctorList.jsx
-import React, { useState, useEffect } from 'react';
-import { 
-  Grid, 
-  Card, 
-  CardContent, 
-  Typography, 
-  Avatar, 
-  Chip, 
-  Rating,
-  Button,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem
+**resources/js/pages/HomePage.jsx**
+
+```jsx
+import React from 'react';
+import MainLayout from '../components/layout/MainLayout';
+import SearchSection from '../components/home/SearchSection';
+import NearbySection from '../components/home/NearbySection';
+import StatsSection from '../components/home/StatsSection';
+import WhyChooseSection from '../components/home/WhyChooseSection';
+import TestimonialsSection from '../components/home/TestimonialsSection';
+
+const HomePage = () => {
+    return (
+        <MainLayout>
+            <SearchSection />
+            <NearbySection />
+            <StatsSection />
+            <WhyChooseSection />
+            <TestimonialsSection />
+        </MainLayout>
+    );
+};
+
+export default HomePage;
+```
+
+**resources/js/pages/admin/AdminDashboard.jsx**
+
+```jsx
+import React from 'react';
+import {
+    Box,
+    Container,
+    Typography,
+    Grid,
+    Card,
+    CardContent,
+    Avatar,
+    Button,
+    Paper,
+    List,
+    ListItem,
+    ListItemText,
+    ListItemIcon,
+    Chip,
+    Divider,
 } from '@mui/material';
-import { doctorAPI } from '../../services/api';
+import {
+    AdminPanelSettings,
+    People,
+    LocalHospital,
+    TrendingUp,
+    Security,
+    Assessment,
+    Settings,
+    Notifications,
+    SupervisorAccount,
+    VerifiedUser,
+} from '@mui/icons-material';
+import MainLayout from '../../components/layout/MainLayout';
 
-const DoctorList = ({ onDoctorSelect }) => {
-  const [doctors, setDoctors] = useState([]);
+const AdminDashboard = () => {
+    const adminStats = [
+        { title: '👥 Total Users', value: '2,456', icon: <People />, color: 'primary' },
+        { title: '🏥 Healthcare Providers', value: '156', icon: <LocalHospital />, color: 'success' },
+        { title: '🔐 System Security', value: '99.9%', icon: <Security />, color: 'warning' },
+        { title: '📈 Platform Growth', value: '+45%', icon: <TrendingUp />, color: 'info' },
+    ];
+
+    const systemAlerts = [
+        { type: 'Security', message: 'System security scan completed', status: 'success', time: '1 hour ago' },
+        { type: 'Performance', message: 'High traffic detected - scaling resources', status: 'warning', time: '3 hours ago' },
+        { type: 'Maintenance', message: 'Scheduled backup completed successfully', status: 'success', time: '6 hours ago' },
+    ];
+
+    return (
+        <MainLayout>
+            <Container maxWidth="lg" sx={{ mt: 12, mb: 4 }}>
+                {/* Header */}
+                <Box sx={{ mb: 4 }}>
+                    <Typography
+                        variant="h4"
+                        sx={{
+                            fontWeight: 'bold',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 2,
+                            mb: 1,
+                        }}
+                    >
+                        <AdminPanelSettings sx={{ fontSize: 40, color: 'primary.main' }} />
+                        👑 Admin Dashboard
+                    </Typography>
+                    <Typography variant="h6" color="text.secondary">
+                        🎛️ Complete platform administration and system management
+                    </Typography>
+                </Box>
+
+                {/* Stats Cards */}
+                <Grid container spacing={3} sx={{ mb: 4 }}>
+                    {adminStats.map((stat, index) => (
+                        <Grid item xs={12} sm={6} md={3} key={index}>
+                            <Card elevation={3} sx={{ height: '100%' }}>
+                                <CardContent>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                        <Avatar
+                                            sx={{
+                                                bgcolor: `${stat.color}.main`,
+                                                mr: 2,
+                                            }}
+                                        >
+                                            {stat.icon}
+                                        </Avatar>
+                                        <Box>
+                                            <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                                                {stat.value}
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                {stat.title}
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+                    ))}
+                </Grid>
+
+                <Grid container spacing={3}>
+                    {/* System Alerts */}
+                    <Grid item xs={12} md={8}>
+                        <Paper elevation={3} sx={{ p: 3 }}>
+                            <Typography
+                                variant="h6"
+                                sx={{
+                                    fontWeight: 'bold',
+                                    mb: 3,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1,
+                                }}
+                            >
+                                <Notifications color="primary" />
+                                🚨 System Alerts
+                            </Typography>
+                            <List>
+                                {systemAlerts.map((alert, index) => (
+                                    <React.Fragment key={index}>
+                                        <ListItem>
+                                            <ListItemIcon>
+                                                <Security
+                                                    color={
+                                                        alert.status === 'success'
+                                                            ? 'success'
+                                                            : alert.status === 'warning'
+                                                            ? 'warning'
+                                                            : 'error'
+                                                    }
+                                                />
+                                            </ListItemIcon>
+                                            <ListItemText
+                                                primary={`🔔 ${alert.type}: ${alert.message}`}
+                                                secondary={`⏰ ${alert.time}`}
+                                            />
+                                            <Chip
+                                                label={alert.status}
+                                                color={
+                                                    alert.status === 'success'
+                                                        ? 'success'
+                                                        : alert.status === 'warning'
+                                                        ? 'warning'
+                                                        : 'error'
+                                                }
+                                                size="small"
+                                            />
+                                        </ListItem>
+                                        {index < systemAlerts.length - 1 && <Divider />}
+                                    </React.Fragment>
+                                ))}
+                            </List>
+                        </Paper>
+                    </Grid>
+
+                    {/* Admin Actions */}
+                    <Grid item xs={12} md={4}>
+                        <Paper elevation={3} sx={{ p: 3 }}>
+                            <Typography
+                                variant="h6"
+                                sx={{
+                                    fontWeight: 'bold',
+                                    mb: 3,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1,
+                                }}
+                            >
+                                <Settings color="primary" />
+                                🔧 Admin Controls
+                            </Typography>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<SupervisorAccount />}
+                                    fullWidth
+                                    sx={{ justifyContent: 'flex-start' }}
+                                >
+                                    👥 User Management
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<VerifiedUser />}
+                                    fullWidth
+                                    sx={{ justifyContent: 'flex-start' }}
+                                >
+                                    ✅ Verify Doctors
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<LocalHospital />}
+                                    fullWidth
+                                    sx={{ justifyContent: 'flex-start' }}
+                                >
+                                    🏥 Platform Settings
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<Assessment />}
+                                    fullWidth
+                                    sx={{ justifyContent: 'flex-start' }}
+                                >
+                                    📊 Analytics
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<Security />}
+                                    fullWidth
+                                    sx={{ justifyContent: 'flex-start' }}
+                                >
+                                    🔐 Security Center
+                                </Button>
+                            </Box>
+                        </Paper>
+                    </Grid>
+                </Grid>
+            </Container>
+        </MainLayout>
+    );
+};
+
+export default AdminDashboard;
+```
+
+**resources/js/pages/doctor/DoctorDashboard.jsx**
+
+```jsx
+import React from 'react';
+import {
+    Box,
+    Container,
+    Typography,
+    Grid,
+    Card,
+    CardContent,
+    Avatar,
+    Button,
+    Chip,
+    Paper,
+    List,
+    ListItem,
+    ListItemText,
+    ListItemIcon,
+    Divider,
+} from '@mui/material';
+import {
+    MedicalServices,
+    Schedule,
+    People,
+    TrendingUp,
+    CalendarToday,
+    Notifications,
+    Settings,
+    LocalHospital,
+    Assignment,
+    Assessment,
+} from '@mui/icons-material';
+import MainLayout from '../../components/layout/MainLayout';
+
+const DoctorDashboard = () => {
+    const doctorStats = [
+        { title: '📅 Today\'s Appointments', value: '12', icon: <Schedule />, color: 'primary' },
+        { title: '👥 Total Patients', value: '248', icon: <People />, color: 'success' },
+        { title: '⭐ Average Rating', value: '4.8', icon: <TrendingUp />, color: 'warning' },
+        { title: '🏥 Active Clinics', value: '3', icon: <LocalHospital />, color: 'info' },
+    ];
+
+    const todayAppointments = [
+        { time: '09:00 AM', patient: 'John Doe', type: 'Consultation', status: 'confirmed' },
+        { time: '10:30 AM', patient: 'Jane Smith', type: 'Follow-up', status: 'pending' },
+        { time: '02:00 PM', patient: 'Mike Johnson', type: 'Check-up', status: 'confirmed' },
+    ];
+
+    return (
+        <MainLayout>
+            <Container maxWidth="lg" sx={{ mt: 12, mb: 4 }}>
+                {/* Header */}
+                <Box sx={{ mb: 4 }}>
+                    <Typography
+                        variant="h4"
+                        sx={{
+                            fontWeight: 'bold',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 2,
+                            mb: 1,
+                        }}
+                    >
+                        <MedicalServices sx={{ fontSize: 40, color: 'primary.main' }} />
+                        👨‍⚕️ Doctor Dashboard
+                    </Typography>
+                    <Typography variant="h6" color="text.secondary">
+                        🩺 Manage your practice, appointments, and patient care
+                    </Typography>
+                </Box>
+
+                {/* Stats Cards */}
+                <Grid container spacing={3} sx={{ mb: 4 }}>
+                    {doctorStats.map((stat, index) => (
+                        <Grid item xs={12} sm={6} md={3} key={index}>
+                            <Card elevation={3} sx={{ height: '100%' }}>
+                                <CardContent>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                        <Avatar
+                                            sx={{
+                                                bgcolor: `${stat.color}.main`,
+                                                mr: 2,
+                                            }}
+                                        >
+                                            {stat.icon}
+                                        </Avatar>
+                                        <Box>
+                                            <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                                                {stat.value}
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                {stat.title}
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+                    ))}
+                </Grid>
+
+                <Grid container spacing={3}>
+                    {/* Today's Appointments */}
+                    <Grid item xs={12} md={8}>
+                        <Paper elevation={3} sx={{ p: 3 }}>
+                            <Typography
+                                variant="h6"
+                                sx={{
+                                    fontWeight: 'bold',
+                                    mb: 3,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1,
+                                }}
+                            >
+                                <CalendarToday color="primary" />
+                                📅 Today's Appointments
+                            </Typography>
+                            <List>
+                                {todayAppointments.map((appointment, index) => (
+                                    <React.Fragment key={index}>
+                                        <ListItem>
+                                            <ListItemIcon>
+                                                <Schedule color="action" />
+                                            </ListItemIcon>
+                                            <ListItemText
+                                                primary={`${appointment.time} - ${appointment.patient}`}
+                                                secondary={`🩺 ${appointment.type}`}
+                                            />
+                                            <Chip
+                                                label={appointment.status}
+                                                color={appointment.status === 'confirmed' ? 'success' : 'warning'}
+                                                size="small"
+                                            />
+                                        </ListItem>
+                                        {index < todayAppointments.length - 1 && <Divider />}
+                                    </React.Fragment>
+                                ))}
+                            </List>
+                        </Paper>
+                    </Grid>
+
+                    {/* Quick Actions */}
+                    <Grid item xs={12} md={4}>
+                        <Paper elevation={3} sx={{ p: 3 }}>
+                            <Typography
+                                variant="h6"
+                                sx={{
+                                    fontWeight: 'bold',
+                                    mb: 3,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1,
+                                }}
+                            >
+                                <Settings color="primary" />
+                                ⚡ Quick Actions
+                            </Typography>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<Assignment />}
+                                    fullWidth
+                                    sx={{ justifyContent: 'flex-start' }}
+                                >
+                                    📋 View All Appointments
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<People />}
+                                    fullWidth
+                                    sx={{ justifyContent: 'flex-start' }}
+                                >
+                                    👥 Manage Patients
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<Schedule />}
+                                    fullWidth
+                                    sx={{ justifyContent: 'flex-start' }}
+                                >
+                                    ⏰ Update Schedule
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<Assessment />}
+                                    fullWidth
+                                    sx={{ justifyContent: 'flex-start' }}
+                                >
+                                    📊 View Reports
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<Notifications />}
+                                    fullWidth
+                                    sx={{ justifyContent: 'flex-start' }}
+                                >
+                                    🔔 Notifications
+                                </Button>
+                            </Box>
+                        </Paper>
+                    </Grid>
+                </Grid>
+            </Container>
+        </MainLayout>
+    );
+};
+
+export default DoctorDashboard;
+```
+
+**resources/js/pages/healthcare/HealthcareDashboard.jsx**
+
+```jsx
+import React from 'react';
+import {
+    Box,
+    Container,
+    Typography,
+    Grid,
+    Card,
+    CardContent,
+    Avatar,
+    Button,
+    Paper,
+    List,
+    ListItem,
+    ListItemText,
+    ListItemIcon,
+    Chip,
+    Divider,
+} from '@mui/material';
+import {
+    LocalHospital,
+    People,
+    Assignment,
+    TrendingUp,
+    MedicalServices,
+    Schedule,
+    Settings,
+    Assessment,
+    Notifications,
+    PersonAdd,
+} from '@mui/icons-material';
+import MainLayout from '../../components/layout/MainLayout';
+
+const HealthcareDashboard = () => {
+    const healthcareStats = [
+        { title: '🏥 Total Facilities', value: '5', icon: <LocalHospital />, color: 'primary' },
+        { title: '👨‍⚕️ Active Doctors', value: '45', icon: <MedicalServices />, color: 'success' },
+        { title: '📅 Monthly Appointments', value: '1,248', icon: <Schedule />, color: 'info' },
+        { title: '📈 Revenue Growth', value: '+23%', icon: <TrendingUp />, color: 'warning' },
+    ];
+
+    const recentActivities = [
+        { action: 'New doctor registration', detail: 'Dr. Sarah Johnson - Cardiology', time: '2 hours ago' },
+        { action: 'Facility update', detail: 'City General Hospital - New equipment added', time: '4 hours ago' },
+        { action: 'Appointment surge', detail: 'Pediatric department - 15% increase', time: '1 day ago' },
+    ];
+
+    return (
+        <MainLayout>
+            <Container maxWidth="lg" sx={{ mt: 12, mb: 4 }}>
+                {/* Header */}
+                <Box sx={{ mb: 4 }}>
+                    <Typography
+                        variant="h4"
+                        sx={{
+                            fontWeight: 'bold',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 2,
+                            mb: 1,
+                        }}
+                    >
+                        <LocalHospital sx={{ fontSize: 40, color: 'primary.main' }} />
+                        🏥 Healthcare Dashboard
+                    </Typography>
+                    <Typography variant="h6" color="text.secondary">
+                        🎯 Manage healthcare facilities, doctors, and operations
+                    </Typography>
+                </Box>
+
+                {/* Stats Cards */}
+                <Grid container spacing={3} sx={{ mb: 4 }}>
+                    {healthcareStats.map((stat, index) => (
+                        <Grid item xs={12} sm={6} md={3} key={index}>
+                            <Card elevation={3} sx={{ height: '100%' }}>
+                                <CardContent>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                        <Avatar
+                                            sx={{
+                                                bgcolor: `${stat.color}.main`,
+                                                mr: 2,
+                                            }}
+                                        >
+                                            {stat.icon}
+                                        </Avatar>
+                                        <Box>
+                                            <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                                                {stat.value}
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                {stat.title}
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+                    ))}
+                </Grid>
+
+                <Grid container spacing={3}>
+                    {/* Recent Activities */}
+                    <Grid item xs={12} md={8}>
+                        <Paper elevation={3} sx={{ p: 3 }}>
+                            <Typography
+                                variant="h6"
+                                sx={{
+                                    fontWeight: 'bold',
+                                    mb: 3,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1,
+                                }}
+                            >
+                                <Assessment color="primary" />
+                                📊 Recent Activities
+                            </Typography>
+                            <List>
+                                {recentActivities.map((activity, index) => (
+                                    <React.Fragment key={index}>
+                                        <ListItem>
+                                            <ListItemIcon>
+                                                <Notifications color="action" />
+                                            </ListItemIcon>
+                                            <ListItemText
+                                                primary={`🔔 ${activity.action}`}
+                                                secondary={`${activity.detail} • ${activity.time}`}
+                                            />
+                                        </ListItem>
+                                        {index < recentActivities.length - 1 && <Divider />}
+                                    </React.Fragment>
+                                ))}
+                            </List>
+                        </Paper>
+                    </Grid>
+
+                    {/* Management Actions */}
+                    <Grid item xs={12} md={4}>
+                        <Paper elevation={3} sx={{ p: 3 }}>
+                            <Typography
+                                variant="h6"
+                                sx={{
+                                    fontWeight: 'bold',
+                                    mb: 3,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1,
+                                }}
+                            >
+                                <Settings color="primary" />
+                                ⚙️ Management
+                            </Typography>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<LocalHospital />}
+                                    fullWidth
+                                    sx={{ justifyContent: 'flex-start' }}
+                                >
+                                    🏥 Manage Facilities
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<PersonAdd />}
+                                    fullWidth
+                                    sx={{ justifyContent: 'flex-start' }}
+                                >
+                                    👨‍⚕️ Add New Doctor
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<People />}
+                                    fullWidth
+                                    sx={{ justifyContent: 'flex-start' }}
+                                >
+                                    👥 Staff Management
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<Assignment />}
+                                    fullWidth
+                                    sx={{ justifyContent: 'flex-start' }}
+                                >
+                                    📋 View Reports
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<Schedule />}
+                                    fullWidth
+                                    sx={{ justifyContent: 'flex-start' }}
+                                >
+                                    ⏰ Schedule Management
+                                </Button>
+                            </Box>
+                        </Paper>
+                    </Grid>
+                </Grid>
+            </Container>
+        </MainLayout>
+    );
+};
+
+export default HealthcareDashboard;
+```
+
+### Step 21: Enhanced Search Section Component 
+
+**resources/js/components/home/SearchSection.jsx**
+
+```jsx
+import React, { useState, useEffect } from 'react';
+import {
+    Box,
+    Container,
+    Typography,
+    Grid,
+    FormControl,
+    Select,
+    MenuItem,
+    TextField,
+    Button,
+    Card,
+    CardContent,
+    Avatar,
+    Chip,
+    Rating,
+    Collapse,
+    Paper,
+    List,
+    ListItem,
+    ListItemAvatar,
+    ListItemText,
+    Divider,
+    ButtonBase,
+} from '@mui/material';
+import { 
+    Search, 
+    LocationOn, 
+    LocalHospital, 
+    Person, 
+    MedicalServices,
+    Verified,
+    Star,
+    AccessTime,
+    Phone
+} from '@mui/icons-material';
+import { specialties, doctors, clinics } from '../../data/dummyData';
+
+const SearchSection = () => {
+    const [selectedSpecialty, setSelectedSpecialty] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState([]);
+    const [showResults, setShowResults] = useState(false);
+    const [currentWordIndex, setCurrentWordIndex] = useState(0);
+    const [displayedText, setDisplayedText] = useState('');
+    const [isTyping, setIsTyping] = useState(true);
+
+    const words = ['Healthcare', 'Doctor'];
+    
+    const titleTemplate = 'Find _ Near You';
+    const subtitles = [
+        "🔍 Discover verified doctors and top-rated clinics in your area with smart location-based search",
+        "📅 Connect with qualified medical professionals and book appointments at your convenience"
+    ];
+
+    useEffect(() => {
+        const currentWord = words[currentWordIndex];
+        let currentIndex = 0;
+        setDisplayedText('');
+        setIsTyping(true);
+
+        const typingInterval = setInterval(() => {
+            if (currentIndex < currentWord.length) {
+                setDisplayedText(currentWord.substring(0, currentIndex + 1));
+                currentIndex++;
+            } else {
+                clearInterval(typingInterval);
+                setIsTyping(false);
+                
+                setTimeout(() => {
+                    setCurrentWordIndex((prevIndex) => (prevIndex + 1) % words.length);
+                }, 6000);
+            }
+        }, 300);
+
+        return () => clearInterval(typingInterval);
+    }, [currentWordIndex]);
+
+    const handleSearch = () => {
+        let results = [];
+        
+        const filteredDoctors = doctors.filter(doctor => 
+            (selectedSpecialty === '' || doctor.specialty.includes(selectedSpecialty)) &&
+            (searchQuery === '' || 
+             doctor.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+             doctor.specialty.toLowerCase().includes(searchQuery.toLowerCase()))
+        );
+
+        const filteredClinics = clinics.filter(clinic =>
+            searchQuery === '' || 
+            clinic.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            clinic.address.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+
+        results = [
+            ...filteredDoctors.map(d => ({ ...d, type: 'doctor' })),
+            ...filteredClinics.map(c => ({ ...c, type: 'clinic' }))
+        ];
+
+        setSearchResults(results);
+        setShowResults(true);
+    };
+
+    const handleKeyPress = (event) => {
+        if (event.key === 'Enter') {
+            handleSearch();
+        }
+    };
+
+    const handleResultClick = (result) => {
+        console.log('Selected:', result);
+    };
+
+    const renderAnimatedTitle = () => {
+        const parts = titleTemplate.split('_');
+        return (
+            <>
+                {parts[^0]}{' '}
+                <span 
+                    style={{ 
+                        color: '#ff5983',
+                        position: 'relative',
+                        display: 'inline-block',
+                        textShadow: '2px 2px 4px rgba(255, 89, 131, 0.3)',
+                    }}
+                >
+                    {displayedText}
+                    {isTyping && (
+                        <span 
+                            className="blinking-cursor"
+                            style={{
+                                borderRight: '3px solid #ff5983',
+                                marginLeft: '2px'
+                            }}
+                        />
+                    )}
+                </span>
+                {' '}{parts[^1]}
+            </>
+        );
+    };
+
+    return (
+        <>
+            <Box
+                sx={{
+                    background: '#fff',
+                    color: '#1a2a32',
+                    boxShadow: '0 8px 32px 0 rgba(16,217,21,0.10), 0 1.5px 4px 0 rgba(60,60,60,0.10)',
+                    borderRadius: 5,
+                    py: { xs: 8, md: 12 },
+                    pt: { xs: '125px', md: '85px' },
+                    position: 'relative',
+                    overflow: 'hidden',
+                }}
+            >
+                <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1 }}>
+                    <Box textAlign="center" mb={6}>
+                        <Typography 
+                            variant="h2" 
+                            component="h1" 
+                            gutterBottom
+                            sx={{ 
+                                fontWeight: 'bold',
+                                fontSize: { xs: '2.5rem', md: '3.5rem', lg: '4rem' },
+                                color: '#10d915',
+                                mb: 3,
+                                minHeight: { xs: '3rem', md: '4rem', lg: '5rem' },
+                                textShadow: '3px 3px 6px rgba(16, 217, 21, 0.3)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 2,
+                            }}
+                        >
+                            <MedicalServices 
+                                sx={{ 
+                                    fontSize: { xs: '2rem', md: '3rem', lg: '3.5rem' },
+                                    color: '#10d915'
+                                }} 
+                            />
+                            {renderAnimatedTitle()}
+                        </Typography>
+                        <Typography 
+                            variant="h5" 
+                            sx={{ 
+                                opacity: 0.95,
+                                fontSize: { xs: '1.2rem', md: '1.5rem' },
+                                maxWidth: '600px',
+                                mx: 'auto',
+                                lineHeight: 1.4,
+                                transition: 'opacity 0.5s ease-in-out',
+                                textShadow: '1px 1px 2px rgba(0, 0, 0, 0.1)',
+                            }}
+                            key={`subtitle-${currentWordIndex}`}
+                        >
+                            {subtitles[currentWordIndex]}
+                        </Typography>
+                    </Box>
+
+                    <Paper 
+                        elevation={8} 
+                        sx={{ 
+                            p: { xs: 3, md: 4 }, 
+                            borderRadius: 3,
+                            background: 'rgba(255, 255, 255, 0.98)',
+                            backdropFilter: 'blur(10px)',
+                            maxWidth: 900,
+                            mx: 'auto'
+                        }}
+                    >
+                        <Grid container spacing={3} alignItems="end">
+                            <Grid item xs={12} md={3}>
+                                <Typography variant="subtitle2" color="text.primary" gutterBottom>
+                                    🩺 Medical Specialty
+                                </Typography>
+                                <FormControl fullWidth>
+                                    <Select
+                                        value={selectedSpecialty}
+                                        onChange={(e) => setSelectedSpecialty(e.target.value)}
+                                        displayEmpty
+                                        sx={{ 
+                                            borderRadius: 2,
+                                            '& .MuiOutlinedInput-root': {
+                                                '& fieldset': { borderColor: 'rgba(0,0,0,0.07)' },
+                                            }
+                                        }}
+                                    >
+                                        <MenuItem value="">🌟 All Specialties</MenuItem>
+                                        {specialties.map((specialty) => (
+                                            <MenuItem key={specialty} value={specialty}>
+                                                🩺 {specialty}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+
+                            <Grid item xs={12} md={7}>
+                                <Typography variant="subtitle2" color="text.primary" gutterBottom>
+                                    🔍 Search Doctor or Clinic
+                                </Typography>
+                                <TextField
+                                    fullWidth
+                                    placeholder="Enter doctor name, clinic name, or specialty..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    onKeyPress={handleKeyPress}
+                                    sx={{ 
+                                        '& .MuiOutlinedInput-root': { 
+                                            borderRadius: 2,
+                                            '& fieldset': { borderColor: 'rgba(0,0,0,0.07)' },
+                                        }
+                                    }}
+                                    InputProps={{
+                                        startAdornment: <Search sx={{ mr: 1, color: 'action.active' }} />
+                                    }}
+                                />
+                            </Grid>
+
+                            <Grid item xs={12} md={2}>
+                                <Button
+                                    fullWidth
+                                    variant="contained"
+                                    size="large"
+                                    onClick={handleSearch}
+                                    startIcon={<Search />}
+                                    sx={{ 
+                                        py: 1.8,
+                                        borderRadius: 2,
+                                        fontWeight: 600,
+                                        boxShadow: 3,
+                                        color:"white",
+                                        '&:hover': { boxShadow: 6 }
+                                    }}
+                                >
+                                    Search
+                                </Button>
+                            </Grid>
+                        </Grid>
+
+                        <Collapse in={showResults}>
+                            <Box sx={{ mt: 4, pt: 3, borderTop: '1px solid rgba(0,0,0,0.08)' }}>
+                                <Typography variant="h6" gutterBottom color="text.primary">
+                                    📊 Search Results ({searchResults.length})
+                                </Typography>
+                                
+                                <Paper 
+                                    sx={{ 
+                                        maxHeight: 400, 
+                                        overflow: 'auto',
+                                        border: '1px solid rgba(0,0,0,0.07)',
+                                        borderRadius: 2
+                                    }}
+                                >
+                                    <List disablePadding>
+                                        {searchResults.map((result, index) => (
+                                            <React.Fragment key={`${result.type}-${result.id}`}>
+                                                <ListItem disablePadding>
+                                                    <ButtonBase
+                                                        component="div"
+                                                        onClick={() => handleResultClick(result)}
+                                                        sx={{
+                                                            width: '100%',
+                                                            py: 2,
+                                                            px: 2,
+                                                            display: 'flex',
+                                                            alignItems: 'flex-start',
+                                                            textAlign: 'left',
+                                                            '&:hover': { 
+                                                                backgroundColor: 'rgba(16,217,21,0.08)' 
+                                                            }
+                                                        }}
+                                                    >
+                                                        <ListItemAvatar sx={{ mr: 2 }}>
+                                                            <Avatar 
+                                                                src={result.image}
+                                                                sx={{ 
+                                                                    width: 60, 
+                                                                    height: 60,
+                                                                    border: '2px solid',
+                                                                    borderColor: result.type === 'doctor' ? '#10d915' : 'secondary.main'
+                                                                }}
+                                                            >
+                                                                {result.type === 'doctor' ? <Person /> : <LocalHospital />}
+                                                            </Avatar>
+                                                        </ListItemAvatar>
+                                                        
+                                                        <ListItemText
+                                                            primary={
+                                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                                                                    <Typography variant="h6" component="span">
+                                                                        {result.type === 'doctor' ? '👨‍⚕️' : '🏥'} {result.name}
+                                                                    </Typography>
+                                                                    {result.type === 'doctor' && result.isVerified && (
+                                                                        <Chip 
+                                                                            label="✅ Verified" 
+                                                                            size="small" 
+                                                                            color="success" 
+                                                                            icon={<Verified />}
+                                                                            sx={{ fontSize: '0.7rem' }}
+                                                                        />
+                                                                    )}
+                                                                </Box>
+                                                            }
+                                                            secondary={
+                                                                <Box>
+                                                                    {result.type === 'doctor' ? (
+                                                                        <>
+                                                                            <Typography variant="body2" color="primary">
+                                                                                {result.specialty} • {result.experience} years exp.
+                                                                            </Typography>
+                                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1 }}>
+                                                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                                                    <Rating value={result.rating} precision={0.1} size="small" readOnly />
+                                                                                    <Typography variant="body2">
+                                                                                        ⭐ {result.rating} ({result.reviewCount} reviews)
+                                                                                    </Typography>
+                                                                                </Box>
+                                                                                <Chip 
+                                                                                    label={`💰 $${result.fee}`}
+                                                                                    size="small"
+                                                                                    color="primary"
+                                                                                    variant="outlined"
+                                                                                />
+                                                                            </Box>
+                                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+                                                                                <AccessTime fontSize="small" color="action" />
+                                                                                <Typography variant="caption" color="text.secondary">
+                                                                                    🕒 Available: {result.nextAvailable}
+                                                                                </Typography>
+                                                                            </Box>
+                                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                                                                                <LocalHospital fontSize="small" color="action" />
+                                                                                <Typography variant="caption" color="text.secondary">
+                                                                                    🏥 {result.clinicName}
+                                                                                </Typography>
+                                                                            </Box>
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                                                                <LocationOn fontSize="small" color="action" />
+                                                                                <Typography variant="body2">
+                                                                                    📍 {result.address}
+                                                                                </Typography>
+                                                                            </Box>
+                                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                                                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                                                    <Rating value={result.rating} precision={0.1} size="small" readOnly />
+                                                                                    <Typography variant="body2">
+                                                                                        ⭐ {result.rating} ({result.reviewCount} reviews)
+                                                                                    </Typography>
+                                                                                </Box>
+                                                                                <Chip 
+                                                                                    label={`📍 ${result.distance}`}
+                                                                                    size="small"
+                                                                                    color="info"
+                                                                                    variant="outlined"
+                                                                                />
+                                                                            </Box>
+                                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                                                                <AccessTime fontSize="small" color="action" />
+                                                                                <Typography variant="caption" color="text.secondary">
+                                                                                    🕒 {result.openTime === '24/7' 
+                                                                                        ? 'Open 24/7' 
+                                                                                        : `${result.openTime} - ${result.closeTime}`}
+                                                                                </Typography>
+                                                                                {result.isOpen && (
+                                                                                    <Chip 
+                                                                                        label="🟢 Open Now"
+                                                                                        size="small"
+                                                                                        color="success"
+                                                                                        sx={{ fontSize: '0.6rem', height: '20px' }}
+                                                                                    />
+                                                                                )}
+                                                                            </Box>
+                                                                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
+                                                                                {result.facilities.slice(0, 3).map((facility, idx) => (
+                                                                                    <Chip 
+                                                                                        key={idx} 
+                                                                                        label={facility} 
+                                                                                        size="small" 
+                                                                                        variant="outlined"
+                                                                                        sx={{ fontSize: '0.7rem', height: '22px' }}
+                                                                                    />
+                                                                                ))}
+                                                                                {result.facilities.length > 3 && (
+                                                                                    <Chip 
+                                                                                        label={`+${result.facilities.length - 3} more`} 
+                                                                                        size="small"
+                                                                                        sx={{ fontSize: '0.7rem', height: '22px' }}
+                                                                                    />
+                                                                                )}
+                                                                            </Box>
+                                                                        </>
+                                                                    )}
+                                                                </Box>
+                                                            }
+                                                        />
+                                                    </ButtonBase>
+                                                </ListItem>
+                                                {index < searchResults.length - 1 && <Divider />}
+                                            </React.Fragment>
+                                        ))}
+                                        {searchResults.length === 0 && showResults && (
+                                            <ListItem>
+                                                <ListItemText
+                                                    primary={
+                                                        <Typography variant="h6" color="text.secondary" textAlign="center">
+                                                            🔍 No results found
+                                                        </Typography>
+                                                    }
+                                                    secondary={
+                                                        <Typography variant="body2" color="text.secondary" textAlign="center">
+                                                            Try adjusting your search criteria or browse our featured doctors and clinics below.
+                                                        </Typography>
+                                                    }
+                                                />
+                                            </ListItem>
+                                        )}
+                                    </List>
+                                </Paper>
+                            </Box>
+                        </Collapse>
+                    </Paper>
+                </Container>
+            </Box>
+
+            <style>{`
+                @keyframes blink {
+                    0%, 50% {
+                        opacity: 1;
+                    }
+                    51%, 100% {
+                        opacity: 0;
+                    }
+                }
+                
+                .blinking-cursor {
+                    animation: blink 1.2s infinite;
+                }
+            `}</style>
+        </>
+    );
+};
+
+export default SearchSection;
+```
+
+
+### Step 22: Enhanced Nearby Section Component
+
+**resources/js/components/home/NearbySection.jsx**
+
+```jsx
+import React from 'react';
+import {
+  Box,
+  Container,
+  Typography,
+  Grid,
+  Card,
+  CardMedia,
+  CardContent,
+  CardActions,
+  Button,
+  Chip,
+  Rating,
+  Avatar,
+  Paper,
+  Divider,
+} from '@mui/material';
+import {
+  LocationOn,
+  Verified,
+  LocalHospital,
+  AccessTime,
+  CheckCircle,
+  Phone,
+  Star,
+} from '@mui/icons-material';
+import MedicalInformationTwoToneIcon from '@mui/icons-material/MedicalInformationTwoTone';
+import Diversity1TwoToneIcon from '@mui/icons-material/Diversity1TwoTone';
+import { clinics, doctors } from '../../data/dummyData';
+
+const NearbySection = () => {
+  return (
+    <Box sx={{ py: { xs: 6, md: 10 }, bgcolor: '#fafbfc' }}>
+      <Container maxWidth="lg">
+
+        {/* Nearby Clinics */}
+        <Box sx={{ mb: { xs: 6, md: 10 } }}>
+          <Box textAlign="center" sx={{ mb: { xs: 4, md: 6 } }}>
+            <Typography
+              variant="h3"
+              component="h2"
+              gutterBottom
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: { xs: 1, sm: 1.25, md: 1.5 },
+                fontWeight: 'bold',
+                fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
+                background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+              }}
+            >
+              <MedicalInformationTwoToneIcon
+                sx={{
+                  fontSize: { xs: 40, sm: 50, md: 60 },
+                  color: '#2196F3',
+                  filter: 'drop-shadow(0 2px 6px rgba(33,150,243,0.25))',
+                }}
+              />
+              <Box component="span" sx={{ lineHeight: 1 }}>
+                🏥 Nearby Clinics
+              </Box>
+            </Typography>
+            <Typography
+              variant="h6"
+              color="text.secondary"
+              sx={{
+                maxWidth: 600,
+                mx: 'auto',
+                fontSize: { xs: '1rem', md: '1.25rem' },
+                px: { xs: 2, md: 0 }
+              }}
+            >
+              🏆 Top-rated medical facilities in your area with comprehensive healthcare services
+            </Typography>
+          </Box>
+
+          <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
+            {clinics.map((clinic) => (
+              <Grid item xs={12} sm={6} md={6} lg={4} xl={3} key={clinic.id}>
+                <Card
+                  elevation={0}
+                  sx={{
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    border: '1px solid',
+                    borderColor: 'grey.200',
+                    borderRadius: { xs: 3, md: 2 },
+                    overflow: 'hidden',
+                    background: 'linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%)',
+                    '&:hover': {
+                      transform: 'translateY(-8px)',
+                      boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
+                      borderColor: 'primary.main',
+                    },
+                    transition: 'all 0.3s ease',
+                  }}
+                >
+                  <Box sx={{ position: 'relative' }}>
+                    <CardMedia
+                      component="img"
+                      height={180}
+                      image={clinic.image}
+                      alt={clinic.name}
+                      sx={{ objectFit: 'cover' }}
+                    />
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        top: 12,
+                        right: 12,
+                        display: 'flex',
+                        gap: 1
+                      }}
+                    >
+                      {clinic.isOpen && (
+                        <Chip
+                          label="🟢 Open Now"
+                          size="small"
+                          icon={<CheckCircle />}
+                          sx={{
+                            bgcolor: 'success.main',
+                            color: 'white',
+                            fontWeight: 600,
+                            '& .MuiChip-icon': { color: 'white' }
+                          }}
+                        />
+                      )}
+                      <Chip
+                        label={`📍 ${clinic.distance}`}
+                        size="small"
+                        sx={{
+                          bgcolor: 'rgba(255,255,255,0.9)',
+                          fontWeight: 600,
+                          backdropFilter: 'blur(10px)'
+                        }}
+                      />
+                    </Box>
+                  </Box>
+
+                  <CardContent sx={{ flexGrow: 1, p: { xs: 1, md: 2 } }}>
+                    <Typography
+                      variant="h6"
+                      component="h3"
+                      sx={{
+                        fontWeight: 'bold',
+                        mb: 1,
+                        fontSize: { xs: '1.25rem', md: '1.35rem' },
+                      }}
+                    >
+                      🏥 {clinic.name}
+                    </Typography>
+
+                    <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 1 }}>
+                      <LocationOn sx={{ color: 'text.secondary', mr: 1, fontSize: 18 }} />
+                      <Typography variant="body2" color="text.secondary">
+                        📍 {clinic.address}
+                      </Typography>
+                    </Box>
+
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                      <Rating value={clinic.rating} precision={0.1} size="small" readOnly />
+                      <Typography variant="body2" sx={{ ml: 1, fontWeight: 600 }}>
+                        ⭐ {clinic.rating} ({clinic.reviewCount} reviews)
+                      </Typography>
+                    </Box>
+
+                    <Box sx={{ mb: 1.5 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                        🛠️ Facilities
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
+                        {clinic.facilities.slice(0, 2).map((facility, idx) => (
+                          <Chip key={idx} label={facility} size="small" variant="outlined" />
+                        ))}
+                        {clinic.facilities.length > 2 && (
+                          <Chip 
+                            label={`+${clinic.facilities.length - 2} more`} 
+                            size="small" 
+                            color="primary"
+                          />
+                        )}
+                      </Box>
+                    </Box>
+
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <AccessTime sx={{ color: 'text.secondary', fontSize: 18, mr: 1 }} />
+                      <Typography variant="caption" color="text.secondary">
+                        🕒 {clinic.openTime === '24/7'
+                          ? 'Open 24/7'
+                          : `${clinic.openTime} - ${clinic.closeTime}`}
+                      </Typography>
+                    </Box>
+                  </CardContent>
+
+                  <Divider />
+
+                  <CardActions sx={{ p: { xs: 1, md: 1 } }}>
+                    <Button
+                      variant="contained"
+                      fullWidth
+                      startIcon={<LocalHospital />}
+                      sx={{
+                        borderRadius: 3,
+                        py: { xs: 1.5, md: 1.8 },
+                        fontWeight: 600,
+                        color: "white",
+                        background: 'linear-gradient(45deg, #0cb010 30%, #10d915 90%)',
+                      }}
+                    >
+                      🔍 View Details
+                    </Button>
+                  </CardActions>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
+
+        {/* Doctors Section */}
+        <Box>
+          <Box textAlign="center" sx={{ mb: { xs: 4, md: 6 } }}>
+            <Typography
+              variant="h3"
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: { xs: 1, sm: 1.25, md: 1.5 },
+                fontWeight: 'bold',
+                fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
+                background: 'linear-gradient(45deg, #FF6B6B 30%, #FF8E8E 90%)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                mb: 1
+              }}
+            >
+              <Diversity1TwoToneIcon
+                sx={{
+                  fontSize: { xs: 30, sm: 40, md: 50 },
+                  color: '#FF6B6B',
+                  filter: 'drop-shadow(0 2px 6px rgba(255,107,107,0.25))',
+                }}
+              />
+              <Box component="span" sx={{ lineHeight: 1 }}>
+                👨‍⚕️ Available Doctors
+              </Box>
+            </Typography>
+            <Typography
+              variant="h6"
+              color="text.secondary"
+              sx={{ maxWidth: 600, mx: 'auto', fontSize: { xs: '1rem', md: '1.25rem' } }}
+            >
+              🩺 Experienced healthcare professionals ready to provide quality medical care
+            </Typography>
+          </Box>
+
+          <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
+            {doctors.map((doctor) => (
+              <Grid item xs={12} sm={6} md={4} lg={3} key={doctor.id}>
+                <Card
+                  elevation={0}
+                  sx={{
+                    textAlign: 'center',
+                    p: { xs: 1, md: 1 },
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    position: 'relative',
+                    border: '1px solid',
+                    borderColor: 'grey.200',
+                    borderRadius: 3,
+                    background: 'linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%)',
+                    '&:hover': {
+                      transform: 'translateY(-8px)',
+                      boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
+                      borderColor: 'primary.main',
+                    },
+                    transition: 'all 0.3s ease',
+                  }}
+                >
+                  <Box sx={{ position: 'relative', mb: { xs: 1.5, md: 2.5 }, width: '100%' }}>
+                    <Avatar
+                      src={doctor.image}
+                      alt={doctor.name}
+                      sx={{
+                        width: { xs: 88, sm: 92, md: 104 },
+                        height: { xs: 88, sm: 92, md: 104 },
+                        mx: 'auto',
+                        border: 3,
+                        borderColor: 'primary.main',
+                        boxShadow: '0 8px 20px rgba(0,0,0,0.08)',
+                      }}
+                    />
+                    {doctor.isVerified && (
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          right: '50%',
+                          bottom: { xs: -10, sm: -10, md: -8 },
+                          transform: 'translateX(50%)',
+                          bgcolor: 'success.main',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          border: '2px solid white',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                          width: { xs: 26, sm: 28, md: 30 },
+                          height: { xs: 26, sm: 28, md: 30 },
+                        }}
+                      >
+                        <Verified
+                          sx={{
+                            color: 'white',
+                            fontSize: { xs: 18, sm: 20, md: 22 },
+                            lineHeight: 1,
+                          }}
+                        />
+                      </Box>
+                    )}
+                  </Box>
+
+                  <Typography variant="h6" sx={{ fontWeight: 'bold', lineHeight: 1.2 }}>
+                    👨‍⚕️ {doctor.name}
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    color="primary"
+                    sx={{ fontWeight: 600, mb: 0.5 }}
+                  >
+                    {doctor.specialty}
+                  </Typography>
+
+                  <Typography variant="caption" color="text.secondary" sx={{ mb: 1 }}>
+                    📅 {doctor.experience} years experience
+                  </Typography>
+
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
+                    <Rating value={doctor.rating} precision={0.1} size="small" readOnly />
+                    <Typography variant="body2" sx={{ ml: 0.75, fontWeight: 600 }}>
+                      ⭐ {doctor.rating}
+                    </Typography>
+                  </Box>
+
+                  <Paper
+                    variant="outlined"
+                    sx={{
+                      p: { xs: 0.5, md: 1 },
+                      mb: 1,
+                      background: 'linear-gradient(45deg, #E3F2FD 30%, #F3E5F5 90%)',
+                      borderColor: 'primary.200',
+                      borderRadius: 3
+                    }}
+                  >
+                    <Typography variant="h6" color="primary" sx={{ fontWeight: 'bold' }}>
+                      💰 ${doctor.fee}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Consultation Fee
+                    </Typography>
+                  </Paper>
+
+                  <Typography variant="caption" color="text.secondary" sx={{ mb: 'auto' }}>
+                    🕒 Available: {doctor.nextAvailable}
+                  </Typography>
+
+                  <Button
+                    variant="contained"
+                    fullWidth
+                    sx={{
+                      mt: { xs: 1, md: 1.5 },
+                      borderRadius: 3,
+                      fontWeight: 600,
+                      py: { xs: 0.9, md: 1.05 },
+                      background: 'linear-gradient(45deg, #FF6B6B 30%, #FF8E8E 90%)',
+                      boxShadow: '0 4px 20px rgba(255, 107, 107, 0.3)',
+                      '&:hover': {
+                        boxShadow: '0 6px 25px rgba(255, 107, 107, 0.4)',
+                      }
+                    }}
+                  >
+                    📅 Book Now
+                  </Button>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
+      </Container>
+    </Box>
+  );
+};
+
+export default NearbySection;
+```
+
+
+### Step 23: Enhanced Stats Section Component
+
+**resources/js/components/home/StatsSection.jsx**
+
+```jsx
+import React, { useState, useEffect, useRef } from 'react';
+import {
+    Box,
+    Container,
+    Typography,
+    Grid,
+    Card,
+    CardContent,
+    Avatar,
+} from '@mui/material';
+import {
+    VerifiedUser,
+    LocalHospital,
+    Event,
+    Star,
+    TrendingUp,
+    People,
+} from '@mui/icons-material';
+
+const StatsSection = () => {
+    const [isVisible, setIsVisible] = useState(false);
+    const [animatedCounts, setAnimatedCounts] = useState([0, 0, 0, 0]);
+    const sectionRef = useRef(null);
+
+    const stats = [
+        {
+            icon: <VerifiedUser fontSize="large" />,
+            count: '500+',
+            targetValue: 500,
+            suffix: '+',
+            label: '✅ Verified Doctors',
+            color: 'success.main',
+            bgColor: 'success.50',
+            emoji: '👨‍⚕️'
+        },
+        {
+            icon: <LocalHospital fontSize="large" />,
+            count: '100+',
+            targetValue: 100,
+            suffix: '+',
+            label: '🏥 Healthcare Facilities',
+            color: 'primary.main',
+            bgColor: 'primary.50',
+            emoji: '🏥'
+        },
+        {
+            icon: <Event fontSize="large" />,
+            count: '10,000+',
+            targetValue: 10000,
+            suffix: '+',
+            label: '📅 Appointments Booked',
+            color: 'secondary.main',
+            bgColor: 'secondary.50',
+            emoji: '📋'
+        },
+        {
+            icon: <Star fontSize="large" />,
+            count: '4.8/5',
+            targetValue: 4.8,
+            suffix: '/5',
+            label: '⭐ Average Rating',
+            color: 'warning.main',
+            bgColor: 'warning.50',
+            emoji: '🌟'
+        }
+    ];
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting && !isVisible) {
+                    setIsVisible(true);
+                }
+            },
+            { threshold: 0.3 }
+        );
+
+        if (sectionRef.current) {
+            observer.observe(sectionRef.current);
+        }
+
+        return () => {
+            if (sectionRef.current) {
+                observer.unobserve(sectionRef.current);
+            }
+        };
+    }, [isVisible]);
+
+    useEffect(() => {
+        if (!isVisible) return;
+
+        const animateCount = (index, targetValue, duration = 2000) => {
+            const startTime = Date.now();
+            const startValue = 0;
+
+            const updateCount = () => {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                const easeOutQuart = 1 - Math.pow(1 - progress, 4);
+                const currentValue = startValue + (targetValue - startValue) * easeOutQuart;
+                
+                setAnimatedCounts(prev => {
+                    const newCounts = [...prev];
+                    newCounts[index] = currentValue;
+                    return newCounts;
+                });
+
+                if (progress < 1) {
+                    requestAnimationFrame(updateCount);
+                }
+            };
+
+            requestAnimationFrame(updateCount);
+        };
+
+        stats.forEach((stat, index) => {
+            setTimeout(() => {
+                animateCount(index, stat.targetValue, 2000);
+            }, index * 200);
+        });
+    }, [isVisible]);
+
+    const formatCount = (value, index) => {
+        const stat = stats[index];
+        if (index === 3) {
+            return value.toFixed(1);
+        } else if (index === 2 && value >= 1000) {
+            return (value / 1000).toFixed(value >= 10000 ? 0 : 1) + 'k';
+        }
+        return Math.floor(value).toString();
+    };
+
+    return (
+        <Box 
+            ref={sectionRef}
+            sx={{ 
+                py: { xs: 6, md: 10 },
+                background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+                position: 'relative'
+            }}
+        >
+            <Container maxWidth="lg">
+                <Box textAlign="center" sx={{ mb: { xs: 4, md: 6 } }}>
+                    <Typography 
+                        variant="h3" 
+                        component="h2" 
+                        gutterBottom
+                        sx={{ 
+                            fontWeight: 'bold', 
+                            color: 'text.primary',
+                            fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 2,
+                        }}
+                    >
+                        <TrendingUp sx={{ fontSize: { xs: '2rem', md: '3rem' }, color: 'primary.main' }} />
+                        📊 Our Impact in Numbers
+                    </Typography>
+                    <Typography 
+                        variant="h6" 
+                        color="text.secondary"
+                        sx={{ 
+                            maxWidth: 600, 
+                            mx: 'auto',
+                            fontSize: { xs: '1rem', md: '1.25rem' },
+                            px: { xs: 2, md: 0 }
+                        }}
+                    >
+                        🤝 Trusted by thousands of patients for quality healthcare services and professional medical care
+                    </Typography>
+                </Box>
+
+                <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
+                    {stats.map((stat, index) => (
+                        <Grid item xs={6} md={3} key={index}>
+                            <Card 
+                                elevation={4}
+                                sx={{ 
+                                    textAlign: 'center',
+                                    p: { xs: 2, sm: 3, md: 4 },
+                                    height: '100%',
+                                    minHeight: { xs: 180, sm: 200, md: 220 },
+                                    background: 'linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%)',
+                                    border: '1px solid rgba(0,0,0,0.05)',
+                                    borderRadius: { xs: 3, md: 2 },
+                                    '&:hover': {
+                                        transform: 'translateY(-8px)',
+                                        boxShadow: { xs: 4, md: 6 },
+                                    },
+                                    transition: 'all 0.3s ease-in-out',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    justifyContent: 'center'
+                                }}
+                            >
+                                <CardContent sx={{ p: 0, flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                                    <Box sx={{ position: 'relative', mb: { xs: 2, md: 3 } }}>
+                                        <Avatar
+                                            sx={{
+                                                width: { xs: 50, sm: 60, md: 80 },
+                                                height: { xs: 50, sm: 60, md: 80 },
+                                                mx: 'auto',
+                                                bgcolor: stat.bgColor,
+                                                color: stat.color,
+                                                boxShadow: 2,
+                                                fontSize: { xs: '1.5rem', md: '2rem' }
+                                            }}
+                                        >
+                                            {stat.emoji}
+                                        </Avatar>
+                                    </Box>
+
+                                    <Typography 
+                                        variant="h3" 
+                                        component="div"
+                                        sx={{ 
+                                            fontWeight: 'bold',
+                                            color: stat.color,
+                                            mb: { xs: 0.5, md: 1 },
+                                            fontSize: { xs: '1.5rem', sm: '1.8rem', md: '2.5rem' },
+                                            lineHeight: 1.2,
+                                            fontFamily: 'monospace',
+                                            minHeight: { xs: '2rem', md: '2.5rem' }
+                                        }}
+                                    >
+                                        {formatCount(animatedCounts[index], index)}{stat.suffix}
+                                    </Typography>
+
+                                    <Typography 
+                                        variant="h6"
+                                        color="text.secondary"
+                                        sx={{ 
+                                            fontWeight: 500,
+                                            fontSize: { xs: '0.75rem', sm: '0.85rem', md: '1.1rem' },
+                                            lineHeight: 1.3,
+                                            px: { xs: 0.5, md: 0 }
+                                        }}
+                                    >
+                                        {stat.label}
+                                    </Typography>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+                    ))}
+                </Grid>
+
+                <Box sx={{ mt: { xs: 4, md: 6 }, textAlign: 'center' }}>
+                    <Box
+                        sx={{
+                            p: 3,
+                            background: 'rgba(255, 255, 255, 0.9)',
+                            borderRadius: 3,
+                            border: '1px solid rgba(16, 217, 21, 0.2)',
+                            boxShadow: '0 4px 20px rgba(16, 217, 21, 0.1)',
+                        }}
+                    >
+                        <Typography 
+                            variant="body1" 
+                            color="text.secondary" 
+                            sx={{ 
+                                fontStyle: 'italic',
+                                fontSize: { xs: '0.9rem', md: '1rem' },
+                                px: { xs: 2, md: 0 },
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 1,
+                            }}
+                        >
+                            <People sx={{ color: 'primary.main' }} />
+                            🤝 Join thousands of satisfied patients who trust Visit Care for their healthcare needs
+                        </Typography>
+                    </Box>
+                </Box>
+            </Container>
+        </Box>
+    );
+};
+
+export default StatsSection;
+```
+
+
+### Step 24: Enhanced Why Choose Section Component
+
+**resources/js/components/home/WhyChooseSection.jsx**
+
+```jsx
+import React from 'react';
+import {
+    Box,
+    Container,
+    Typography,
+    Grid,
+    Card,
+    CardContent,
+    Avatar,
+} from '@mui/material';
+import {
+    LocationOn,
+    Schedule,
+    VerifiedUser,
+    PhoneIphone,
+    Security,
+    NotificationImportant,
+} from '@mui/icons-material';
+import { whyChooseFeatures } from '../../data/dummyData';
+
+const WhyChooseSection = () => {
+    const iconMap = {
+        LocationOn: <LocationOn fontSize="large" />,
+        Schedule: <Schedule fontSize="large" />,
+        VerifiedUser: <VerifiedUser fontSize="large" />,
+        PhoneIphone: <PhoneIphone fontSize="large" />,
+        Security: <Security fontSize="large" />,
+        NotificationImportant: <NotificationImportant fontSize="large" />
+    };
+
+    const colors = [
+        { main: 'primary.main', bg: 'primary.50', emoji: '📍' },
+        { main: 'success.main', bg: 'success.50', emoji: '⏰' },
+        { main: 'info.main', bg: 'info.50', emoji: '✅' },
+        { main: 'warning.main', bg: 'warning.50', emoji: '📱' },
+        { main: 'error.main', bg: 'error.50', emoji: '🔒' },
+        { main: 'secondary.main', bg: 'secondary.50', emoji: '🔔' }
+    ];
+
+    return (
+        <Box sx={{ py: { xs: 6, md: 10 }, bgcolor: 'background.paper' }}>
+            <Container maxWidth="lg">
+                <Box textAlign="center" sx={{ mb: 8 }}>
+                    <Typography 
+                        variant="h3" 
+                        component="h2" 
+                        gutterBottom
+                        sx={{ 
+                            fontWeight: 'bold', 
+                            color: 'text.primary',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 2,
+                        }}
+                    >
+                        🌟 Why Choose Visit Care?
+                    </Typography>
+                    <Typography 
+                        variant="h6" 
+                        color="text.secondary"
+                        sx={{ maxWidth: 800, mx: 'auto', lineHeight: 1.6 }}
+                    >
+                        🚀 We're revolutionizing healthcare with cutting-edge technology and a patient-first approach 
+                        that puts your health and convenience at the center of everything we do
+                    </Typography>
+                </Box>
+
+                <Grid container spacing={4}>
+                    {whyChooseFeatures.map((feature, index) => (
+                        <Grid item xs={12} sm={6} lg={4} key={index}>
+                            <Card 
+                                elevation={0}
+                                sx={{ 
+                                    textAlign: 'center',
+                                    p: { xs: 3, md: 4 },
+                                    height: '100%',
+                                    background: 'linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%)',
+                                    border: '1px solid rgba(0,0,0,0.05)',
+                                    borderRadius: 3,
+                                    '&:hover': {
+                                        transform: 'translateY(-8px)',
+                                        boxShadow: 8,
+                                        '& .feature-avatar': {
+                                            transform: 'scale(1.1)',
+                                        },
+                                        '& .feature-emoji': {
+                                            transform: 'rotate(360deg)',
+                                        }
+                                    },
+                                    transition: 'all 0.4s ease-in-out'
+                                }}
+                            >
+                                <CardContent>
+                                    <Box sx={{ position: 'relative', mb: 3 }}>
+                                        <Avatar
+                                            className="feature-avatar"
+                                            sx={{
+                                                width: 80,
+                                                height: 80,
+                                                mx: 'auto',
+                                                bgcolor: colors[index].bg,
+                                                color: colors[index].main,
+                                                boxShadow: 3,
+                                                transition: 'transform 0.3s ease-in-out'
+                                            }}
+                                        >
+                                            {iconMap[feature.icon]}
+                                        </Avatar>
+                                        <Typography
+                                            className="feature-emoji"
+                                            sx={{
+                                                position: 'absolute',
+                                                top: -10,
+                                                right: -10,
+                                                fontSize: '2rem',
+                                                transition: 'transform 0.6s ease-in-out',
+                                            }}
+                                        >
+                                            {colors[index].emoji}
+                                        </Typography>
+                                    </Box>
+
+                                    <Typography 
+                                        variant="h5" 
+                                        component="h3"
+                                        gutterBottom
+                                        sx={{ 
+                                            fontWeight: 'bold',
+                                            color: 'text.primary',
+                                            mb: 2
+                                        }}
+                                    >
+                                        {feature.title}
+                                    </Typography>
+
+                                    <Typography 
+                                        variant="body1"
+                                        color="text.secondary"
+                                        sx={{ 
+                                            lineHeight: 1.6,
+                                            fontSize: '1rem'
+                                        }}
+                                    >
+                                        {feature.description}
+                                    </Typography>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+                    ))}
+                </Grid>
+            </Container>
+        </Box>
+    );
+};
+
+export default WhyChooseSection;
+```
+
+
+### Step 25: Enhanced Testimonials Section Component
+
+**resources/js/components/home/TestimonialsSection.jsx**
+
+```jsx
+import React from 'react';
+import {
+    Box,
+    Container,
+    Typography,
+    Grid,
+    Card,
+    CardContent,
+    Avatar,
+    Rating,
+    Paper,
+    Chip,
+} from '@mui/material';
+import { FormatQuote, LocationOn, Favorite } from '@mui/icons-material';
+import { testimonials } from '../../data/dummyData';
+
+const TestimonialsSection = () => {
+    return (
+        <Box
+            sx={{
+                py: { xs: 6, md: 10 },
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                position: 'relative',
+                '&::before': {
+                    content: '""',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background:
+                        'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.05\'%3E%3Ccircle cx=\'30\' cy=\'30\' r=\'2\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")',
+                    opacity: 0.3,
+                }
+            }}
+        >
+            <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1 }}>
+                <Box textAlign="center" sx={{ mb: 8 }}>
+                    <Typography
+                        variant="h3"
+                        component="h2"
+                        gutterBottom
+                        sx={{ 
+                            fontWeight: 'bold', 
+                            color: 'white',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 2,
+                        }}
+                    >
+                        💬 What Our Users Say
+                    </Typography>
+                    <Typography
+                        variant="h6"
+                        sx={{
+                            maxWidth: 600,
+                            mx: 'auto',
+                            opacity: 0.9,
+                            lineHeight: 1.6
+                        }}
+                    >
+                        ⭐ Real stories from satisfied patients who found their perfect healthcare match through Visit Care
+                    </Typography>
+                </Box>
+
+                <Grid container spacing={4}>
+                    {testimonials.map((testimonial) => (
+                        <Grid item xs={12} sm={6} lg={3} key={testimonial.id}>
+                            <Card
+                                elevation={8}
+                                sx={{
+                                    height: '100%',
+                                    background: 'rgba(255, 255, 255, 0.95)',
+                                    backdropFilter: 'blur(10px)',
+                                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                                    borderRadius: 3,
+                                    '&:hover': {
+                                        transform: 'translateY(-8px)',
+                                        boxShadow: 12,
+                                    },
+                                    transition: 'all 0.3s ease-in-out',
+                                    position: 'relative',
+                                    overflow: 'visible'
+                                }}
+                            >
+                                <Box
+                                    sx={{
+                                        position: 'absolute',
+                                        top: -22,
+                                        left: 20,
+                                        width: 44,
+                                        height: 44,
+                                        bgcolor: 'primary.main',
+                                        borderRadius: '50%',
+                                        boxShadow: 3,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        zIndex: 2,
+                                    }}
+                                >
+                                    <FormatQuote sx={{ color: 'white', fontSize: 24 }} />
+                                </Box>
+
+                                <CardContent sx={{ p: 4, pt: 5 }}>
+                                    <Box sx={{ mb: 3, display: 'flex', justifyContent: 'center' }}>
+                                        <Rating
+                                            value={testimonial.rating}
+                                            readOnly
+                                            size="small"
+                                            sx={{
+                                                '& .MuiRating-iconFilled': {
+                                                    color: 'warning.main',
+                                                }
+                                            }}
+                                        />
+                                    </Box>
+
+                                    <Typography
+                                        variant="body1"
+                                        sx={{
+                                            mb: 4,
+                                            fontStyle: 'italic',
+                                            color: 'text.secondary',
+                                            lineHeight: 1.6,
+                                            minHeight: 80,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            position: 'relative',
+                                            '&::before': {
+                                                content: '"💬"',
+                                                position: 'absolute',
+                                                left: -20,
+                                                top: 0,
+                                                fontSize: '1.5rem',
+                                                opacity: 0.3,
+                                            }
+                                        }}
+                                    >
+                                        "{testimonial.comment}"
+                                    </Typography>
+
+                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <Avatar
+                                            src={testimonial.avatar}
+                                            sx={{
+                                                width: 50,
+                                                height: 50,
+                                                mr: 2,
+                                                border: '2px solid',
+                                                borderColor: 'primary.main'
+                                            }}
+                                        />
+                                        <Box sx={{ textAlign: 'left' }}>
+                                            <Typography
+                                                variant="h6"
+                                                sx={{
+                                                    fontWeight: 'bold',
+                                                    color: 'text.primary',
+                                                    fontSize: '1rem'
+                                                }}
+                                            >
+                                                👤 {testimonial.name}
+                                            </Typography>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
+                                                <LocationOn
+                                                    fontSize="small"
+                                                    sx={{ color: 'text.secondary', mr: 0.5 }}
+                                                />
+                                                <Typography
+                                                    variant="caption"
+                                                    color="text.secondary"
+                                                >
+                                                    📍 {testimonial.location}
+                                                </Typography>
+                                            </Box>
+                                        </Box>
+                                    </Box>
+
+                                    <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+                                        <Chip
+                                            label="✅ Verified Patient"
+                                            size="small"
+                                            color="success"
+                                            variant="outlined"
+                                            sx={{ fontSize: '0.7rem' }}
+                                        />
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+                    ))}
+                </Grid>
+
+                <Box sx={{ mt: 8, textAlign: 'center' }}>
+                    <Paper
+                        elevation={4}
+                        sx={{
+                            p: 4,
+                            bgcolor: 'rgba(255, 255, 255, 0.1)',
+                            backdropFilter: 'blur(10px)',
+                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                            borderRadius: 3,
+                            color: 'white'
+                        }}
+                    >
+                        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                            <Favorite sx={{ color: 'red' }} />
+                            👥 Join 50,000+ Happy Patients
+                        </Typography>
+                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                            📊 Over 98% of our users recommend Visit Care to their friends and family
+                        </Typography>
+                    </Paper>
+                </Box>
+            </Container>
+        </Box>
+    );
+};
+
+export default TestimonialsSection;
+```
+
+
+### Step 26: Complete Location Map Component
+
+**resources/js/components/home/LocationMap.jsx**
+
+```jsx
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Box,
+  Typography,
+  Button,
+  IconButton,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  TextField,
+  InputAdornment,
+  Chip,
+  CircularProgress,
+  Alert,
+  useMediaQuery,
+  useTheme,
+} from "@mui/material";
+import { ListItemButton } from "@mui/material";
+import { 
+  Close, 
+  LocationOn, 
+  MyLocation, 
+  Search, 
+  Navigation,
+  Map,
+  Place
+} from "@mui/icons-material";
+
+const LocationMap = ({
+  open,
+  onClose,
+  currentLocation,
+  currentCoords,
+  onLocationUpdate,
+}) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down("sm"));
+
+  const [searchLocation, setSearchLocation] = useState("");
+  const [currentPosition, setCurrentPosition] = useState(null);
+  const [selectedLocation, setSelectedLocation] = useState(
+    currentLocation || "New York, NY"
+  );
+  const [selectedCoords, setSelectedCoords] = useState(
+    currentCoords || [40.7128, -74.006]
+  );
   const [loading, setLoading] = useState(false);
-  const [filters, setFilters] = useState({
-    specialization: '',
-    location: '',
-    minRating: ''
-  });
+  const [error, setError] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
+  
+  const mapRef = useRef(null);
+  const googleMapRef = useRef(null);
+  const markersRef = useRef([]);
+  const searchTimeoutRef = useRef(null);
+  const geocoderRef = useRef(null);
+  const mapContainerRef = useRef(null);
+  const isUnmountingRef = useRef(false);
+  const placesServiceRef = useRef(null);
 
-  const specializations = [
-    'Cardiology', 'Dermatology', 'Neurology', 'Orthopedics', 
-    'Pediatrics', 'Psychiatry', 'General Medicine'
+  const recentLocations = [
+    { name: 'New York, NY', coords: [40.7128, -74.006], emoji: '🗽' },
+    { name: 'Brooklyn, NY', coords: [40.6892, -73.9442], emoji: '🌉' },
+    { name: 'Queens, NY', coords: [40.7282, -73.9442], emoji: '🏙️' },
+    { name: 'Manhattan, NY', coords: [40.7158, -73.997], emoji: '🏢' },
   ];
 
-  const fetchDoctors = async () => {
-    setLoading(true);
-    try {
-      const response = await doctorAPI.getDoctors(filters);
-      setDoctors(response.data.data);
-    } catch (error) {
-      console.error('Error fetching doctors:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchDoctors();
-  }, [filters]);
-
-  const handleFilterChange = (field, value) => {
-    setFilters(prev => ({ ...prev, [field]: value }));
-  };
-
-  return (
-    <div>
-      {/* Search Filters */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={12} md={4}>
-          <FormControl fullWidth>
-            <InputLabel>Specialization</InputLabel>
-            <Select
-              value={filters.specialization}
-              onChange={(e) => handleFilterChange('specialization', e.target.value)}
-            >
-              <MenuItem value="">All Specializations</MenuItem>
-              {specializations.map(spec => (
-                <MenuItem key={spec} value={spec}>{spec}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <TextField
-            fullWidth
-            label="Location"
-            value={filters.location}
-            onChange={(e) => handleFilterChange('location', e.target.value)}
-            placeholder="Enter city or area"
-          />
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <FormControl fullWidth>
-            <InputLabel>Minimum Rating</InputLabel>
-            <Select
-              value={filters.minRating}
-              onChange={(e) => handleFilterChange('minRating', e.target.value)}
-            >
-              <MenuItem value="">Any Rating</MenuItem>
-              <MenuItem value="4">4+ Stars</MenuItem>
-              <MenuItem value="3">3+ Stars</MenuItem>
-            </Select>
-          </FormControl>
-        </Grid>
-      </Grid>
-
-      {/* Doctor Cards */}
-      <Grid container spacing={3}>
-        {doctors.map((doctor) => (
-          <Grid item xs={12} md={6} lg={4} key={doctor.id}>
-            <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-              <CardContent sx={{ flexGrow: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Avatar
-                    src={doctor.user.avatar}
-                    sx={{ width: 60, height: 60, mr: 2 }}
-                  >
-                    {doctor.user.name.charAt(0)}
-                  </Avatar>
-                  <div>
-                    <Typography variant="h6" component="h2">
-                      Dr. {doctor.user.name}
-                    </Typography>
-                    <Typography color="text.secondary">
-                      {doctor.specialization}
-                    </Typography>
-                  </div>
-                </div>
-
-                <div style={{ mb: 1 }}>
-                  <Rating value={doctor.rating} readOnly size="small" />
-                  <Typography variant="body2" display="inline" sx={{ ml: 1 }}>
-                    ({doctor.total_reviews} reviews)
-                  </Typography>
-                </div>
-
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                  {doctor.experience_years} years experience
-                </Typography>
-
-                <Typography variant="body2" sx={{ mb: 2 }}>
-                  ₹{doctor.consultation_fee} consultation fee
-                </Typography>
-
-                {doctor.languages && (
-                  <div style={{ mb: 2 }}>
-                    {doctor.languages.map((lang, index) => (
-                      <Chip 
-                        key={index} 
-                        label={lang} 
-                        size="small" 
-                        sx={{ mr: 0.5, mb: 0.5 }}
-                      />
-                    ))}
-                  </div>
-                )}
-
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Available at {doctor.clinics?.length || 0} clinic(s)
-                </Typography>
-
-                <Button 
-                  variant="contained" 
-                  fullWidth
-                  onClick={() => onDoctorSelect(doctor)}
-                >
-                  Book Appointment
-                </Button>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
-
-      {doctors.length === 0 && !loading && (
-        <Typography textAlign="center" sx={{ mt: 4 }}>
-          No doctors found matching your criteria.
-        </Typography>
-      )}
-    </div>
-  );
-};
-
-export default DoctorList;
-```
-
-
-### 11. 📅 Appointment Booking Component
-
-```javascript
-// resources/js/components/appointments/BookingForm.jsx
-import React, { useState, useEffect } from 'react';
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  Grid,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  TextField,
-  Typography,
-  Alert,
-  Box
-} from '@mui/material';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import dayjs from 'dayjs';
-import { doctorAPI, appointmentAPI } from '../../services/api';
-
-const BookingForm = ({ open, onClose, doctor }) => {
-  const [selectedClinic, setSelectedClinic] = useState('');
-  const [selectedDate, setSelectedDate] = useState(dayjs());
-  const [selectedTime, setSelectedTime] = useState('');
-  const [symptoms, setSymptoms] = useState('');
-  const [availableSlots, setAvailableSlots] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-
-  useEffect(() => {
-    if (selectedClinic && selectedDate) {
-      fetchAvailability();
+    if (currentLocation && currentCoords) {
+      setSelectedLocation(currentLocation);
+      setSelectedCoords(Array.isArray(currentCoords) ? currentCoords : [40.7128, -74.006]);
     }
-  }, [selectedClinic, selectedDate]);
+  }, [currentLocation, currentCoords]);
 
-  const fetchAvailability = async () => {
-    if (!selectedClinic || !selectedDate) return;
+  const cleanup = useCallback(() => {
+    isUnmountingRef.current = true;
     
-    setLoading(true);
-    try {
-      const response = await doctorAPI.getAvailability(
-        doctor.id, 
-        selectedClinic, 
-        selectedDate.format('YYYY-MM-DD')
-      );
-      
-      if (response.data.available) {
-        setAvailableSlots(response.data.slots);
-        setError('');
-      } else {
-        setAvailableSlots([]);
-        setError(response.data.message);
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+      searchTimeoutRef.current = null;
+    }
+
+    if (markersRef.current && Array.isArray(markersRef.current)) {
+      markersRef.current.forEach(marker => {
+        try {
+          if (marker && typeof marker.setMap === 'function') {
+            marker.setMap(null);
+          }
+        } catch (e) {
+          console.warn('Error removing marker:', e);
+        }
+      });
+      markersRef.current = [];
+    }
+
+    if (googleMapRef.current) {
+      try {
+        googleMapRef.current = null;
+      } catch (e) {
+        console.warn('Error clearing map reference:', e);
       }
-    } catch (err) {
-      setError('Failed to fetch availability');
-      setAvailableSlots([]);
-    } finally {
-      setLoading(false);
+    }
+
+    geocoderRef.current = null;
+    placesServiceRef.current = null;
+    setMapLoaded(false);
+  }, []);
+
+  useEffect(() => {
+    const loadGoogleMaps = async () => {
+      if (window.google && window.google.maps) {
+        setGoogleMapsLoaded(true);
+        return;
+      }
+
+      try {
+        if (document.querySelector('script[src*="maps.googleapis.com"]')) {
+          const checkGoogleMaps = () => {
+            if (isUnmountingRef.current) return;
+            
+            if (window.google && window.google.maps) {
+              setGoogleMapsLoaded(true);
+            } else {
+              setTimeout(checkGoogleMaps, 100);
+            }
+          };
+          checkGoogleMaps();
+          return;
+        }
+
+        const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+        if (!apiKey) {
+          throw new Error("Google Maps API key not found in environment variables");
+        }
+
+        await new Promise((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry`;
+          script.async = true;
+          script.defer = true;
+          script.onload = () => {
+            if (!isUnmountingRef.current) {
+              setGoogleMapsLoaded(true);
+            }
+            resolve();
+          };
+          script.onerror = () => {
+            if (!isUnmountingRef.current) {
+              setError("Failed to load Google Maps");
+            }
+            reject();
+          };
+          document.head.appendChild(script);
+        });
+      } catch (error) {
+        console.error("Error loading Google Maps:", error);
+        if (!isUnmountingRef.current) {
+          setError("Failed to load Google Maps");
+        }
+      }
+    };
+
+    if (open) {
+      isUnmountingRef.current = false;
+      loadGoogleMaps();
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (open && googleMapsLoaded && !googleMapRef.current && mapRef.current && !isUnmountingRef.current) {
+      const timer = setTimeout(() => {
+        if (!isUnmountingRef.current) {
+          initializeMap();
+        }
+      }, 100);
+
+      return () => clearTimeout(timer);
+    }
+  }, [open, googleMapsLoaded]);
+
+  useEffect(() => {
+    if (!open) {
+      cleanup();
+    }
+    
+    return () => {
+      cleanup();
+    };
+  }, [open, cleanup]);
+
+  const initializeMap = () => {
+    if (!mapRef.current || !window.google || googleMapRef.current || isUnmountingRef.current) {
+      return;
+    }
+
+    try {
+      const coords = Array.isArray(selectedCoords) && selectedCoords.length >= 2 
+        ? selectedCoords 
+        : [40.7128, -74.006];
+
+      googleMapRef.current = new window.google.maps.Map(mapRef.current, {
+        center: { lat: coords[^0], lng: coords[^1] },
+        zoom: 13,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+        styles: [
+          {
+            featureType: "poi",
+            elementType: "labels",
+            stylers: [{ visibility: "on" }]
+          }
+        ]
+      });
+
+      geocoderRef.current = new window.google.maps.Geocoder();
+      placesServiceRef.current = new window.google.maps.places.PlacesService(googleMapRef.current);
+
+      addMarker(coords, selectedLocation, true);
+      googleMapRef.current.addListener("click", handleMapClick);
+
+      if (!isUnmountingRef.current) {
+        setMapLoaded(true);
+      }
+    } catch (error) {
+      console.error("Error initializing map:", error);
+      if (!isUnmountingRef.current) {
+        setError("Failed to initialize map");
+      }
     }
   };
 
-  const handleBooking = async () => {
-    if (!selectedClinic || !selectedDate || !selectedTime) {
-      setError('Please fill all required fields');
+  const addMarker = (coords, title, isSelected = false) => {
+    if (!googleMapRef.current || !window.google || isUnmountingRef.current) return;
+
+    if (!Array.isArray(coords) || coords.length < 2) {
+      console.error("Invalid coordinates for marker:", coords);
+      return;
+    }
+
+    const position = { lat: coords[^0], lng: coords[^1] };
+    
+    try {
+      const marker = new window.google.maps.Marker({
+        position: position,
+        map: googleMapRef.current,
+        title: title,
+        icon: isSelected
+          ? {
+              path: window.google.maps.SymbolPath.CIRCLE,
+              scale: 10,
+              fillColor: "#2196F3",
+              fillOpacity: 1,
+              strokeColor: "white",
+              strokeWeight: 3,
+            }
+          : {
+              path: window.google.maps.SymbolPath.CIRCLE,
+              scale: 8,
+              fillColor: "#ff5722",
+              fillOpacity: 1,
+              strokeColor: "white",
+              strokeWeight: 2,
+            }
+      });
+
+      const infoWindow = new window.google.maps.InfoWindow({
+        content: title,
+      });
+
+      marker.addListener("click", () => {
+        if (!isUnmountingRef.current) {
+          infoWindow.open(googleMapRef.current, marker);
+        }
+      });
+
+      markersRef.current.push(marker);
+      return marker;
+    } catch (error) {
+      console.error("Error adding marker:", error);
+      return null;
+    }
+  };
+
+  const clearMarkers = () => {
+    if (markersRef.current && Array.isArray(markersRef.current)) {
+      markersRef.current.forEach((marker) => {
+        try {
+          if (marker && typeof marker.setMap === 'function') {
+            marker.setMap(null);
+          }
+        } catch (e) {
+          console.warn('Error removing marker:', e);
+        }
+      });
+      markersRef.current = [];
+    }
+  };
+
+  const handleMapClick = async (e) => {
+    if (isUnmountingRef.current) return;
+    
+    const lat = e.latLng.lat();
+    const lng = e.latLng.lng();
+    setLoading(true);
+
+    try {
+      const address = await reverseGeocode(lat, lng);
+      if (!isUnmountingRef.current) {
+        setSelectedLocation(address);
+        setSelectedCoords([lat, lng]);
+
+        clearMarkers();
+        addMarker([lat, lng], address, true);
+      }
+    } catch (error) {
+      if (!isUnmountingRef.current) {
+        setError("Failed to get location details");
+      }
+    } finally {
+      if (!isUnmountingRef.current) {
+        setLoading(false);
+      }
+    }
+  };
+
+  const reverseGeocode = async (lat, lng) => {
+    try {
+      if (!geocoderRef.current || isUnmountingRef.current) return "Location not found";
+
+      return new Promise((resolve) => {
+        geocoderRef.current.geocode(
+          { location: { lat, lng } },
+          (results, status) => {
+            if (isUnmountingRef.current) {
+              resolve("Location not found");
+              return;
+            }
+            
+            if (status === "OK" && results[^0]) {
+              const address = results.formatted_address;
+              const parts = address.split(",").slice(0, 3);
+              resolve(parts.join(",").trim());
+            } else {
+              resolve("Location not found");
+            }
+          }
+        );
+      });
+    } catch (error) {
+      console.error("Reverse geocoding error:", error);
+      return "Location not found";
+    }
+  };
+
+  const searchLocations = async (query) => {
+    if (!query.trim() || isUnmountingRef.current) {
+      setSearchResults([]);
       return;
     }
 
     setLoading(true);
     try {
-      const bookingData = {
-        doctor_id: doctor.id,
-        clinic_id: selectedClinic,
-        appointment_date: selectedDate.format('YYYY-MM-DD'),
-        appointment_time: selectedTime,
-        symptoms: symptoms
+      if (!window.google || !window.google.maps || !placesServiceRef.current) {
+        throw new Error("Google Maps not loaded");
+      }
+
+      const request = {
+        query: query,
+        fields: ["name", "geometry", "formatted_address", "place_id"],
       };
 
-      await appointmentAPI.bookAppointment(bookingData);
-      setSuccess('Appointment booked successfully!');
-      
-      // Reset form
-      setSelectedClinic('');
-      setSelectedTime('');
-      setSymptoms('');
-      
-      setTimeout(() => {
-        setSuccess('');
-        onClose();
-      }, 2000);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to book appointment');
-    } finally {
-      setLoading(false);
+      placesServiceRef.current.textSearch(request, (results, status) => {
+        if (isUnmountingRef.current) return;
+        
+        if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
+          const searchData = results.slice(0, 5).map(place => ({
+            display_name: place.formatted_address,
+            lat: place.geometry.location.lat(),
+            lon: place.geometry.location.lng(),
+            place_id: place.place_id
+          }));
+          setSearchResults(searchData);
+        } else {
+          setSearchResults([]);
+        }
+        setLoading(false);
+      });
+    } catch (error) {
+      console.error("Search error:", error);
+      if (!isUnmountingRef.current) {
+        setError("Failed to search locations");
+        setSearchResults([]);
+        setLoading(false);
+      }
     }
   };
 
-  if (!doctor) return null;
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchLocation(value);
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      if (!isUnmountingRef.current) {
+        searchLocations(value);
+      }
+    }, 500);
+  };
+
+  const selectSearchResult = (result) => {
+    if (isUnmountingRef.current) return;
+    
+    const coords = [parseFloat(result.lat), parseFloat(result.lon)];
+    const locationName = result.display_name.split(",").slice(0, 3).join(",").trim();
+
+    setSelectedLocation(locationName);
+    setSelectedCoords(coords);
+    setSearchLocation("");
+    setSearchResults([]);
+
+    if (googleMapRef.current) {
+      googleMapRef.current.setCenter({ lat: coords[^0], lng: coords[^1] });
+      googleMapRef.current.setZoom(15);
+      clearMarkers();
+      addMarker(coords, locationName, true);
+    }
+  };
+
+  const selectRecentLocation = (location) => {
+    if (isUnmountingRef.current) return;
+    
+    setSelectedLocation(location.name);
+    setSelectedCoords(location.coords);
+
+    if (googleMapRef.current) {
+      googleMapRef.current.setCenter({ lat: location.coords[^0], lng: location.coords[^1] });
+      googleMapRef.current.setZoom(15);
+      clearMarkers();
+      addMarker(location.coords, location.name, true);
+    }
+  };
+
+  const handleCurrentLocation = () => {
+    if (!navigator.geolocation || isUnmountingRef.current) {
+      setError("Geolocation is not supported by this browser");
+      return;
+    }
+
+    setLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        if (isUnmountingRef.current) return;
+        
+        const { latitude, longitude } = position.coords;
+        const coords = [latitude, longitude];
+
+        try {
+          const address = await reverseGeocode(latitude, longitude);
+          if (!isUnmountingRef.current) {
+            setCurrentPosition(coords);
+            setSelectedLocation(address);
+            setSelectedCoords(coords);
+
+            if (googleMapRef.current) {
+              googleMapRef.current.setCenter({ lat: latitude, lng: longitude });
+              googleMapRef.current.setZoom(15);
+              clearMarkers();
+              addMarker(coords, address, true);
+            }
+          }
+        } catch (error) {
+          if (!isUnmountingRef.current) {
+            setError("Failed to get current location details");
+          }
+        } finally {
+          if (!isUnmountingRef.current) {
+            setLoading(false);
+          }
+        }
+      },
+      (error) => {
+        console.error("Geolocation error:", error);
+        if (!isUnmountingRef.current) {
+          setError("Failed to get current location");
+          setLoading(false);
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 300000,
+      }
+    );
+  };
+
+  const handleUpdateLocation = () => {
+    if (onLocationUpdate) {
+      onLocationUpdate(selectedLocation, selectedCoords);
+    }
+    onClose();
+  };
+
+  const formatCoordinates = (coords) => {
+    if (!Array.isArray(coords) || coords.length < 2) {
+      return "0.0000, 0.0000";
+    }
+    return `${coords[^0].toFixed(4)}, ${coords[^1].toFixed(4)}`;
+  };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>
-        Book Appointment with Dr. {doctor.user?.name}
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth={false}
+      fullScreen={isSmallScreen}
+      PaperProps={{
+        sx: {
+          borderRadius: isSmallScreen ? 0 : 3,
+          maxHeight: isSmallScreen ? "100vh" : "95vh",
+          width: isSmallScreen ? "100vw" : isMobile ? "90vw" : "800px",
+          height: isSmallScreen ? "100vh" : "auto",
+          m: isSmallScreen ? 0 : 2,
+        },
+      }}
+    >
+      <DialogTitle
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          pb: 1,
+          borderBottom: "1px solid",
+          borderColor: "divider",
+          marginBottom: 1,
+        }}
+      >
+        <Typography variant="h6" component="div" sx={{ fontWeight: "bold", display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Map sx={{ color: 'primary.main' }} />
+          🗺️ Select Location
+        </Typography>
+        <IconButton onClick={onClose} size="small">
+          <Close />
+        </IconButton>
       </DialogTitle>
-      
-      <DialogContent>
+
+      <DialogContent
+        sx={{
+          p: isMobile ? 2 : 3,
+          position: "relative",
+          height: isSmallScreen ? "calc(100vh - 140px)" : "auto",
+          overflowY: "auto",
+        }}
+      >
         {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
+          <Alert
+            severity="error"
+            sx={{ mb: 2 }}
+            onClose={() => setError("")}
+            action={
+              <Button color="inherit" size="small" onClick={() => setError("")}>
+                Dismiss
+              </Button>
+            }
+          >
             {error}
           </Alert>
         )}
-        
-        {success && (
-          <Alert severity="success" sx={{ mb: 2 }}>
-            {success}
-          </Alert>
-        )}
 
-        <Grid container spacing={3} sx={{ mt: 1 }}>
-          {/* Doctor Info */}
-          <Grid item xs={12}>
-            <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-              <Typography variant="h6">Dr. {doctor.user?.name}</Typography>
-              <Typography color="text.secondary">
-                {doctor.specialization} • ₹{doctor.consultation_fee}
+        <Button
+          fullWidth
+          variant="outlined"
+          startIcon={loading ? <CircularProgress size={16} /> : <MyLocation />}
+          onClick={handleCurrentLocation}
+          disabled={loading}
+          sx={{
+            mb: 1,
+            py: 1.5,
+            borderRadius: 2,
+            textTransform: "none",
+            justifyContent: "flex-start",
+            fontSize: isMobile ? "0.9rem" : "1rem",
+          }}
+        >
+          📍 Use Current Location
+        </Button>
+
+        <Box sx={{ position: "relative", mb: 1 }}>
+          <TextField
+            fullWidth
+            placeholder="Search for a location..."
+            value={searchLocation}
+            onChange={handleSearchChange}
+            size={isMobile ? "small" : "medium"}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  {loading ? <CircularProgress size={20} /> : <Search />}
+                </InputAdornment>
+              ),
+            }}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                borderRadius: 2,
+              },
+            }}
+          />
+
+          {searchResults.length > 0 && (
+            <Box
+              sx={{
+                position: "absolute",
+                top: "100%",
+                left: 0,
+                right: 0,
+                bgcolor: "background.paper",
+                border: 1,
+                borderColor: "divider",
+                borderRadius: 1,
+                boxShadow: 3,
+                zIndex: 1000,
+                maxHeight: 250,
+                overflow: "auto",
+              }}
+            >
+              <List disablePadding>
+                {searchResults.map((result, index) => (
+                  <ListItem key={result.place_id || index} disablePadding>
+                    <ListItemButton
+                      onClick={() => selectSearchResult(result)}
+                      sx={{
+                        py: 1,
+                        "&:hover": { backgroundColor: "action.hover" },
+                      }}
+                    >
+                      <ListItemIcon sx={{ minWidth: 30 }}>
+                        <Place fontSize="small" color="primary" />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={result.display_name
+                          .split(",")
+                          .slice(0, 3)
+                          .join(",")}
+                        primaryTypographyProps={{
+                          variant: "body2",
+                          sx: { fontSize: isMobile ? "0.8rem" : "0.9rem" },
+                        }}
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                ))}
+              </List>
+            </Box>
+          )}
+        </Box>
+
+        <Box
+          ref={(el) => {
+            mapRef.current = el;
+            mapContainerRef.current = el;
+          }}
+          sx={{
+            height: isMobile ? 300 : 350,
+            width: "100%",
+            borderRadius: 2,
+            mb: 2,
+            border: "1px solid",
+            borderColor: "divider",
+            position: "relative",
+            backgroundColor: "#f5f5f5",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {!mapLoaded && googleMapsLoaded && (
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+              }}
+            >
+              <CircularProgress />
+              <Typography variant="body2" sx={{ mt: 1 }}>
+                🗺️ Loading map...
               </Typography>
             </Box>
-          </Grid>
-
-          {/* Clinic Selection */}
-          <Grid item xs={12} md={6}>
-            <FormControl fullWidth required>
-              <InputLabel>Select Clinic</InputLabel>
-              <Select
-                value={selectedClinic}
-                onChange={(e) => setSelectedClinic(e.target.value)}
-              >
-                {doctor.clinics?.map((clinic) => (
-                  <MenuItem key={clinic.id} value={clinic.id}>
-                    {clinic.name} - {clinic.address}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-
-          {/* Date Selection */}
-          <Grid item xs={12} md={6}>
-            <DatePicker
-              label="Select Date"
-              value={selectedDate}
-              onChange={setSelectedDate}
-              minDate={dayjs()}
-              maxDate={dayjs().add(30, 'day')}
-              slotProps={{ textField: { fullWidth: true, required: true } }}
-            />
-          </Grid>
-
-          {/* Time Selection */}
-          {selectedClinic && selectedDate && (
-            <Grid item xs={12}>
-              <Typography variant="subtitle1" sx={{ mb: 1 }}>
-                Available Time Slots
-              </Typography>
-              {loading ? (
-                <Typography>Loading slots...</Typography>
-              ) : (
-                <Grid container spacing={1}>
-                  {availableSlots
-                    .filter(slot => slot.available)
-                    .map((slot) => (
-                      <Grid item key={slot.time}>
-                        <Button
-                          variant={selectedTime === slot.time ? 'contained' : 'outlined'}
-                          onClick={() => setSelectedTime(slot.time)}
-                          size="small"
-                        >
-                          {slot.time}
-                        </Button>
-                      </Grid>
-                    ))}
-                </Grid>
-              )}
-              
-              {availableSlots.length === 0 && !loading && selectedClinic && (
-                <Typography color="text.secondary">
-                  No available slots for selected date
-                </Typography>
-              )}
-            </Grid>
           )}
+          {!googleMapsLoaded && (
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+              }}
+            >
+              <CircularProgress />
+              <Typography variant="body2" sx={{ mt: 1 }}>
+                🌍 Initializing map...
+              </Typography>
+            </Box>
+          )}
+        </Box>
 
-          {/* Symptoms */}
-          <Grid item xs={12}>
-            <TextField
-              fullWidth
-              label="Symptoms (Optional)"
-              multiline
-              rows={3}
-              value={symptoms}
-              onChange={(e) => setSymptoms(e.target.value)}
-              placeholder="Briefly describe your symptoms or reason for consultation"
+        <Box
+          sx={{
+            mb: 2,
+            p: 2.5,
+            bgcolor: "rgba(255, 255, 255, 0.95)",
+            backdropFilter: "blur(15px)",
+            borderRadius: 3,
+            border: "1px solid rgba(16, 217, 21, 0.2)",
+            boxShadow: "0 8px 32px rgba(16, 217, 21, 0.1)",
+            position: "relative",
+            overflow: "hidden",
+            "&::before": {
+              content: '""',
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: "3px",
+              background: "linear-gradient(90deg, #ff5983, #f53b69ff)",
+            },
+          }}
+        >
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              mb: 1.5,
+              position: "relative",
+              zIndex: 1,
+            }}
+          >
+            <Box
+              sx={{
+                p: 0.8,
+                borderRadius: "50%",
+                bgcolor: "rgba(16, 217, 21, 0.1)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                mr: 1.5,
+              }}
+            >
+              <LocationOn
+                sx={{
+                  color: "primary.main",
+                  fontSize: "1.2rem",
+                }}
+              />
+            </Box>
+            <Typography
+              variant="subtitle1"
+              sx={{
+                fontWeight: 700,
+                color: "primary.main",
+                fontSize: isMobile ? "1rem" : "1.1rem",
+                textShadow: "0 1px 2px rgba(0, 0, 0, 0.1)",
+              }}
+            >
+              📍 Selected Location
+            </Typography>
+          </Box>
+
+          <Typography
+            variant="body1"
+            sx={{
+              fontWeight: 600,
+              mb: 2,
+              fontSize: isMobile ? "1rem" : "1.1rem",
+              color: "text.primary",
+              lineHeight: 1.4,
+            }}
+          >
+            {selectedLocation}
+          </Typography>
+
+          <Box
+            sx={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 1.5,
+              alignItems: "center",
+            }}
+          >
+            <Chip
+              label={`📍 ${formatCoordinates(selectedCoords)}`}
+              size="small"
+              sx={{
+                fontSize: "0.75rem",
+                bgcolor: "rgba(16, 217, 21, 0.08)",
+                border: "1px solid rgba(16, 217, 21, 0.2)",
+                color: "primary.main",
+                fontWeight: 500,
+                backdropFilter: "blur(10px)",
+                "&:hover": {
+                  bgcolor: "rgba(16, 217, 21, 0.15)",
+                  transform: "translateY(-1px)",
+                  boxShadow: "0 4px 12px rgba(16, 217, 21, 0.2)",
+                },
+                transition: "all 0.3s ease",
+              }}
             />
-          </Grid>
-        </Grid>
+            <Chip
+              label="🗺️ Google Maps"
+              size="small"
+              sx={{
+                fontSize: "0.75rem",
+                bgcolor: "rgba(108, 117, 125, 0.08)",
+                border: "1px solid rgba(108, 117, 125, 0.2)",
+                color: "text.secondary",
+                fontWeight: 500,
+                backdropFilter: "blur(10px)",
+                "&:hover": {
+                  bgcolor: "rgba(108, 117, 125, 0.15)",
+                  transform: "translateY(-1px)",
+                  boxShadow: "0 4px 12px rgba(108, 117, 125, 0.2)",
+                },
+                transition: "all 0.3s ease",
+              }}
+            />
+          </Box>
+        </Box>
+
+        <Typography
+          variant="h6"
+          sx={{
+            fontWeight: 600,
+            mb: 2,
+            color: "primary.main",
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+          }}
+        >
+          <LocationOn fontSize="small" />
+          📍 Recent Search Locations
+        </Typography>
+
+        <Box
+          sx={{
+            bgcolor: "rgba(255, 255, 255, 0.9)",
+            backdropFilter: "blur(10px)",
+            borderRadius: 3,
+            border: "1px solid rgba(0, 0, 0, 0.1)",
+            boxShadow: "0 4px 20px rgba(0, 0, 0, 0.1)",
+            overflow: "hidden",
+          }}
+        >
+          <List disablePadding>
+            {recentLocations.map((location, index) => (
+              <ListItem
+                key={index}
+                disablePadding
+                sx={{
+                  borderBottom:
+                    index < recentLocations.length - 1
+                      ? "1px solid rgba(0, 0, 0, 0.05)"
+                      : "none",
+                  transition: "all 0.3s ease",
+                }}
+                onClick={() => selectRecentLocation(location)}
+              >
+                <ListItemButton
+                  sx={{
+                    py: 2,
+                    px: 2.5,
+                    "&:hover": {
+                      bgcolor: "rgba(16, 217, 21, 0.08)",
+                      "& .location-icon": {
+                        transform: "scale(1.1)",
+                        color: "primary.main",
+                      },
+                    },
+                  }}
+                >
+                  <ListItemIcon sx={{ minWidth: 50 }}>
+                    <Typography sx={{ fontSize: '1.5rem', mr: 1 }}>
+                      {location.emoji}
+                    </Typography>
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={location.name}
+                    primaryTypographyProps={{
+                      variant: "body1",
+                      sx: {
+                        fontWeight: 500,
+                        fontSize: isMobile ? "0.9rem" : "1rem",
+                      },
+                    }}
+                  />
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </List>
+        </Box>
       </DialogContent>
 
-      <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button 
-          onClick={handleBooking}
-          variant="contained"
-          disabled={loading || !selectedClinic || !selectedTime}
+      <DialogActions
+        sx={{
+          p: isMobile ? 2 : 3,
+          pt: 1,
+          borderTop: "1px solid",
+          borderColor: "divider",
+          gap: 1,
+        }}
+      >
+        <Button
+          onClick={onClose}
+          variant="outlined"
+          color="secondary"
+          sx={{ mr: 1, minWidth: isMobile ? "80px" : "100px" }}
         >
-          {loading ? 'Booking...' : 'Book Appointment'}
+          ❌ Cancel
+        </Button>
+        <Button
+          variant="contained"
+          startIcon={<Navigation />}
+          onClick={handleUpdateLocation}
+          disabled={loading}
+          sx={{
+            minWidth: isMobile ? "120px" : "140px",
+            py: isMobile ? 1 : 1.2,
+            color: "white",
+          }}
+        >
+          📍 Update Location
         </Button>
       </DialogActions>
     </Dialog>
   );
 };
 
-export default BookingForm;
+export default LocationMap;
 ```
+### Step 27: Enhanced Auth Component (Complete)
 
+**resources/js/components/auth/LoginModal.jsx**
 
-### 12. 🏠 Home Page Component
-
-```javascript
-// resources/js/pages/Home.jsx
-import React, { useState } from 'react';
+```jsx
+import React, { useState, useEffect } from "react";
 import {
-  Container,
-  Typography,
-  Box,
-  TextField,
-  Button,
-  Grid,
-  Card,
-  CardContent,
-  CardMedia,
-  Paper
-} from '@mui/material';
-import { Search, LocalHospital, Schedule, LocationOn } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+    Modal,
+    Box,
+    Typography,
+    TextField,
+    Button,
+    IconButton,
+    Card,
+    CardContent,
+    InputAdornment,
+    Alert,
+    CircularProgress,
+    Link,
+    useTheme,
+    useMediaQuery,
+    Fade,
+    Backdrop,
+    Select,
+    MenuItem,
+    FormControl,
+    InputLabel,
+    Avatar,
+} from "@mui/material";
+import {
+    Close,
+    Person,
+    Phone,
+    Email,
+    Lock,
+    Google,
+    Facebook,
+    Apple,
+    GitHub,
+    PersonAdd,
+    Visibility,
+    VisibilityOff,
+    LoginOutlined,
+    PersonAddOutlined,
+} from "@mui/icons-material";
+import axios from "axios";
 
-const Home = () => {
-  const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [location, setLocation] = useState('');
+// Reusable Components
+const UserTypeSelect = ({ value, onChange, error, disabled, required = false, sx = {} }) => {
+    const theme = useTheme();
+    
+    const userTypeOptions = [
+        { value: "patient", label: "Patient" },
+        { value: "doctor", label: "Doctor" },
+        { value: "healthcare", label: "Healthcare Provider" },
+    ];
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    const params = new URLSearchParams();
-    if (searchQuery) params.set('q', searchQuery);
-    if (location) params.set('location', location);
-    navigate(`/search?${params.toString()}`);
-  };
-
-  const features = [
-    {
-      icon: <Search sx={{ fontSize: 40 }} />,
-      title: 'Find Doctors',
-      description: 'Search for doctors by specialization, location, and ratings'
-    },
-    {
-      icon: <LocalHospital sx={{ fontSize: 40 }} />,
-      title: 'Book Appointments',
-      description: 'Schedule appointments with your preferred doctors and clinics'
-    },
-    {
-      icon: <LocationOn sx={{ fontSize: 40 }} />,
-      title: 'Find Clinics',
-      description: 'Locate nearby clinics and healthcare facilities'
-    },
-    {
-      icon: <Schedule sx={{ fontSize: 40 }} />,
-      title: 'Manage Appointments',
-      description: 'View, reschedule, or cancel your appointments easily'
-    }
-  ];
-
-  return (
-    <Container maxWidth="lg">
-      {/* Hero Section */}
-      <Box 
-        sx={{ 
-          textAlign: 'center', 
-          py: 8,
-          background: 'linear-gradient(45deg, #FE6B8B 30%, #FF8E53 90%)',
-          borderRadius: 2,
-          color: 'white',
-          my: 4
-        }}
-      >
-        <Typography variant="h2" component="h1" gutterBottom>
-          Find Healthcare
-        </Typography>
-        <Typography variant="h5" sx={{ mb: 4 }}>
-          Book appointments with verified doctors and clinics near you
-        </Typography>
-
-        {/* Search Form */}
-        <Paper 
-          component="form" 
-          onSubmit={handleSearch}
-          sx={{ 
-            p: 2, 
-            display: 'flex', 
-            alignItems: 'center', 
-            maxWidth: 600, 
-            mx: 'auto',
-            gap: 2
-          }}
-        >
-          <TextField
+    return (
+        <FormControl
             fullWidth
-            placeholder="Search doctors, clinics, or specializations"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            variant="outlined"
-          />
-          <TextField
-            placeholder="Location"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            variant="outlined"
-            sx={{ minWidth: 150 }}
-          />
-          <Button 
-            type="submit"
-            variant="contained" 
-            size="large"
-            startIcon={<Search />}
-          >
-            Search
-          </Button>
-        </Paper>
-      </Box>
-
-      {/* Features Section */}
-      <Box sx={{ py: 6 }}>
-        <Typography variant="h4" component="h2" textAlign="center" gutterBottom>
-          Why Choose Our Platform?
-        </Typography>
-        
-        <Grid container spacing={4} sx={{ mt: 2 }}>
-          {features.map((feature, index) => (
-            <Grid item xs={12} md={6} lg={3} key={index}>
-              <Card sx={{ textAlign: 'center', height: '100%' }}>
-                <CardContent>
-                  <Box sx={{ color: 'primary.main', mb: 2 }}>
-                    {feature.icon}
-                  </Box>
-                  <Typography variant="h6" component="h3" gutterBottom>
-                    {feature.title}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {feature.description}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
-      </Box>
-
-      {/* Quick Actions */}
-      <Box sx={{ py: 4, textAlign: 'center' }}>
-        <Typography variant="h5" gutterBottom>
-          Quick Actions
-        </Typography>
-        <Grid container spacing={2} justifyContent="center">
-          <Grid item>
-            <Button 
-              variant="outlined" 
-              size="large"
-              onClick={() => navigate('/search?specialization=Cardiology')}
+            margin="dense"
+            required={required}
+            error={!!error}
+            sx={{ mb: 1, ...sx }}
+        >
+            <InputLabel>I want to become a</InputLabel>
+            <Select
+                value={value}
+                onChange={onChange}
+                label="I want to become a"
+                disabled={disabled}
+                startAdornment={
+                    <InputAdornment position="start">
+                        <PersonAdd color="action" />
+                    </InputAdornment>
+                }
+                sx={{
+                    borderRadius: 2,
+                    "&:hover": {
+                        "& .MuiOutlinedInput-notchedOutline": {
+                            borderColor: theme.palette.primary.main,
+                        },
+                    },
+                }}
             >
-              Find Cardiologist
-            </Button>
-          </Grid>
-          <Grid item>
-            <Button 
-              variant="outlined" 
-              size="large"
-              onClick={() => navigate('/search?specialization=Dermatology')}
-            >
-              Find Dermatologist
-            </Button>
-          </Grid>
-          <Grid item>
-            <Button 
-              variant="outlined" 
-              size="large"
-              onClick={() => navigate('/search?specialization=General Medicine')}
-            >
-              General Medicine
-            </Button>
-          </Grid>
-        </Grid>
-      </Box>
-    </Container>
-  );
+                {userTypeOptions.map((option) => (
+                    <MenuItem key={option.value} value={option.value}>
+                        {option.label}
+                    </MenuItem>
+                ))}
+            </Select>
+            {error && (
+                <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.5 }}>
+                    {Array.isArray(error) ? error[0] : error}
+                </Typography>
+            )}
+        </FormControl>
+    );
 };
 
-export default Home;
+const AuthToggle = ({ authType, setAuthType, disabled }) => (
+    <Box
+        sx={{
+            display: "flex",
+            mb: 1.5,
+            borderRadius: 2,
+            backgroundColor: "#f8f9fa",
+            p: 0.5,
+            border: "1px solid #e9ecef",
+        }}
+    >
+        <Button
+            fullWidth
+            variant={authType === "mobile" ? "contained" : "text"}
+            onClick={() => setAuthType("mobile")}
+            startIcon={<Phone />}
+            disabled={disabled}
+            sx={{
+                borderRadius: 1.5,
+                textTransform: "none",
+                fontWeight: 500,
+                transition: "all 0.2s ease-in-out",
+                ...(authType === "mobile" && {
+                    background: "linear-gradient(135deg, #ff5983 0%, #dc004e 100%)",
+                    color: "white",
+                    boxShadow: "0 4px 8px rgba(196, 9, 25, 0.3)",
+                }),
+            }}
+        >
+            Mobile
+        </Button>
+        <Button
+            fullWidth
+            variant={authType === "email" ? "contained" : "text"}
+            onClick={() => setAuthType("email")}
+            startIcon={<Email />}
+            disabled={disabled}
+            sx={{
+                borderRadius: 1.5,
+                textTransform: "none",
+                fontWeight: 500,
+                transition: "all 0.2s ease-in-out",
+                ...(authType === "email" && {
+                    background: "linear-gradient(135deg, #ff5983 0%, #dc004e 100%)",
+                    color: "white",
+                    boxShadow: "0 4px 8px rgba(196, 9, 25, 0.3)",
+                }),
+            }}
+        >
+            Email
+        </Button>
+        <Button
+            fullWidth
+            variant={authType === "social" ? "contained" : "text"}
+            onClick={() => setAuthType("social")}
+            startIcon={<Google />}
+            disabled={disabled}
+            sx={{
+                borderRadius: 1.5,
+                textTransform: "none",
+                fontWeight: 500,
+                transition: "all 0.2s ease-in-out",
+                ...(authType === "social" && {
+                    background: "linear-gradient(135deg, #ff5983 0%, #dc004e 100%)",
+                    color: "white",
+                    boxShadow: "0 4px 8px rgba(196, 9, 25, 0.3)",
+                }),
+            }}
+        >
+            Social
+        </Button>
+    </Box>
+);
+
+const SubmitButton = ({ loading, disabled, onClick, children, type = "button" }) => (
+    <Button
+        type={type}
+        fullWidth
+        variant="contained"
+        size="large"
+        disabled={loading || disabled}
+        onClick={onClick}
+        sx={{
+            mt: 1,
+            mb: 1,
+            borderRadius: 2,
+            textTransform: "none",
+            fontSize: "1.1rem",
+            fontWeight: "bold",
+            minHeight: "48px",
+            backgroundColor: "#00C853",
+            boxShadow: "0 4px 15px rgba(0, 200, 83, 0.4)",
+            transition: "all 0.3s ease-in-out",
+            "&:hover": {
+                backgroundColor: "#00B348",
+                boxShadow: "0 6px 20px rgba(0, 200, 83, 0.6)",
+                transform: "translateY(-1px)",
+            },
+            "&:active": {
+                transform: "translateY(0)",
+            },
+            "&:disabled": {
+                background: "#e0e0e0",
+                color: "#9e9e9e",
+                boxShadow: "none",
+                transform: "none",
+            },
+        }}
+    >
+        {loading ? (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <CircularProgress size={20} sx={{ color: "white" }} />
+                <Typography variant="inherit">Loading...</Typography>
+            </Box>
+        ) : (
+            children
+        )}
+    </Button>
+);
+
+const SocialButton = ({ provider, icon, onClick, disabled, fullWidth = false, color }) => (
+    <Button
+        fullWidth={fullWidth}
+        variant="outlined"
+        startIcon={icon}
+        onClick={onClick}
+        disabled={disabled}
+        sx={{
+            borderRadius: 2,
+            textTransform: "none",
+            fontWeight: 500,
+            minHeight: "44px",
+            borderColor: color,
+            color: color,
+            transition: "all 0.3s ease-in-out",
+            "&:hover": {
+                backgroundColor: color,
+                color: "white",
+                borderColor: color,
+                transform: "translateY(-1px)",
+                boxShadow: `0 4px 12px ${color}30`,
+            },
+            "&:active": {
+                transform: "translateY(0)",
+            },
+            "&:disabled": {
+                borderColor: "#e0e0e0",
+                color: "#9e9e9e",
+            },
+        }}
+    >
+        {provider}
+    </Button>
+);
+
+// Main Component
+const LoginModal = ({ open, onClose, onLoginSuccess }) => {
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+    const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md"));
+    const apiUrl = import.meta.env.VITE_API_URL;
+
+    // Form states
+    const [isLogin, setIsLogin] = useState(true);
+    const [authType, setAuthType] = useState("mobile");
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    
+    // Mobile auth data
+    const [mobileData, setMobileData] = useState({
+        fullName: "",
+        mobileNumber: "",
+        userType: "",
+    });
+    
+    // Email auth data
+    const [emailData, setEmailData] = useState({
+        name: "",
+        email: "",
+        password: "",
+        password_confirmation: "",
+        user_type: "",
+    });
+    
+    // Social auth data
+    const [socialData, setSocialData] = useState({
+        user_type: "",
+    });
+
+    // Error states
+    const [mobileErrors, setMobileErrors] = useState({
+        name: "",
+        number: "",
+    });
+    const [emailErrors, setEmailErrors] = useState({});
+    const [loading, setLoading] = useState(false);
+    const [generalError, setGeneralError] = useState("");
+    const [socialProviders, setSocialProviders] = useState([]);
+    const [socialLoading, setSocialLoading] = useState({});
+
+    // Reset form when modal opens/closes
+    useEffect(() => {
+        if (!open) {
+            const timer = setTimeout(() => {
+                setMobileData({ fullName: "", mobileNumber: "", userType: "" });
+                setEmailData({
+                    name: "", email: "", password: "", password_confirmation: "", user_type: "",
+                });
+                setSocialData({ user_type: "" });
+                setMobileErrors({ name: "", number: "" });
+                setEmailErrors({});
+                setGeneralError("");
+                setLoading(false);
+                setAuthType("mobile");
+                setIsLogin(true);
+                setShowPassword(false);
+                setShowConfirmPassword(false);
+                setSocialLoading({});
+                // Clear stored user type on modal close
+                localStorage.removeItem("selected_user_type");
+                localStorage.removeItem("social_auth_mode");
+                localStorage.removeItem("social_redirect_provider");
+            }, 150);
+            return () => clearTimeout(timer);
+        }
+    }, [open]);
+
+    // Load social providers
+    useEffect(() => {
+        if (open) {
+            loadSocialProviders();
+        }
+    }, [open]);
+
+    const loadSocialProviders = async () => {
+        try {
+            const response = await axios.get(`${apiUrl}/auth/social/providers`);
+            setSocialProviders(response.data.providers || []);
+        } catch (error) {
+            console.error('Failed to load social providers:', error);
+            // Set default providers if API fails
+            setSocialProviders(['google', 'facebook', 'github', 'apple']);
+        }
+    };
+
+    const checkAlreadyLoggedIn = () => {
+        const token = localStorage.getItem("auth_token") || localStorage.getItem("portal_token");
+        const userId = localStorage.getItem("user_id");
+        return token && userId;
+    };
+
+    // Mobile validation
+    const validateMobileForm = () => {
+        let valid = true;
+        const trimmedName = mobileData.fullName.trim();
+        const trimmedNumber = mobileData.mobileNumber.trim();
+
+        setMobileErrors({ name: "", number: "" });
+
+        if (!trimmedName) {
+            setMobileErrors(prev => ({ ...prev, name: "Name is required" }));
+            valid = false;
+        } else if (trimmedName.length < 2) {
+            setMobileErrors(prev => ({ ...prev, name: "Name must be at least 2 characters" }));
+            valid = false;
+        }
+
+        const mobileRegex = /^[6-9]\d{9}$/;
+        if (!trimmedNumber) {
+            setMobileErrors(prev => ({ ...prev, number: "Mobile number is required" }));
+            valid = false;
+        } else if (!mobileRegex.test(trimmedNumber)) {
+            setMobileErrors(prev => ({ ...prev, number: "Enter a valid 10-digit Indian mobile number" }));
+            valid = false;
+        }
+
+        if (!mobileData.userType) {
+            setGeneralError("Please select your role");
+            valid = false;
+        }
+
+        return valid;
+    };
+
+    // Email validation
+    const validateEmailForm = () => {
+        let newErrors = {};
+        let valid = true;
+
+        if (!isLogin && !emailData.name.trim()) {
+            newErrors.name = "Name is required";
+            valid = false;
+        } else if (!isLogin && emailData.name.trim().length < 2) {
+            newErrors.name = "Name must be at least 2 characters";
+            valid = false;
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailData.email.trim()) {
+            newErrors.email = "Email is required";
+            valid = false;
+        } else if (!emailRegex.test(emailData.email.trim())) {
+            newErrors.email = "Enter a valid email address";
+            valid = false;
+        }
+
+        if (!emailData.password) {
+            newErrors.password = "Password is required";
+            valid = false;
+        } else if (!isLogin && emailData.password.length < 8) {
+            newErrors.password = "Password must be at least 8 characters";
+            valid = false;
+        }
+
+        if (!isLogin && emailData.password !== emailData.password_confirmation) {
+            newErrors.password_confirmation = "Passwords do not match";
+            valid = false;
+        }
+
+        if (!isLogin && !emailData.user_type) {
+            newErrors.user_type = "Please select your role";
+            valid = false;
+        }
+
+        setEmailErrors(newErrors);
+        return valid;
+    };
+
+    // Handle mobile input changes
+    const handleMobileInputChange = (field) => (event) => {
+        setMobileData({ ...mobileData, [field]: event.target.value });
+
+        if (field === "fullName" && event.target.value.trim().length >= 2) {
+            setMobileErrors(prev => ({ ...prev, name: "" }));
+        }
+        if (field === "mobileNumber") {
+            const mobileRegex = /^[6-9]\d{9}$/;
+            if (mobileRegex.test(event.target.value.trim())) {
+                setMobileErrors(prev => ({ ...prev, number: "" }));
+            }
+        }
+        if (generalError) setGeneralError("");
+    };
+
+    // Handle email input changes
+    const handleEmailInputChange = (field) => (event) => {
+        setEmailData({ ...emailData, [field]: event.target.value });
+        if (emailErrors[field]) {
+            setEmailErrors({ ...emailErrors, [field]: "" });
+        }
+        if (generalError) setGeneralError("");
+    };
+
+    // Handle social input changes - CRITICAL FIX FOR USER TYPE HANDLING
+    const handleSocialInputChange = (field) => (event) => {
+        const newValue = event.target.value;
+        console.log(`Social ${field} changed to:`, newValue);
+        
+        setSocialData({ ...socialData, [field]: newValue });
+        
+        // CRITICAL FIX: Store the selected user type immediately when changed
+        if (field === "user_type" && newValue) {
+            localStorage.setItem("selected_user_type", newValue);
+            console.log("Stored user_type in localStorage:", newValue);
+        }
+        
+        if (generalError) setGeneralError("");
+    };
+
+    // Mobile authentication
+    const handleMobileAuth = async (e) => {
+        e.preventDefault();
+        if (!validateMobileForm()) return;
+
+        if (checkAlreadyLoggedIn()) {
+            setGeneralError("Please logout first before logging in again");
+            return;
+        }
+
+        setLoading(true);
+        setGeneralError("");
+
+        try {
+            const response = await axios.post(
+                `${apiUrl}/auth/mobile/authenticate`,
+                {
+                    name: mobileData.fullName.trim(),
+                    number: mobileData.mobileNumber.trim(),
+                    userType: mobileData.userType,
+                }
+            );
+
+            localStorage.removeItem("otp_token");
+            localStorage.setItem("otp_token", response.data.token);
+
+            console.log(`OTP sent: ${response.data.otp}`);
+
+            onLoginSuccess({
+                user: response.data.user,
+                token: response.data.token,
+                otp: response.data.otp,
+                mobileNumber: mobileData.mobileNumber.trim(),
+                requiresOTP: true,
+            });
+
+            onClose();
+        } catch (error) {
+            if (error.response?.data?.errors) {
+                const errs = error.response.data.errors;
+                if (errs.name) setMobileErrors(prev => ({ ...prev, name: errs.name[0] }));
+                if (errs.number) setMobileErrors(prev => ({ ...prev, number: errs.number[0] }));
+            } else {
+                setGeneralError(error.response?.data?.message || "An error occurred during mobile authentication");
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Email authentication
+    const handleEmailAuth = async (e) => {
+        e.preventDefault();
+        if (!validateEmailForm()) return;
+
+        if (checkAlreadyLoggedIn()) {
+            setGeneralError("Please logout first before logging in again");
+            return;
+        }
+
+        setLoading(true);
+        setGeneralError("");
+
+        try {
+            const endpoint = isLogin ? "/auth/login" : "/auth/register";
+            const payload = isLogin 
+                ? {
+                    email: emailData.email.trim(),
+                    password: emailData.password,
+                }
+                : {
+                    name: emailData.name.trim(),
+                    email: emailData.email.trim(),
+                    password: emailData.password,
+                    password_confirmation: emailData.password_confirmation,
+                    user_type: emailData.user_type,
+                };
+
+            const response = await axios.post(`${apiUrl}${endpoint}`, payload);
+
+            localStorage.setItem("auth_token", response.data.token);
+            localStorage.setItem("user_id", response.data.user.id);
+            localStorage.setItem("user_data", JSON.stringify(response.data.user));
+
+            onLoginSuccess({
+                user: response.data.user,
+                token: response.data.token,
+                isNewUser: !isLogin,
+            });
+
+            onClose();
+        } catch (error) {
+            if (error.response?.data?.errors) {
+                setEmailErrors(error.response.data.errors);
+            } else {
+                setGeneralError(error.response?.data?.message || "An error occurred during email authentication");
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // CRITICAL FIX: Social Authentication with Proper User Type Handling
+    const handleSocialLogin = async (provider) => {
+        console.log("Social login initiated for provider:", provider);
+        console.log("Current socialData:", socialData);
+        console.log("IsLogin:", isLogin);
+        
+        // CRITICAL FIX: Always require user type selection for social auth
+        if (!socialData.user_type) {
+            setGeneralError("Please select your role first");
+            return;
+        }
+
+        if (checkAlreadyLoggedIn()) {
+            setGeneralError("Please logout first before logging in again");
+            return;
+        }
+
+        try {
+            setSocialLoading(prev => ({ ...prev, [provider]: true }));
+
+            // CRITICAL FIX: Always store user type in localStorage before redirect
+            const userTypeToStore = socialData.user_type;
+            
+            // Clear previous stored data
+            localStorage.removeItem("selected_user_type");
+            localStorage.removeItem("social_auth_mode");
+            localStorage.removeItem("social_redirect_provider");
+            localStorage.removeItem("social_redirect_timestamp");
+            
+            // Store the selected user type and auth mode
+            localStorage.setItem("selected_user_type", userTypeToStore);
+            localStorage.setItem("social_auth_mode", isLogin ? "login" : "register");
+            localStorage.setItem("social_redirect_provider", provider);
+            localStorage.setItem("social_redirect_timestamp", Date.now().toString());
+            
+            console.log("Stored data before redirect:", {
+                selected_user_type: userTypeToStore,
+                social_auth_mode: isLogin ? "login" : "register",
+                provider: provider
+            });
+            
+            // CRITICAL FIX: Always pass user_type in URL regardless of login/register mode
+            const requestUrl = `${apiUrl}/auth/social/${provider}?user_type=${encodeURIComponent(userTypeToStore)}&mode=${isLogin ? 'login' : 'register'}`;
+                
+            console.log("Making request to:", requestUrl);
+            
+            const response = await axios.get(requestUrl);
+            
+            if (response.data.redirect_url) {
+                // CRITICAL FIX: Ensure user_type is always in redirect URL
+                let redirectUrl = response.data.redirect_url;
+                
+                // Parse the existing URL to add user_type parameter
+                const url = new URL(redirectUrl);
+                url.searchParams.set('user_type', userTypeToStore);
+                redirectUrl = url.toString();
+                
+                console.log("Final redirect URL:", redirectUrl);
+                
+                // Redirect to the OAuth provider
+                window.location.href = redirectUrl;
+            } else {
+                throw new Error("No redirect URL received");
+            }
+        } catch (error) {
+            setSocialLoading(prev => ({ ...prev, [provider]: false }));
+            console.error(`${provider} authentication failed:`, error);
+            setGeneralError(`${provider} authentication failed: ${error.response?.data?.message || error.message}`);
+        }
+    };
+
+    const handleClose = () => {
+        if (!loading && !Object.values(socialLoading).some(loading => loading)) {
+            onClose();
+        }
+    };
+
+    const toggleAuthMode = () => {
+        setIsLogin(!isLogin);
+        setEmailErrors({});
+        setMobileErrors({ name: "", number: "" });
+        setGeneralError("");
+        setEmailData({
+            name: "", email: "", password: "", password_confirmation: "", user_type: "",
+        });
+        setMobileData({ fullName: "", mobileNumber: "", userType: "" });
+        setSocialData({ user_type: "" });
+        // Clear stored user type when switching modes
+        localStorage.removeItem("selected_user_type");
+        localStorage.removeItem("social_auth_mode");
+    };
+
+    const getModalWidth = () => {
+        if (isMobile) {
+            return "calc(100vw - 16px)";
+        } else if (isTablet) {
+            return "480px";
+        } else {
+            return "520px";
+        }
+    };
+
+    const modalStyle = {
+        position: "fixed",
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+        width: getModalWidth(),
+        maxWidth: isMobile ? "420px" : "540px",
+        maxHeight: "calc(100vh - 16px)",
+        overflowY: "auto",
+        outline: "none",
+        zIndex: 1300,
+        contain: "layout style paint",
+        willChange: "transform, opacity",
+    };
+
+    return (
+        <Modal
+            open={open}
+            onClose={handleClose}
+            closeAfterTransition
+            disableAutoFocus
+            disableEnforceFocus
+            disableRestoreFocus
+            BackdropComponent={Backdrop}
+            BackdropProps={{
+                timeout: 200,
+                sx: {
+                    backgroundColor: "rgba(0, 0, 0, 0.7)",
+                    backdropFilter: "blur(8px)",
+                    zIndex: 1299,
+                },
+            }}
+            sx={{
+                zIndex: 1300,
+                position: "fixed",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "8px",
+                overflow: "hidden",
+            }}
+        >
+            <Fade in={open} timeout={200} appear>
+                <Box sx={modalStyle}>
+                    <Card
+                        sx={{
+                            width: "100%",
+                            boxShadow:
+                                "0 24px 38px 3px rgba(0, 0, 0, 0.14), 0 9px 46px 8px rgba(0, 0, 0, 0.12), 0 11px 15px -7px rgba(0, 0, 0, 0.2)",
+                            borderRadius: "16px",
+                            overflow: "hidden",
+                            backfaceVisibility: "hidden",
+                            perspective: 1000,
+                            transform: "translateZ(0)",
+                        }}
+                        elevation={0}
+                    >
+                        <CardContent sx={{ p: 0 }}>
+                            {/* Header with Logo */}
+                            <Box
+                                sx={{
+                                    p: 2.5,
+                                    position: "relative",
+                                    textAlign: "center",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    alignItems: "center",
+                                }}
+                            >
+                                <IconButton
+                                    onClick={handleClose}
+                                    disabled={loading || Object.values(socialLoading).some(loading => loading)}
+                                    sx={{
+                                        position: "absolute",
+                                        right: 8,
+                                        top: 8,
+                                        color: "text.secondary",
+                                        "&:hover": {
+                                            backgroundColor: "rgba(0, 0, 0, 0.04)",
+                                        },
+                                        "&:disabled": {
+                                            color: "text.disabled",
+                                        },
+                                    }}
+                                >
+                                    <Close />
+                                </IconButton>
+
+                                <Avatar
+                                    alt="App Logo"
+                                    src="/images/common/icon.webp"
+                                    loading="eager"
+                                    decoding="async"
+                                    sx={{
+                                        width: 55,
+                                        height: 55,
+                                        mb: 0.5,
+                                        bgcolor: "white",
+                                        mx: "auto",
+                                        "& img": {
+                                            objectFit: "contain",
+                                            width: "100%",
+                                            height: "100%",
+                                        },
+                                    }}
+                                />
+
+                                <Typography
+                                    variant="h6"
+                                    sx={{
+                                        fontWeight: "bold",
+                                        mb: 0.5,
+                                        color: "text.primary",
+                                    }}
+                                >
+                                    India's healthcare booking app
+                                </Typography>
+                                <Typography
+                                    variant="body2"
+                                    sx={{ color: "text.secondary" }}
+                                >
+                                    {authType === "mobile" 
+                                        ? "Log in or Sign up" 
+                                        : isLogin 
+                                        ? "Log in to your account" 
+                                        : "Create your account"
+                                    }
+                                </Typography>
+                            </Box>
+
+                            {/* Form Content */}
+                            <Box sx={{ px: 2.5, pb: 2 }}>
+                                {generalError && (
+                                    <Alert
+                                        severity="error"
+                                        sx={{
+                                            mb: 2,
+                                            borderRadius: 2,
+                                            fontSize: "0.85rem",
+                                        }}
+                                        onClose={() => setGeneralError("")}
+                                    >
+                                        {generalError}
+                                    </Alert>
+                                )}
+
+                                {/* Debug Info - Remove in production */}
+                                {process.env.NODE_ENV === 'development' && authType === "social" && (
+                                    <Box sx={{ mb: 2, p: 1, bgcolor: "#f0f0f0", borderRadius: 1, fontSize: "0.8rem" }}>
+                                        <Typography variant="caption">
+                                            Debug - Social Data: {JSON.stringify(socialData)}
+                                        </Typography>
+                                        <br />
+                                        <Typography variant="caption">
+                                            Debug - IsLogin: {isLogin ? 'true' : 'false'}
+                                        </Typography>
+                                        <br />
+                                        <Typography variant="caption">
+                                            Debug - LocalStorage user_type: {localStorage.getItem("selected_user_type")}
+                                        </Typography>
+                                    </Box>
+                                )}
+
+                                {/* Auth Type Toggle */}
+                                <AuthToggle
+                                    authType={authType}
+                                    setAuthType={setAuthType}
+                                    disabled={loading || Object.values(socialLoading).some(loading => loading)}
+                                />
+
+                                {/* Mobile Authentication */}
+                                {authType === "mobile" && (
+                                    <form onSubmit={handleMobileAuth}>
+                                        <TextField
+                                            fullWidth
+                                            label="Enter your name"
+                                            value={mobileData.fullName}
+                                            onChange={handleMobileInputChange("fullName")}
+                                            margin="dense"
+                                            required
+                                            disabled={loading}
+                                            placeholder="Enter your full name"
+                                            error={!!mobileErrors.name}
+                                            helperText={mobileErrors.name}
+                                            InputProps={{
+                                                startAdornment: (
+                                                    <InputAdornment position="start">
+                                                        <Person color="action" />
+                                                    </InputAdornment>
+                                                ),
+                                            }}
+                                            sx={{
+                                                mb: 1,
+                                                "& .MuiOutlinedInput-root": {
+                                                    borderRadius: 2,
+                                                    "&:hover": {
+                                                        "& .MuiOutlinedInput-notchedOutline": {
+                                                            borderColor: theme.palette.primary.main,
+                                                        },
+                                                    },
+                                                },
+                                            }}
+                                        />
+
+                                        <TextField
+                                            fullWidth
+                                            label="Enter mobile number"
+                                            type="tel"
+                                            value={mobileData.mobileNumber}
+                                            onChange={handleMobileInputChange("mobileNumber")}
+                                            margin="dense"
+                                            required
+                                            disabled={loading}
+                                            placeholder="Enter mobile number"
+                                            error={!!mobileErrors.number}
+                                            helperText={mobileErrors.number}
+                                            InputProps={{
+                                                startAdornment: (
+                                                    <InputAdornment position="start">
+                                                        <Typography
+                                                            variant="body1"
+                                                            sx={{
+                                                                mr: 1,
+                                                                color: "text.secondary",
+                                                            }}
+                                                        >
+                                                            +91
+                                                        </Typography>
+                                                    </InputAdornment>
+                                                ),
+                                            }}
+                                            sx={{
+                                                mb: 1,
+                                                "& .MuiOutlinedInput-root": {
+                                                    borderRadius: 2,
+                                                    "&:hover": {
+                                                        "& .MuiOutlinedInput-notchedOutline": {
+                                                            borderColor: theme.palette.primary.main,
+                                                        },
+                                                    },
+                                                },
+                                            }}
+                                        />
+
+                                        <UserTypeSelect
+                                            value={mobileData.userType}
+                                            onChange={handleMobileInputChange("userType")}
+                                            disabled={loading}
+                                            required
+                                        />
+
+                                        <SubmitButton
+                                            type="submit"
+                                            loading={loading}
+                                            disabled={
+                                                !mobileData.fullName ||
+                                                !mobileData.mobileNumber ||
+                                                !mobileData.userType
+                                            }
+                                        >
+                                            CONTINUE
+                                        </SubmitButton>
+                                    </form>
+                                )}
+
+                                {/* Email Authentication */}
+                                {authType === "email" && (
+                                    <form onSubmit={handleEmailAuth}>
+                                        {!isLogin && (
+                                            <TextField
+                                                fullWidth
+                                                label="Full Name"
+                                                value={emailData.name}
+                                                onChange={handleEmailInputChange("name")}
+                                                margin="dense"
+                                                required
+                                                disabled={loading}
+                                                placeholder="Enter your full name"
+                                                error={!!emailErrors.name}
+                                                helperText={emailErrors.name ? (Array.isArray(emailErrors.name) ? emailErrors.name[0] : emailErrors.name) : ""}
+                                                InputProps={{
+                                                    startAdornment: (
+                                                        <InputAdornment position="start">
+                                                            <Person color="action" />
+                                                        </InputAdornment>
+                                                    ),
+                                                }}
+                                                sx={{
+                                                    mb: 1,
+                                                    "& .MuiOutlinedInput-root": {
+                                                        borderRadius: 2,
+                                                        "&:hover": {
+                                                            "& .MuiOutlinedInput-notchedOutline": {
+                                                                borderColor: theme.palette.primary.main,
+                                                            },
+                                                        },
+                                                    },
+                                                }}
+                                            />
+                                        )}
+
+                                        <TextField
+                                            fullWidth
+                                            label="Email Address"
+                                            type="email"
+                                            value={emailData.email}
+                                            onChange={handleEmailInputChange("email")}
+                                            margin="dense"
+                                            required
+                                            disabled={loading}
+                                            placeholder="Enter your email"
+                                            error={!!emailErrors.email}
+                                            helperText={emailErrors.email ? (Array.isArray(emailErrors.email) ? emailErrors.email[0] : emailErrors.email) : ""}
+                                            InputProps={{
+                                                startAdornment: (
+                                                    <InputAdornment position="start">
+                                                        <Email color="action" />
+                                                    </InputAdornment>
+                                                ),
+                                            }}
+                                            sx={{
+                                                mb: 1,
+                                                "& .MuiOutlinedInput-root": {
+                                                    borderRadius: 2,
+                                                    "&:hover": {
+                                                        "& .MuiOutlinedInput-notchedOutline": {
+                                                            borderColor: theme.palette.primary.main,
+                                                        },
+                                                    },
+                                                },
+                                            }}
+                                        />
+
+                                        <TextField
+                                            fullWidth
+                                            label="Password"
+                                            type={showPassword ? "text" : "password"}
+                                            value={emailData.password}
+                                            onChange={handleEmailInputChange("password")}
+                                            margin="dense"
+                                            required
+                                            disabled={loading}
+                                            placeholder="Enter your password"
+                                            error={!!emailErrors.password}
+                                            helperText={emailErrors.password ? (Array.isArray(emailErrors.password) ? emailErrors.password[0] : emailErrors.password) : ""}
+                                            InputProps={{
+                                                startAdornment: (
+                                                    <InputAdornment position="start">
+                                                        <Lock color="action" />
+                                                    </InputAdornment>
+                                                ),
+                                                endAdornment: (
+                                                    <InputAdornment position="end">
+                                                        <IconButton
+                                                            onClick={() => setShowPassword(!showPassword)}
+                                                            disabled={loading}
+                                                            edge="end"
+                                                        >
+                                                            {showPassword ? <VisibilityOff /> : <Visibility />}
+                                                        </IconButton>
+                                                    </InputAdornment>
+                                                ),
+                                            }}
+                                            sx={{
+                                                mb: 1,
+                                                "& .MuiOutlinedInput-root": {
+                                                    borderRadius: 2,
+                                                    "&:hover": {
+                                                        "& .MuiOutlinedInput-notchedOutline": {
+                                                            borderColor: theme.palette.primary.main,
+                                                        },
+                                                    },
+                                                },
+                                            }}
+                                        />
+
+                                        {!isLogin && (
+                                            <TextField
+                                                fullWidth
+                                                label="Confirm Password"
+                                                type={showConfirmPassword ? "text" : "password"}
+                                                value={emailData.password_confirmation}
+                                                onChange={handleEmailInputChange("password_confirmation")}
+                                                margin="dense"
+                                                required
+                                                disabled={loading}
+                                                placeholder="Confirm your password"
+                                                error={!!emailErrors.password_confirmation}
+                                                helperText={emailErrors.password_confirmation ? (Array.isArray(emailErrors.password_confirmation) ? emailErrors.password_confirmation[0] : emailErrors.password_confirmation) : ""}
+                                                InputProps={{
+                                                    startAdornment: (
+                                                        <InputAdornment position="start">
+                                                            <Lock color="action" />
+                                                        </InputAdornment>
+                                                    ),
+                                                    endAdornment: (
+                                                        <InputAdornment position="end">
+                                                            <IconButton
+                                                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                                                disabled={loading}
+                                                                edge="end"
+                                                            >
+                                                                {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                                                            </IconButton>
+                                                        </InputAdornment>
+                                                    ),
+                                                }}
+                                                sx={{
+                                                    mb: 1,
+                                                    "& .MuiOutlinedInput-root": {
+                                                        borderRadius: 2,
+                                                        "&:hover": {
+                                                            "& .MuiOutlinedInput-notchedOutline": {
+                                                                borderColor: theme.palette.primary.main,
+                                                            },
+                                                        },
+                                                    },
+                                                }}
+                                            />
+                                        )}
+
+                                        {!isLogin && (
+                                            <UserTypeSelect
+                                                value={emailData.user_type}
+                                                onChange={handleEmailInputChange("user_type")}
+                                                error={emailErrors.user_type}
+                                                disabled={loading}
+                                                required
+                                            />
+                                        )}
+
+                                        <SubmitButton
+                                            type="submit"
+                                            loading={loading}
+                                        >
+                                            {isLogin ? "LOGIN" : "CREATE ACCOUNT"}
+                                        </SubmitButton>
+
+                                        {/* Forgot Password Link for Login */}
+                                        {isLogin && (
+                                            <Box sx={{ textAlign: "center", mt: 1, mb: 2 }}>
+                                                <Link
+                                                    component="button"
+                                                    type="button"
+                                                    variant="body2"
+                                                    onClick={() => {
+                                                        // Handle forgot password
+                                                        console.log("Forgot password clicked");
+                                                    }}
+                                                    disabled={loading}
+                                                    sx={{
+                                                        textDecoration: "none",
+                                                        color: "primary.main",
+                                                        cursor: "pointer",
+                                                        "&:hover": {
+                                                            textDecoration: "underline",
+                                                        },
+                                                        "&:disabled": {
+                                                            color: "text.disabled",
+                                                        },
+                                                    }}
+                                                >
+                                                    Forgot your password?
+                                                </Link>
+                                            </Box>
+                                        )}
+
+                                        {/* Toggle Auth Mode */}
+                                        <Box sx={{ textAlign: "center", mt: 1 }}>
+                                            <Typography variant="body2" color="text.secondary">
+                                                {isLogin ? "Don't have an account? " : "Already have an account? "}
+                                                <Link
+                                                    component="button"
+                                                    type="button"
+                                                    onClick={toggleAuthMode}
+                                                    disabled={loading}
+                                                    sx={{
+                                                        textDecoration: "underline",
+                                                        color: "primary.main",
+                                                        cursor: "pointer",
+                                                        "&:disabled": {
+                                                            color: "text.disabled",
+                                                        },
+                                                    }}
+                                                >
+                                                    {isLogin ? "Sign up" : "Log in"}
+                                                </Link>
+                                            </Typography>
+                                        </Box>
+                                    </form>
+                                )}
+
+                                {/* CRITICAL FIX: Social Authentication with Proper User Type Handling */}
+                                {authType === "social" && (
+                                    <Box>
+                                        {/* ALWAYS SHOW USER TYPE SELECT FOR SOCIAL AUTH */}
+                                        <UserTypeSelect
+                                            value={socialData.user_type}
+                                            onChange={handleSocialInputChange("user_type")}
+                                            disabled={loading || Object.values(socialLoading).some(loading => loading)}
+                                            required={true} // Always required for social auth
+                                            sx={{ mb: 2 }}
+                                        />
+
+                                        {/* Social Login Buttons - Only enable when user type is selected */}
+                                        <Box
+                                            sx={{
+                                                display: "flex",
+                                                flexDirection: "column",
+                                                gap: 1.5,
+                                                mb: 2,
+                                            }}
+                                        >
+                                            <SocialButton
+                                                provider={socialLoading.google ? "Connecting..." : "Continue with Google"}
+                                                icon={socialLoading.google ? <CircularProgress size={20} /> : <Google />}
+                                                onClick={() => handleSocialLogin("google")}
+                                                disabled={loading || socialLoading.google || !socialData.user_type}
+                                                fullWidth
+                                                color="#db4437"
+                                            />
+
+                                            <Box sx={{ display: "flex", gap: 1 }}>
+                                                <SocialButton
+                                                    provider={socialLoading.facebook ? "Connecting..." : "Facebook"}
+                                                    icon={socialLoading.facebook ? <CircularProgress size={20} /> : <Facebook />}
+                                                    onClick={() => handleSocialLogin("facebook")}
+                                                    disabled={loading || socialLoading.facebook || !socialData.user_type}
+                                                    fullWidth
+                                                    color="#4267B2"
+                                                />
+
+                                                <SocialButton
+                                                    provider={socialLoading.github ? "Connecting..." : "GitHub"}
+                                                    icon={socialLoading.github ? <CircularProgress size={20} /> : <GitHub />}
+                                                    onClick={() => handleSocialLogin("github")}
+                                                    disabled={loading || socialLoading.github || !socialData.user_type}
+                                                    fullWidth
+                                                    color="#333"
+                                                />
+                                            </Box>
+
+                                            <SocialButton
+                                                provider={socialLoading.apple ? "Connecting..." : "Continue with Apple"}
+                                                icon={socialLoading.apple ? <CircularProgress size={20} /> : <Apple />}
+                                                onClick={() => handleSocialLogin("apple")}
+                                                disabled={loading || socialLoading.apple || !socialData.user_type}
+                                                fullWidth
+                                                color="#000000"
+                                            />
+                                        </Box>
+
+                                        {/* Show helper text when no user type is selected */}
+                                        {!socialData.user_type && (
+                                            <Box sx={{ textAlign: "center", mb: 2 }}>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    👆 Please select your role first to continue with social login
+                                                </Typography>
+                                            </Box>
+                                        )}
+
+                                        {/* Toggle Auth Mode for Social */}
+                                        <Box sx={{ textAlign: "center", mt: 1 }}>
+                                            <Typography variant="body2" color="text.secondary">
+                                                {isLogin ? "Don't have an account? " : "Already have an account? "}
+                                                <Link
+                                                    component="button"
+                                                    type="button"
+                                                    onClick={toggleAuthMode}
+                                                    disabled={loading || Object.values(socialLoading).some(loading => loading)}
+                                                    sx={{
+                                                        textDecoration: "underline",
+                                                        color: "primary.main",
+                                                        cursor: "pointer",
+                                                        "&:disabled": {
+                                                            color: "text.disabled",
+                                                        },
+                                                    }}
+                                                >
+                                                    {isLogin ? "Sign up" : "Log in"}
+                                                </Link>
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                )}
+
+                                {/* Terms and Privacy */}
+                                <Box
+                                    sx={{
+                                        textAlign: "center",
+                                        pt: 1,
+                                        borderTop: "1px solid #e9ecef",
+                                    }}
+                                >
+                                    <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                        sx={{ fontSize: "0.75rem" }}
+                                    >
+                                        By continuing, you agree to our{" "}
+                                        <Link
+                                            component="button"
+                                            type="button"
+                                            variant="caption"
+                                            onClick={() => {
+                                                onClose();
+                                                console.log("Navigate to Terms of Service");
+                                            }}
+                                            disabled={loading || Object.values(socialLoading).some(loading => loading)}
+                                            sx={{
+                                                textDecoration: "underline",
+                                                color: "grey",
+                                                fontSize: "inherit",
+                                                cursor: "pointer",
+                                                "&:disabled": {
+                                                    color: "text.disabled",
+                                                },
+                                            }}
+                                        >
+                                            Terms of Service
+                                        </Link>
+                                        {" & "}
+                                        <Link
+                                            component="button"
+                                            type="button"
+                                            variant="caption"
+                                            onClick={() => {
+                                                onClose();
+                                                console.log("Navigate to Privacy Policy");
+                                            }}
+                                            disabled={loading || Object.values(socialLoading).some(loading => loading)}
+                                            sx={{
+                                                textDecoration: "underline",
+                                                color: "grey",
+                                                fontSize: "inherit",
+                                                cursor: "pointer",
+                                                "&:disabled": {
+                                                    color: "text.disabled",
+                                                },
+                                            }}
+                                        >
+                                            Privacy Policy
+                                        </Link>
+                                    </Typography>
+                                </Box>
+                            </Box>
+                        </CardContent>
+                    </Card>
+                </Box>
+            </Fade>
+        </Modal>
+    );
+};
+
+export default LoginModal;
+```
+
+**resources/js//components/auth/AuthCallback.jsx**
+
+```jsx
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import {
+    Box,
+    Typography,
+    CircularProgress,
+    Card,
+    CardContent,
+    Avatar,
+    Fade,
+    LinearProgress,
+} from '@mui/material';
+import {
+    CheckCircle,
+    Person,
+    LocalHospital,
+    MedicalServices,
+    AdminPanelSettings,
+} from '@mui/icons-material';
+
+const AuthCallback = () => {
+    const [searchParams] = useSearchParams();
+    const navigate = useNavigate();
+    const [progress, setProgress] = useState(0);
+    const [userType, setUserType] = useState('');
+    const [userName, setUserName] = useState('');
+
+    useEffect(() => {
+        // Get URL parameters for both new and old social auth styles
+        const authToken = searchParams.get('token') || searchParams.get('portal_token');
+        const userParam = searchParams.get('user');
+        const isNewUser = searchParams.get('is_new_user') === 'true';
+        const provider = searchParams.get('provider');
+        const error = searchParams.get('error');
+        const urlUserType = searchParams.get('user_type'); // CRITICAL FIX: Get user_type from URL
+
+        console.log("AuthCallback received params:", {
+            authToken: !!authToken,
+            userParam: !!userParam,
+            isNewUser,
+            provider,
+            error,
+            urlUserType
+        });
+
+        // Handle error cases
+        if (error) {
+            console.error('Social auth error:', error);
+            setTimeout(() => {
+                navigate('/?error=social_auth_failed');
+            }, 1000);
+            return;
+        }
+
+        if (authToken && userParam) {
+            try {
+                // Parse user data
+                const userData = JSON.parse(decodeURIComponent(userParam));
+                setUserName(userData.name || 'User');
+                
+                // CRITICAL FIX: Use URL user_type if available, otherwise use userData user_type
+                const finalUserType = urlUserType || userData.user_type || 'patient';
+                setUserType(finalUserType);
+
+                console.log("Processed user data:", {
+                    userId: userData.id,
+                    userType: finalUserType,
+                    userName: userData.name,
+                    isNewUser
+                });
+
+                // Clear existing tokens
+                localStorage.removeItem('auth_token');
+                localStorage.removeItem('portal_token');
+                localStorage.removeItem('user_id');
+                localStorage.removeItem('user_data');
+                localStorage.removeItem('selected_user_type');
+                localStorage.removeItem('social_auth_mode');
+                localStorage.removeItem('social_redirect_provider');
+
+                // Start progress animation
+                const progressInterval = setInterval(() => {
+                    setProgress((prev) => {
+                        if (prev >= 100) {
+                            clearInterval(progressInterval);
+                            return 100;
+                        }
+                        return prev + 2;
+                    });
+                }, 50);
+
+                // Store auth data after progress completes
+                setTimeout(() => {
+                    // Store tokens based on auth type
+                    if (searchParams.get('portal_token')) {
+                        // Old style mobile auth
+                        localStorage.setItem('portal_token', authToken);
+                        localStorage.setItem('user_id', userData.id);
+                    } else {
+                        // New style email/social auth
+                        localStorage.setItem('auth_token', authToken);
+                        localStorage.setItem('user_id', userData.id);
+                    }
+                    
+                    // CRITICAL FIX: Store user data with correct user_type
+                    const userDataToStore = {
+                        ...userData,
+                        user_type: finalUserType // Ensure correct user_type is stored
+                    };
+                    localStorage.setItem('user_data', JSON.stringify(userDataToStore));
+
+                    console.log("Stored user data:", userDataToStore);
+
+                    // Role-based redirection
+                    redirectBasedOnRole(finalUserType);
+                }, 3000);
+
+            } catch (error) {
+                console.error('Auth callback error:', error);
+                setTimeout(() => {
+                    navigate('/?error=auth_data_invalid');
+                }, 1000);
+            }
+        } else {
+            console.error('Missing auth data in callback');
+            setTimeout(() => {
+                navigate('/?error=missing_auth_data');
+            }, 1000);
+        }
+    }, [searchParams, navigate]);
+
+    const redirectBasedOnRole = (role) => {
+        console.log("Redirecting based on role:", role);
+        
+        switch (role) {
+            case 'patient':
+                navigate('/');
+                break;
+            case 'doctor':
+                navigate('/doctor/dashboard');
+                break;
+            case 'healthcare':
+                navigate('/healthcare/dashboard');
+                break;
+            case 'admin':
+                navigate('/admin/dashboard');
+                break;
+            default:
+                console.log("Unknown role, redirecting to home:", role);
+                navigate('/');
+        }
+    };
+
+    const getRoleIcon = () => {
+        switch (userType) {
+            case 'patient':
+                return <Person sx={{ fontSize: 40, color: 'primary.main' }} />;
+            case 'doctor':
+                return <MedicalServices sx={{ fontSize: 40, color: 'success.main' }} />;
+            case 'healthcare':
+                return <LocalHospital sx={{ fontSize: 40, color: 'info.main' }} />;
+            case 'admin':
+                return <AdminPanelSettings sx={{ fontSize: 40, color: 'warning.main' }} />;
+            default:
+                return <Person sx={{ fontSize: 40, color: 'primary.main' }} />;
+        }
+    };
+
+    const getRoleColor = () => {
+        switch (userType) {
+            case 'patient':
+                return 'primary.main';
+            case 'doctor':
+                return 'success.main';
+            case 'healthcare':
+                return 'info.main';
+            case 'admin':
+                return 'warning.main';
+            default:
+                return 'primary.main';
+        }
+    };
+
+    const getRoleEmoji = () => {
+        switch (userType) {
+            case 'patient':
+                return '👤';
+            case 'doctor':
+                return '👨‍⚕️';
+            case 'healthcare':
+                return '🏥';
+            case 'admin':
+                return '👑';
+            default:
+                return '👤';
+        }
+    };
+
+    const getRoleDisplayName = () => {
+        switch (userType) {
+            case 'patient':
+                return 'Patient';
+            case 'doctor':
+                return 'Doctor';
+            case 'healthcare':
+                return 'Healthcare Provider';
+            case 'admin':
+                return 'Administrator';
+            default:
+                return 'User';
+        }
+    };
+
+    return (
+        <Box
+            sx={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: '100vh',
+                width: '100vw',
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                zIndex: 9999,
+            }}
+        >
+            <Fade in={true} timeout={500}>
+                <Card
+                    elevation={24}
+                    sx={{
+                        maxWidth: 400,
+                        width: '90%',
+                        borderRadius: 4,
+                        overflow: 'hidden',
+                        background: 'rgba(255, 255, 255, 0.95)',
+                        backdropFilter: 'blur(20px)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                    }}
+                >
+                    <CardContent sx={{ p: 4, textAlign: 'center' }}>
+                        {/* Logo */}
+                        <Avatar
+                            src="/images/common/icon.webp"
+                            sx={{
+                                width: 80,
+                                height: 80,
+                                mx: 'auto',
+                                mb: 3,
+                                border: '3px solid',
+                                borderColor: getRoleColor(),
+                                boxShadow: 6,
+                            }}
+                        />
+
+                        {/* Role Icon */}
+                        <Box
+                            sx={{
+                                mb: 3,
+                                p: 2,
+                                borderRadius: '50%',
+                                bgcolor: 'rgba(255, 255, 255, 0.8)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxShadow: 4,
+                            }}
+                        >
+                            {getRoleIcon()}
+                        </Box>
+
+                        {/* Welcome Message */}
+                        <Typography
+                            variant="h5"
+                            sx={{
+                                fontWeight: 'bold',
+                                mb: 1,
+                                color: 'text.primary',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 1,
+                            }}
+                        >
+                            {getRoleEmoji()} Welcome, {userName}!
+                        </Typography>
+
+                        <Typography
+                            variant="body1"
+                            sx={{
+                                color: 'text.secondary',
+                                mb: 3,
+                                fontWeight: 500,
+                            }}
+                        >
+                            🎉 Login successful! Setting up your {getRoleDisplayName()} dashboard...
+                        </Typography>
+
+                        {/* Progress Bar */}
+                        <Box sx={{ mb: 3 }}>
+                            <LinearProgress
+                                variant="determinate"
+                                value={progress}
+                                sx={{
+                                    height: 8,
+                                    borderRadius: 4,
+                                    bgcolor: 'rgba(0, 0, 0, 0.1)',
+                                    '& .MuiLinearProgress-bar': {
+                                        borderRadius: 4,
+                                        background: `linear-gradient(45deg, ${getRoleColor()}, ${getRoleColor()}dd)`,
+                                    },
+                                }}
+                            />
+                            <Typography
+                                variant="caption"
+                                sx={{
+                                    display: 'block',
+                                    mt: 1,
+                                    color: 'text.secondary',
+                                    fontWeight: 500,
+                                }}
+                            >
+                                ⏳ {Math.round(progress)}% Complete
+                            </Typography>
+                        </Box>
+
+                        {/* Status Message */}
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 2,
+                                p: 2,
+                                borderRadius: 3,
+                                bgcolor: 'rgba(76, 175, 80, 0.1)',
+                                border: '1px solid rgba(76, 175, 80, 0.3)',
+                            }}
+                        >
+                            {progress >= 100 ? (
+                                <CheckCircle sx={{ color: 'success.main' }} />
+                            ) : (
+                                <CircularProgress
+                                    size={20}
+                                    sx={{ color: getRoleColor() }}
+                                />
+                            )}
+                            <Typography
+                                variant="body2"
+                                sx={{
+                                    color: progress >= 100 ? 'success.main' : 'text.secondary',
+                                    fontWeight: 600,
+                                }}
+                            >
+                                {progress >= 100
+                                    ? '✅ Redirecting to dashboard...'
+                                    : '🔄 Completing authentication...'}
+                            </Typography>
+                        </Box>
+
+                        {/* Debug Info - Remove in production */}
+                        {process.env.NODE_ENV === 'development' && (
+                            <Box sx={{ mt: 2, p: 1, bgcolor: "#f0f0f0", borderRadius: 1, fontSize: "0.8rem" }}>
+                                <Typography variant="caption">
+                                    Debug - User Type: {userType}
+                                </Typography>
+                                <br />
+                                <Typography variant="caption">
+                                    Debug - User Name: {userName}
+                                </Typography>
+                            </Box>
+                        )}
+                    </CardContent>
+                </Card>
+            </Fade>
+        </Box>
+    );
+};
+
+export default AuthCallback;
 ```
 
 
-### 13. 🌱 Database Seeder with UUID
+
+### Step 28: Enhanced CSS Styles
+
+**resources/css/app.css**
+
+```css
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap');
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: #f5f5f5;
+}
+
+/* CSS Variables for Theme Colors */
+:root {
+    --primary-color: #10d915;
+    --secondary-color: #dc004e;
+    --success-color: #10d915;
+    --error-color: #f27474;
+    --warning-color: #f7e119;
+    --info-color: #2196f3;
+    --text-primary: #1a2a32;
+    --text-secondary: #6c757d;
+    --appbar-bg: rgba(255, 255, 255, 0.95);
+    --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    --hover-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+/* Dark mode variables */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --appbar-bg: rgba(26, 32, 44, 0.95);
+        --text-primary: #ffffff;
+        --text-secondary: #a0aec0;
+    }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+    transition: background 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* Smooth scroll behavior */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Remove default button focus outline */
+button:focus {
+    outline: none;
+}
+
+/* Enhanced utility classes */
+.gradient-text {
+    background: linear-gradient(45deg, #1976d2, #dc004e);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.gradient-primary {
+    background: linear-gradient(45deg, var(--primary-color) 30%, #21CBF3 90%);
+}
+
+.gradient-secondary {
+    background: linear-gradient(45deg, var(--secondary-color) 30%, #ff5983 90%);
+}
+
+/* Enhanced animations */
+.animate-fade-in {
+    animation: fadeIn 0.6s ease-in;
+}
+
+@keyframes fadeIn {
+    from { 
+        opacity: 0; 
+        transform: translateY(20px); 
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0); 
+    }
+}
+
+.animate-slide-up {
+    animation: slideUp 0.5s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-scale {
+    transition: transform 0.3s ease-in-out;
+}
+
+.animate-scale:hover {
+    transform: scale(1.02);
+}
+
+.animate-bounce {
+    animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+    0%, 20%, 53%, 80%, 100% {
+        animation-timing-function: cubic-bezier(0.215, 0.610, 0.355, 1.000);
+        transform: translate3d(0, 0, 0);
+    }
+    40%, 43% {
+        animation-timing-function: cubic-bezier(0.755, 0.050, 0.855, 0.060);
+        transform: translate3d(0, -30px, 0);
+    }
+    70% {
+        animation-timing-function: cubic-bezier(0.755, 0.050, 0.855, 0.060);
+        transform: translate3d(0, -15px, 0);
+    }
+    90% {
+        transform: translate3d(0, -4px, 0);
+    }
+}
+
+/* Enhanced card shadows */
+.card-shadow {
+    box-shadow: var(--card-shadow);
+    transition: box-shadow 0.3s ease-in-out, transform 0.3s ease-in-out;
+}
+
+.card-shadow:hover {
+    box-shadow: var(--hover-shadow);
+    transform: translateY(-4px);
+}
+
+.card-shadow-lg {
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+.card-shadow-xl {
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+}
+
+/* Loading animation */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+/* Enhanced responsive utilities */
+.container {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 16px;
+}
+
+@media (min-width: 600px) {
+    .container {
+        padding: 0 24px;
+    }
+}
+
+@media (min-width: 900px) {
+    .container {
+        padding: 0 32px;
+    }
+}
+
+@media (min-width: 1200px) {
+    .container {
+        padding: 0 40px;
+    }
+}
+
+/* Enhanced button styles */
+.btn-gradient {
+    background: linear-gradient(45deg, #1976d2 30%, #21CBF3 90%);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    padding: 12px 24px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: none;
+    font-family: inherit;
+}
+
+.btn-gradient:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(25, 118, 210, 0.4);
+}
+
+.btn-gradient:active {
+    transform: translateY(0);
+}
+
+.btn-gradient:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Enhanced form elements */
+.form-input {
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    padding: 12px 16px;
+    font-size: 16px;
+    transition: all 0.3s ease;
+    background-color: #ffffff;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(16, 217, 21, 0.1);
+}
+
+.form-input:hover {
+    border-color: #cbd5e0;
+}
+
+/* Hide scrollbar for specific elements */
+.hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+/* Glass morphism effect */
+.glass {
+    background: rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.glass-dark {
+    background: rgba(0, 0, 0, 0.25);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Material-UI custom overrides */
+.MuiCard-root {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.MuiButton-root {
+    font-weight: 600 !important;
+    text-transform: none !important;
+}
+
+.MuiChip-root {
+    font-weight: 500 !important;
+}
+
+.MuiAlert-root {
+    border-radius: 8px !important;
+}
+
+/* Enhanced focus styles */
+.MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+    border-color: var(--primary-color) !important;
+}
+
+.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+    border-color: var(--primary-color) !important;
+}
+
+/* Enhanced typography */
+.text-gradient {
+    background: linear-gradient(45deg, var(--primary-color), var(--info-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.text-shadow {
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.text-shadow-lg {
+    text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* Enhanced responsive font sizes */
+@media (max-width: 600px) {
+    .MuiTypography-h1 {
+        font-size: 2rem !important;
+    }
+    
+    .MuiTypography-h2 {
+        font-size: 1.75rem !important;
+    }
+    
+    .MuiTypography-h3 {
+        font-size: 1.5rem !important;
+    }
+    
+    .MuiTypography-h4 {
+        font-size: 1.25rem !important;
+    }
+}
+
+/* Custom emoji animations */
+.emoji-bounce {
+    display: inline-block;
+    animation: emojiBounce 2s ease-in-out infinite;
+}
+
+@keyframes emojiBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.emoji-pulse {
+    display: inline-block;
+    animation: emojiPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes emojiPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+/* Enhanced accessibility */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* Print styles */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    
+    body {
+        background: white !important;
+        color: black !important;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    :root {
+        --primary-color: #0066cc;
+        --secondary-color: #cc0066;
+        --text-primary: #000000;
+        --text-secondary: #333333;
+    }
+}
+
+/* Enhanced selection styles */
+::selection {
+    background-color: rgba(16, 217, 21, 0.3);
+    color: inherit;
+}
+
+::-moz-selection {
+    background-color: rgba(16, 217, 21, 0.3);
+    color: inherit;
+}
+```
+
+
+### Step 29: Database Seeders (Complete Implementation)
+
+**database/seeders/UserSeeder.php**
 
 ```php
-// database/seeders/DatabaseSeeder.php
 <?php
+
+namespace Database\Seeders;
+
+use Illuminate\Database\Seeder;
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
+
+class UserSeeder extends Seeder
+{
+    public function run()
+    {
+        // Create doctor users
+        $doctorUsers = [
+            [
+                'name' => 'Dr. Rajesh Kumar',
+                'email' => 'dr.rajesh@example.com',
+                'password' => Hash::make('password'),
+                'user_type' => 'doctor',
+                'phone' => '+91-9876543210',
+                'address' => '12 Medical Complex, Mysuru, Karnataka',
+                'latitude' => 12.2958,
+                'longitude' => 76.6394
+            ],
+            [
+                'name' => 'Dr. Priya Sharma',
+                'email' => 'dr.priya@example.com',
+                'password' => Hash::make('password'),
+                'user_type' => 'doctor',
+                'phone' => '+91-9876543220',
+                'address' => '34 Healthcare Avenue, Mysuru, Karnataka',
+                'latitude' => 12.3047,
+                'longitude' => 76.6551
+            ],
+            [
+                'name' => 'Dr. Arun Patel',
+                'email' => 'dr.arun@example.com',
+                'password' => Hash::make('password'),
+                'user_type' => 'doctor',
+                'phone' => '+91-9876543230',
+                'address' => '56 Medical Street, Mysuru, Karnataka',
+                'latitude' => 12.3100,
+                'longitude' => 76.6600
+            ],
+            [
+                'name' => 'Dr. Kavya Reddy',
+                'email' => 'dr.kavya@example.com',
+                'password' => Hash::make('password'),
+                'user_type' => 'doctor',
+                'phone' => '+91-9876543240',
+                'address' => '78 Pediatric Lane, Mysuru, Karnataka',
+                'latitude' => 12.2800,
+                'longitude' => 76.6200
+            ],
+            [
+                'name' => 'Dr. Vikram Singh',
+                'email' => 'dr.vikram@example.com',
+                'password' => Hash::make('password'),
+                'user_type' => 'doctor',
+                'phone' => '+91-9876543250',
+                'address' => '90 Dermatology Plaza, Mysuru, Karnataka',
+                'latitude' => 12.3200,
+                'longitude' => 76.6700
+            ]
+        ];
+
+        // Create patient users
+        $patientUsers = [
+            [
+                'name' => 'John Doe',
+                'email' => 'john@example.com',
+                'password' => Hash::make('password'),
+                'user_type' => 'patient',
+                'phone' => '+91-9876543211',
+                'address' => '789 Patient Street, Mysuru, Karnataka',
+                'latitude' => 12.2958,
+                'longitude' => 76.6394
+            ],
+            [
+                'name' => 'Jane Smith',
+                'email' => 'jane@example.com',
+                'password' => Hash::make('password'),
+                'user_type' => 'patient',
+                'phone' => '+91-9876543212',
+                'address' => '456 Health Avenue, Mysuru, Karnataka',
+                'latitude' => 12.3047,
+                'longitude' => 76.6551
+            ],
+            [
+                'name' => 'Robert Johnson',
+                'email' => 'robert@example.com',
+                'password' => Hash::make('password'),
+                'user_type' => 'patient',
+                'phone' => '+91-9876543213',
+                'address' => '123 Wellness Road, Mysuru, Karnataka',
+                'latitude' => 12.3100,
+                'longitude' => 76.6600
+            ],
+            [
+                'name' => 'Emily Davis',
+                'email' => 'emily@example.com',
+                'password' => Hash::make('password'),
+                'user_type' => 'patient',
+                'phone' => '+91-9876543214',
+                'address' => '321 Care Lane, Mysuru, Karnataka',
+                'latitude' => 12.2800,
+                'longitude' => 76.6200
+            ],
+            [
+                'name' => 'Michael Brown',
+                'email' => 'michael@example.com',
+                'password' => Hash::make('password'),
+                'user_type' => 'patient',
+                'phone' => '+91-9876543215',
+                'address' => '654 Treatment Street, Mysuru, Karnataka',
+                'latitude' => 12.3200,
+                'longitude' => 76.6700
+            ]
+        ];
+
+        // Create admin user
+        $adminUser = [
+            'name' => 'Admin User',
+            'email' => 'admin@example.com',
+            'password' => Hash::make('password'),
+            'user_type' => 'admin',
+            'phone' => '+91-9876543200',
+            'address' => 'Admin Office, Healthcare Plaza, Mysuru',
+            'latitude' => 12.2958,
+            'longitude' => 76.6394
+        ];
+
+        // Insert all users
+        foreach ($doctorUsers as $userData) {
+            User::create($userData);
+        }
+
+        foreach ($patientUsers as $userData) {
+            User::create($userData);
+        }
+
+        User::create($adminUser);
+
+        $this->command->info('✅ Users seeded successfully!');
+    }
+}
+```
+
+**database/seeders/ClinicSeeder.php**
+
+```php
+<?php
+
+namespace Database\Seeders;
+
+use Illuminate\Database\Seeder;
+use App\Models\Clinic;
+
+class ClinicSeeder extends Seeder
+{
+    public function run()
+    {
+        $clinics = [
+            [
+                'name' => 'City General Hospital',
+                'description' => 'Multi-specialty hospital with modern facilities and experienced medical professionals',
+                'address' => '123 Main Street, Mysuru, Karnataka 570001',
+                'latitude' => 12.2958,
+                'longitude' => 76.6394,
+                'phone' => '+91-821-2345678',
+                'email' => 'info@citygeneral.com',
+                'facilities' => ['🚨 Emergency', '🩻 X-Ray', '🔬 Lab', '💊 Pharmacy', '🏥 ICU'],
+                'opening_time' => '08:00',
+                'closing_time' => '22:00'
+            ],
+            [
+                'name' => 'Wellness Clinic',
+                'description' => 'Specialized in preventive healthcare and family medicine',
+                'address' => '456 Health Lane, Mysuru, Karnataka 570002',
+                'latitude' => 12.3047,
+                'longitude' => 76.6551,
+                'phone' => '+91-821-3456789',
+                'email' => 'contact@wellness.com',
+                'facilities' => ['🩺 Consultation', '🔬 Lab', '💊 Pharmacy'],
+                'opening_time' => '09:00',
+                'closing_time' => '18:00'
+            ],
+            [
+                'name' => 'Heart Care Center',
+                'description' => 'Specialized cardiac care facility with advanced equipment',
+                'address' => '789 Cardiac Lane, Mysuru, Karnataka 570003',
+                'latitude' => 12.3100,
+                'longitude' => 76.6600,
+                'phone' => '+91-821-4567890',
+                'email' => 'care@heartcenter.com',
+                'facilities' => ['⚡ ECG', '🫀 Echo', '🏃‍♂️ Stress Test', '🚨 Emergency'],
+                'opening_time' => '06:00',
+                'closing_time' => '20:00'
+            ],
+            [
+                'name' => 'Pediatric Care Center',
+                'description' => 'Specialized children healthcare facility with child-friendly environment',
+                'address' => '321 Kids Avenue, Mysuru, Karnataka 570004',
+                'latitude' => 12.2800,
+                'longitude' => 76.6200,
+                'phone' => '+91-821-5678901',
+                'email' => 'info@pediatriccare.com',
+                'facilities' => ['💉 Vaccination', '🏥 Pediatric ICU', '🚨 Emergency', '🔬 Lab'],
+                'opening_time' => '08:00',
+                'closing_time' => '20:00'
+            ],
+            [
+                'name' => 'Skin & Beauty Clinic',
+                'description' => 'Advanced dermatology and cosmetic treatments center',
+                'address' => '654 Beauty Street, Mysuru, Karnataka 570005',
+                'latitude' => 12.3200,
+                'longitude' => 76.6700,
+                'phone' => '+91-821-6789012',
+                'email' => 'contact@skinbeauty.com',
+                'facilities' => ['✨ Laser Treatment', '🔬 Cosmetic Surgery', '🩺 Consultation'],
+                'opening_time' => '10:00',
+                'closing_time' => '19:00'
+            ]
+        ];
+
+        foreach ($clinics as $clinicData) {
+            Clinic::create($clinicData);
+        }
+
+        $this->command->info('✅ Clinics seeded successfully!');
+    }
+}
+```
+
+**database/seeders/DoctorSeeder.php**
+
+```php
+<?php
+
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use App\Models\User;
 use App\Models\Doctor;
-use App\Models\Clinic;
-use Illuminate\Support\Facades\Hash;
 
-class DatabaseSeeder extends Seeder
+class DoctorSeeder extends Seeder
 {
     public function run()
     {
-        // Create sample clinics
-        $clinic1 = Clinic::create([
-            'name' => 'City General Hospital',
-            'description' => 'Multi-specialty hospital with modern facilities',
-            'address' => '123 Main Street, Mysuru, Karnataka',
-            'latitude' => 12.2958,
-            'longitude' => 76.6394,
-            'phone' => '+91-821-2345678',
-            'email' => 'info@citygeneral.com',
-            'facilities' => ['Emergency', 'X-Ray', 'Lab', 'Pharmacy', 'ICU'],
-            'opening_time' => '08:00',
-            'closing_time' => '22:00'
+        $doctorUsers = User::where('user_type', 'doctor')->get();
+
+        $doctorsData = [
+            [
+                'email' => 'dr.rajesh@example.com',
+                'specialization' => 'Cardiology',
+                'license_number' => 'MCI12345',
+                'experience_years' => 15,
+                'bio' => '🫀 Experienced cardiologist specializing in interventional cardiology and heart disease prevention with advanced expertise in cardiac procedures.',
+                'consultation_fee' => 800.00,
+                'qualification' => 'MBBS, MD Cardiology, Fellowship in Interventional Cardiology',
+                'languages' => ['🇺🇸 English', '🇮🇳 Hindi', '🇮🇳 Kannada'],
+                'rating' => 4.8,
+                'total_reviews' => 125,
+                'is_verified' => true
+            ],
+            [
+                'email' => 'dr.priya@example.com',
+                'specialization' => 'Dermatology',
+                'license_number' => 'MCI12346',
+                'experience_years' => 8,
+                'bio' => '✨ Specialist in skin care, cosmetic dermatology, and advanced skin treatments with focus on aesthetic medicine.',
+                'consultation_fee' => 600.00,
+                'qualification' => 'MBBS, MD Dermatology, Aesthetic Medicine Certification',
+                'languages' => ['🇺🇸 English', '🇮🇳 Hindi'],
+                'rating' => 4.5,
+                'total_reviews' => 89,
+                'is_verified' => true
+            ],
+            [
+                'email' => 'dr.arun@example.com',
+                'specialization' => 'General Medicine',
+                'license_number' => 'MCI12347',
+                'experience_years' => 12,
+                'bio' => '🩺 General practitioner with expertise in family medicine and preventive healthcare, providing comprehensive medical care.',
+                'consultation_fee' => 400.00,
+                'qualification' => 'MBBS, MD General Medicine, Diploma in Family Medicine',
+                'languages' => ['🇺🇸 English', '🇮🇳 Hindi', '🇮🇳 Gujarati'],
+                'rating' => 4.3,
+                'total_reviews' => 156,
+                'is_verified' => true
+            ],
+            [
+                'email' => 'dr.kavya@example.com',
+                'specialization' => 'Pediatrics',
+                'license_number' => 'MCI12348',
+                'experience_years' => 10,
+                'bio' => '👶 Pediatric specialist focusing on child health, vaccination, and developmental care with compassionate approach.',
+                'consultation_fee' => 500.00,
+                'qualification' => 'MBBS, MD Pediatrics, Fellowship in Pediatric Critical Care',
+                'languages' => ['🇺🇸 English', '🇮🇳 Hindi', '🇮🇳 Telugu'],
+                'rating' => 4.7,
+                'total_reviews' => 203,
+                'is_verified' => true
+            ],
+            [
+                'email' => 'dr.vikram@example.com',
+                'specialization' => 'Dermatology',
+                'license_number' => 'MCI12349',
+                'experience_years' => 6,
+                'bio' => '🌟 Young dermatologist specializing in acne treatment and laser therapies with modern treatment approaches.',
+                'consultation_fee' => 550.00,
+                'qualification' => 'MBBS, MD Dermatology, Laser Therapy Certification',
+                'languages' => ['🇺🇸 English', '🇮🇳 Hindi', '🇮🇳 Punjabi'],
+                'rating' => 4.4,
+                'total_reviews' => 67,
+                'is_verified' => true
+            ]
+        ];
+
+        foreach ($doctorsData as $doctorData) {
+            $user = $doctorUsers->where('email', $doctorData['email'])->first();
+            if ($user) {
+                Doctor::create([
+                    'user_id' => $user->id,
+                    'specialization' => $doctorData['specialization'],
+                    'license_number' => $doctorData['license_number'],
+                    'experience_years' => $doctorData['experience_years'],
+                    'bio' => $doctorData['bio'],
+                    'consultation_fee' => $doctorData['consultation_fee'],
+                    'qualification' => $doctorData['qualification'],
+                    'languages' => $doctorData['languages'],
+                    'rating' => $doctorData['rating'],
+                    'total_reviews' => $doctorData['total_reviews'],
+                    'is_verified' => $doctorData['is_verified']
+                ]);
+            }
+        }
+
+        $this->command->info('✅ Doctors seeded successfully!');
+    }
+}
+```
+
+**database/seeders/DoctorClinicScheduleSeeder.php**
+
+```php
+<?php
+
+namespace Database\Seeders;
+
+use Illuminate\Database\Seeder;
+use App\Models\Doctor;
+use App\Models\Clinic;
+
+class DoctorClinicScheduleSeeder extends Seeder
+{
+    public function run()
+    {
+        $doctors = Doctor::with('user')->get();
+        $clinics = Clinic::all();
+
+        $schedules = [
+            'dr.rajesh@example.com' => [
+                'City General Hospital' => [
+                    'available_days' => ['monday', 'tuesday', 'wednesday', 'friday'],
+                    'start_time' => '10:00',
+                    'end_time' => '16:00',
+                    'slot_duration' => 30,
+                    'is_active' => true
+                ],
+                'Heart Care Center' => [
+                    'available_days' => ['thursday', 'saturday'],
+                    'start_time' => '09:00',
+                    'end_time' => '13:00',
+                    'slot_duration' => 30,
+                    'is_active' => true
+                ]
+            ],
+            'dr.priya@example.com' => [
+                'City General Hospital' => [
+                    'available_days' => ['monday', 'wednesday', 'friday'],
+                    'start_time' => '14:00',
+                    'end_time' => '18:00',
+                    'slot_duration' => 30,
+                    'is_active' => true
+                ],
+                'Skin & Beauty Clinic' => [
+                    'available_days' => ['tuesday', 'thursday', 'saturday'],
+                    'start_time' => '10:00',
+                    'end_time' => '17:00',
+                    'slot_duration' => 45,
+                    'is_active' => true
+                ]
+            ],
+            'dr.arun@example.com' => [
+                'City General Hospital' => [
+                    'available_days' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+                    'start_time' => '09:00',
+                    'end_time' => '17:00',
+                    'slot_duration' => 20,
+                    'is_active' => true
+                ],
+                'Wellness Clinic' => [
+                    'available_days' => ['saturday'],
+                    'start_time' => '10:00',
+                    'end_time' => '16:00',
+                    'slot_duration' => 20,
+                    'is_active' => true
+                ]
+            ],
+            'dr.kavya@example.com' => [
+                'Pediatric Care Center' => [
+                    'available_days' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+                    'start_time' => '09:00',
+                    'end_time' => '17:00',
+                    'slot_duration' => 30,
+                    'is_active' => true
+                ],
+                'City General Hospital' => [
+                    'available_days' => ['saturday'],
+                    'start_time' => '10:00',
+                    'end_time' => '14:00',
+                    'slot_duration' => 30,
+                    'is_active' => true
+                ]
+            ],
+            'dr.vikram@example.com' => [
+                'Skin & Beauty Clinic' => [
+                    'available_days' => ['monday', 'wednesday', 'friday'],
+                    'start_time' => '11:00',
+                    'end_time' => '18:00',
+                    'slot_duration' => 45,
+                    'is_active' => true
+                ],
+                'Wellness Clinic' => [
+                    'available_days' => ['tuesday', 'thursday'],
+                    'start_time' => '14:00',
+                    'end_time' => '17:00',
+                    'slot_duration' => 30,
+                    'is_active' => true
+                ]
+            ]
+        ];
+
+        foreach ($schedules as $doctorEmail => $clinicSchedules) {
+            $doctor = $doctors->where('user.email', $doctorEmail)->first();
+            
+            if ($doctor) {
+                foreach ($clinicSchedules as $clinicName => $schedule) {
+                    $clinic = $clinics->where('name', $clinicName)->first();
+                    
+                    if ($clinic) {
+                        $doctor->clinics()->attach($clinic->id, [
+                            'available_days' => json_encode($schedule['available_days']),
+                            'start_time' => $schedule['start_time'],
+                            'end_time' => $schedule['end_time'],
+                            'slot_duration' => $schedule['slot_duration'],
+                            'is_active' => $schedule['is_active'],
+                            'created_at' => now(),
+                            'updated_at' => now()
+                        ]);
+                    }
+                }
+            }
+        }
+
+        $this->command->info('✅ Doctor-Clinic schedules seeded successfully!');
+    }
+}
+```
+
+**database/seeders/AppointmentSeeder.php**
+
+```php
+<?php
+
+namespace Database\Seeders;
+
+use Illuminate\Database\Seeder;
+use App\Models\User;
+use App\Models\Doctor;
+use App\Models\Appointment;
+use Carbon\Carbon;
+
+class AppointmentSeeder extends Seeder
+{
+    public function run()
+    {
+        $patients = User::where('user_type', 'patient')->get();
+        $doctors = Doctor::with(['user', 'clinics'])->get();
+
+        $appointmentsData = [
+            [
+                'patient_email' => 'john@example.com',
+                'doctor_email' => 'dr.rajesh@example.com',
+                'clinic_name' => 'City General Hospital',
+                'appointment_date' => Carbon::today()->addDays(1)->format('Y-m-d'),
+                'appointment_time' => '10:00',
+                'status' => 'confirmed',
+                'symptoms' => '💔 Chest pain and shortness of breath during physical activity',
+                'payment_status' => 'paid'
+            ],
+            [
+                'patient_email' => 'jane@example.com',
+                'doctor_email' => 'dr.priya@example.com',
+                'clinic_name' => 'Skin & Beauty Clinic',
+                'appointment_date' => Carbon::today()->addDays(2)->format('Y-m-d'),
+                'appointment_time' => '14:30',
+                'status' => 'pending',
+                'symptoms' => '🌟 Acne treatment consultation and skin care advice needed',
+                'payment_status' => 'pending'
+            ],
+            [
+                'patient_email' => 'robert@example.com',
+                'doctor_email' => 'dr.arun@example.com',
+                'clinic_name' => 'Wellness Clinic',
+                'appointment_date' => Carbon::today()->addDays(3)->format('Y-m-d'),
+                'appointment_time' => '11:00',
+                'status' => 'confirmed',
+                'symptoms' => '🩺 Regular health checkup and preventive care assessment',
+                'payment_status' => 'paid'
+            ],
+            [
+                'patient_email' => 'emily@example.com',
+                'doctor_email' => 'dr.kavya@example.com',
+                'clinic_name' => 'Pediatric Care Center',
+                'appointment_date' => Carbon::today()->addDays(1)->format('Y-m-d'),
+                'appointment_time' => '15:00',
+                'status' => 'confirmed',
+                'symptoms' => '💉 Child vaccination and routine developmental checkup',
+                'payment_status' => 'paid'
+            ],
+            [
+                'patient_email' => 'michael@example.com',
+                'doctor_email' => 'dr.vikram@example.com',
+                'clinic_name' => 'Skin & Beauty Clinic',
+                'appointment_date' => Carbon::today()->addDays(4)->format('Y-m-d'),
+                'appointment_time' => '16:00',
+                'status' => 'pending',
+                'symptoms' => '✨ Laser treatment consultation for skin pigmentation',
+                'payment_status' => 'pending'
+            ]
+        ];
+
+        foreach ($appointmentsData as $appointmentData) {
+            $patient = $patients->where('email', $appointmentData['patient_email'])->first();
+            $doctor = $doctors->where('user.email', $appointmentData['doctor_email'])->first();
+            $clinic = $doctor?->clinics->where('name', $appointmentData['clinic_name'])->first();
+
+            if ($patient && $doctor && $clinic) {
+                Appointment::create([
+                    'patient_id' => $patient->id,
+                    'doctor_id' => $doctor->id,
+                    'clinic_id' => $clinic->id,
+                    'appointment_date' => $appointmentData['appointment_date'],
+                    'appointment_time' => $appointmentData['appointment_time'],
+                    'status' => $appointmentData['status'],
+                    'symptoms' => $appointmentData['symptoms'],
+                    'amount' => $doctor->consultation_fee,
+                    'payment_status' => $appointmentData['payment_status']
+                ]);
+            }
+        }
+
+        $this->command->info('✅ Sample appointments seeded successfully!');
+    }
+}
+```
+
+**database/seeders/DatabaseSeeder.php**
+
+```php
+<?php
+
+namespace Database\Seeders;
+
+use Illuminate\Database\Seeder;
+
+class DatabaseSeeder extends Seeder
+{
+    /**
+     * Seed the application's database.
+     */
+    public function run(): void
+    {
+        $this->command->info('🚀 Starting Visit Care database seeding...');
+        $this->command->newLine();
+
+        // Run seeders in proper order
+        $this->call([
+            ClinicSeeder::class,
+            UserSeeder::class,
+            DoctorSeeder::class,
+            DoctorClinicScheduleSeeder::class,
+            AppointmentSeeder::class,
         ]);
 
-        $clinic2 = Clinic::create([
-            'name' => 'Wellness Clinic',
-            'description' => 'Specialized in preventive healthcare',
-            'address' => '456 Health Lane, Mysuru, Karnataka',
-            'latitude' => 12.3047,
-            'longitude' => 76.6551,
-            'phone' => '+91-821-3456789',
-            'email' => 'contact@wellness.com',
-            'facilities' => ['Consultation', 'Lab', 'Pharmacy'],
-            'opening_time' => '09:00',
-            'closing_time' => '18:00'
-        ]);
-
-        // Create sample doctors
-        $doctor1User = User::create([
-            'name' => 'Rajesh Kumar',
-            'email' => 'dr.rajesh@example.com',
-            'password' => Hash::make('password'),
-            'user_type' => 'doctor',
-            'phone' => '+91-9876543210'
-        ]);
-
-        $doctor1 = Doctor::create([
-            'user_id' => $doctor1User->id,
-            'specialization' => 'Cardiology',
-            'license_number' => 'MCI12345',
-            'experience_years' => 15,
-            'bio' => 'Experienced cardiologist specializing in interventional cardiology',
-            'consultation_fee' => 800.00,
-            'qualification' => 'MBBS, MD Cardiology',
-            'languages' => ['English', 'Hindi', 'Kannada'],
-            'rating' => 4.8,
-            'total_reviews' => 125,
-            'is_verified' => true
-        ]);
-
-        // Attach doctor to clinics with schedule
-        $doctor1->clinics()->attach($clinic1->id, [
-            'available_days' => ['monday', 'tuesday', 'wednesday', 'friday'],
-            'start_time' => '10:00',
-            'end_time' => '16:00',
-            'slot_duration' => 30
-        ]);
-
-        $doctor1->clinics()->attach($clinic2->id, [
-            'available_days' => ['thursday', 'saturday'],
-            'start_time' => '09:00',
-            'end_time' => '13:00',
-            'slot_duration' => 30
-        ]);
-
-        // Create sample patient
-        User::create([
-            'name' => 'John Doe',
-            'email' => 'john@example.com',
-            'password' => Hash::make('password'),
-            'user_type' => 'patient',
-            'phone' => '+91-9876543211'
-        ]);
+        $this->command->newLine();
+        $this->command->info('🎯 Database seeding completed successfully!');
+        $this->command->newLine();
+        
+        // Seeding Summary with emojis
+        $this->command->info('📊 Seeding Summary:');
+        $this->command->info('🏥 Clinics: 5 healthcare facilities created');
+        $this->command->info('👥 Users: 11 users created (5 Doctors, 5 Patients, 1 Admin)');
+        $this->command->info('🩺 Doctors: 5 verified doctor profiles generated');
+        $this->command->info('📅 Schedules: Doctor-Clinic availability schedules linked');
+        $this->command->info('📋 Appointments: 5 sample appointment records added');
+        $this->command->newLine();
+        
+        $this->command->info('🎉 Visit Care database is ready for use! 🚀');
+        $this->command->info('');
+        $this->command->info('📝 Login Credentials:');
+        $this->command->info('👨‍⚕️ Doctor: dr.rajesh@example.com / password');
+        $this->command->info('👤 Patient: john@example.com / password');
+        $this->command->info('👑 Admin: admin@example.com / password');
     }
 }
 ```
 
 
-### 14. ⚙️ Environment Configuration
-
-**🔧 Laravel .env**
-
-```env
-APP_NAME="Doctor Clinic App"
-APP_ENV=local
-APP_KEY=base64:your-app-key
-APP_DEBUG=true
-APP_URL=http://localhost:8000
-
-DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=doctor_clinic_db
-DB_USERNAME=root
-DB_PASSWORD=
-
-BROADCAST_DRIVER=log
-CACHE_DRIVER=file
-FILESYSTEM_DRIVER=local
-QUEUE_CONNECTION=sync
-SESSION_DRIVER=file
-SESSION_LIFETIME=120
-
-SANCTUM_STATEFUL_DOMAINS=localhost:8000
-```
-
-
-### 15. 📄 CSS Styling
-
-```css
-/* resources/css/app.css */
-@import 'tailwindcss/base';
-@import 'tailwindcss/components';
-@import 'tailwindcss/utilities';
-
-/* Custom styles for the app */
-.app {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-main {
-  flex: 1;
-}
-
-/* Leaflet map styles */
-.leaflet-container {
-  height: 400px;
-  width: 100%;
-}
-
-/* Loading spinner */
-.loading-spinner {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 2rem;
-}
-
-/* Custom card hover effects */
-.doctor-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.12);
-  transition: all 0.2s ease-in-out;
-}
-
-.clinic-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.12);
-  transition: all 0.2s ease-in-out;
-}
-```
-
-
-### 16. 🚀 Deployment Steps
-
-**🔧 Backend Deployment with Vite**
+### Step 30: Final Installation \& Setup Commands
 
 ```bash
-# 1. Clone and setup
-git clone your-repo
-cd doctor-clinic-backend
+# 1. Install Backend Dependencies
 composer install
-cp .env.example .env
-php artisan key:generate
 
-# 2. Install Node dependencies
+# 2. Install Frontend Dependencies
 npm install
 
-# 3. Database setup
+# 3. Generate Application Key
+php artisan key:generate
+
+# 4. Run Migrations
 php artisan migrate
+
+# 5. Seed Database
 php artisan db:seed
 
-# 4. Build React assets
-npm run build
-
-# 5. Storage and cache
+# 6. Create Storage Link
 php artisan storage:link
+
+# 7. Cache Configuration (Optional)
 php artisan config:cache
 php artisan route:cache
+php artisan view:cache
 
-# 6. Start server
+# 8. Start Development Servers
+# Terminal 1: Laravel Server
 php artisan serve
-```
 
-**🎯 Development Commands**
-
-```bash
-# For development with hot reload
+# Terminal 2: Vite Development Server
 npm run dev
-
-# For production build
-npm run build
-
-# Watch for changes during development
-php artisan serve & npm run dev
 ```
 
 
-### 17. ✨ Features Summary
+### 🎉 Completion Summary
 
-**🎯 Core Features:**
+**Visit Care Application is now complete with:**
 
-- ✅ Laravel backend with Vite + React integration (no separate frontend)
-- ✅ UUID primary keys for all models
-- ✅ User authentication (patients, doctors) with Sanctum
-- ✅ Doctor search with filters (specialization, location, rating)
-- ✅ Clinic search with map integration using Leaflet
-- ✅ Doctor availability management per clinic
-- ✅ Appointment booking with time slots
-- ✅ Real-time slot availability checking
-- ✅ Interactive map with clinic locations
-- ✅ Responsive design with Material-UI
-- ✅ Single Laravel application serving both API and frontend
+✅ **Full-Stack Implementation**
 
-**🚀 Advanced Features to Add:**
+- Laravel 12 backend with UUID-based models
+- React 18 + Material-UI frontend
+- Sanctum API authentication
+- Location-based search functionality
 
-- 💳 Payment gateway integration
-- 📧 Email/SMS notifications
-- 👨⚕️ Doctor dashboard for managing appointments
-- 📋 Patient medical records
-- ⭐ Reviews and ratings system
-- 🌐 Multi-language support
-- 📱 Push notifications
-- 💊 Prescription management
+✅ **Enhanced Features**
 
-**🗺️ Map Integration Features:**
+- Beautiful emoji-enhanced UI components
+- Responsive design for all devices
+- Google Maps integration
+- Real-time search with typewriter effects
+- Animated statistics counters
+- Professional testimonials section
 
-- 📍 Real-time clinic locations with Leaflet maps
-- 🛣️ Distance-based search
-- 🧭 Interactive clinic markers
-- 🏥 Nearby healthcare facilities
-- 📱 Geolocation-based recommendations
+✅ **Database Structure**
 
-***
+- Complete migrations for all entities
+- Comprehensive seeders with sample data
+- Proper relationships and constraints
+- UUID primary keys throughout
 
-## 🎉 Conclusion
+✅ **API Implementation**
 
-This comprehensive application provides a complete medical appointment booking system with Laravel backend integrated with Vite + React frontend. All primary keys use UUIDs, and the application serves both API and frontend from a single Laravel installation. The system includes all requested features including map integration, doctor-clinic relationships, availability management, and patient booking functionality.
+- RESTful API endpoints
+- Authentication \& authorization
+- Location-based filtering
+- Appointment booking system
 
-### 🚀 Key Improvements Made:
+✅ **Production Ready**
 
-1. **🔗 Integrated Frontend**: No separate React app - everything runs through Laravel with Vite
-2. **🆔 UUID Primary Keys**: All models use UUID instead of auto-increment IDs
-3. **⚡ Vite Integration**: Hot reload, fast builds, and modern tooling
-4. **🎨 Material-UI**: Professional, responsive design
-5. **🗺️ Leaflet Maps**: Open source mapping solution
-6. **🔐 Sanctum Auth**: Seamless authentication between Laravel and React
-7. **📱 SPA Routing**: Single page application with React Router
+- Optimized build configuration
+- Error handling \& validation
+- Security best practices
+- Performance optimizations
 
-### 🚀 Next Steps:
-
-1. **Set up** the Laravel project with provided migrations and models
-2. **Install** Node dependencies and configure Vite
-3. **Configure** API endpoints and authentication
-4. **Set up** the database with sample data using the UUID seeder
-5. **Build** the React assets and test the booking flow
-6. **Test** the map functionality and all features
-
-The application is ready for **production deployment** and can handle real-world healthcare appointment booking scenarios with professional-grade features and user experience! 🏥✨
-<span style="display:none">[^1]</span>
-
+**🚀 Your Visit Care application is ready for deployment and use!**
 
 
