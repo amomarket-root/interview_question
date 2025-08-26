@@ -2336,6 +2336,7 @@ Route::middleware('auth:sanctum')->group(function () {
         "react": "^18.2.0",
         "react-countup": "^6.5.3",
         "react-dom": "^18.2.0",
+        "react-icons": "^5.5.0",
         "react-leaflet": "^4.2.1",
         "react-router-dom": "^7.1.5",
         "socket.io": "^4.7.5",
@@ -2854,18 +2855,18 @@ import { Box, useTheme, useMediaQuery } from '@mui/material';
 import Header from '../common/Header';
 import Footer from '../common/Footer';
 
-const MainLayout = ({ children, disableGutters = false, maxWidth = "lg", sx = {} }) => {
+const MainLayout = ({ children, disableGutters = false, maxWidth = "false", fullWidth = false, sx = {} }) => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
     const isSmallMobile = useMediaQuery(theme.breakpoints.down('sm'));
     const isTablet = useMediaQuery(theme.breakpoints.between('sm', 'md'));
 
-    // Calculate appropriate top padding based on device type - REDUCED VALUES
+    // Calculate appropriate top padding based on device type
     const getTopPadding = () => {
-        if (isSmallMobile) return '40px'; // Reduced from 60px
-        if (isMobile) return '60px'; // Reduced from 100px  
-        if (isTablet) return '50px'; // Reduced from 80px
-        return '0px'; // Desktop header height remains same
+        if (isSmallMobile) return '65px';
+        if (isMobile) return '85px';
+        if (isTablet) return '70px';
+        return '0px';
     };
 
     return (
@@ -2887,17 +2888,23 @@ const MainLayout = ({ children, disableGutters = false, maxWidth = "lg", sx = {}
                 component="main"
                 sx={{
                     flexGrow: 1,
-                    width: '100%',
-                    paddingTop: getTopPadding(), // Dynamic padding based on screen size - REDUCED
-                    paddingX: disableGutters ? 0 : { xs: 1, sm: 2, md: 3 },
+                    width: fullWidth ? '100vw' : '100%',
+                    paddingTop: getTopPadding(),
+                    paddingX: disableGutters || fullWidth ? 0 : { xs: 0.5, sm: 1, md: 1.5 }, // Reduced padding
                     minHeight: `calc(100vh - ${getTopPadding()})`,
-                    // Ensure content doesn't get cut off on mobile
                     position: 'relative',
                     zIndex: 1,
-                    // Add safe area for notched devices - with reduced padding
+                    // Ensure content doesn't get cut off on mobile
                     '@supports (padding: max(0px))': {
                         paddingTop: `max(${getTopPadding()}, env(safe-area-inset-top))`,
-                    }
+                    },
+                    // Full width override for specific sections
+                    ...(fullWidth && {
+                        marginLeft: 'calc(-50vw + 50%)',
+                        marginRight: 'calc(-50vw + 50%)',
+                        maxWidth: '100vw',
+                        width: '100vw',
+                    })
                 }}
             >
                 {children}
@@ -3964,15 +3971,14 @@ export default HomePage;
 **resources/js/pages/DoctorDetailPage.jsx**
 
 ```jsx
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import {
     Container,
     Typography,
     Box,
     Grid,
     Card,
-    CardContent,
     Button,
     Chip,
     Rating,
@@ -3981,7 +3987,6 @@ import {
     ListItem,
     ListItemIcon,
     ListItemText,
-    Paper,
     CircularProgress,
     Alert,
     Tabs,
@@ -3989,33 +3994,105 @@ import {
     Accordion,
     AccordionSummary,
     AccordionDetails,
-    IconButton,
-} from '@mui/material';
+    Paper,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    Divider,
+    useTheme,
+    useMediaQuery,
+    Stack,
+} from "@mui/material";
 import {
-    Person,
-    Schedule,
-    LocalHospital,
     CalendarToday,
-    LocationOn,
-    Verified,
     ExpandMore,
-    MedicalServices,
-} from '@mui/icons-material';
-import MainLayout from '../components/layout/MainLayout';
-import LoginModal from '../components/auth/LoginModal';
-import axios from 'axios';
+    Work,
+    Today,
+    Weekend,
+    BusinessCenter,
+} from "@mui/icons-material";
+import {
+    FaUserMd,
+    FaHospital,
+    FaCalendarAlt,
+    FaClock,
+    FaCheckCircle,
+    FaTimesCircle,
+    FaPhone,
+    FaMapMarkerAlt,
+    FaStethoscope,
+    FaMedkit,
+    FaGraduationCap,
+    FaLanguage,
+    FaMoneyBillWave,
+    FaCalendarCheck,
+} from "react-icons/fa";
+import {
+    MdVerified,
+    MdSchedule,
+    MdLocationOn,
+    MdLocalHospital,
+    MdInfo,
+    MdAccessTime,
+    MdEventAvailable,
+} from "react-icons/md";
+import MainLayout from "../components/layout/MainLayout";
+import LoginModal from "../components/auth/LoginModal";
+import axios from "axios";
 
 const DoctorDetailPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const apiUrl = import.meta.env.VITE_API_URL;
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+    const isTablet = useMediaQuery(theme.breakpoints.down("md"));
 
     const [doctor, setDoctor] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+    const [error, setError] = useState("");
     const [tabValue, setTabValue] = useState(0);
     const [showLoginModal, setShowLoginModal] = useState(false);
     const [selectedClinic, setSelectedClinic] = useState(null);
+
+    // Days of the week with React Icons
+    const daysOfWeek = [
+        { key: "monday", label: "Monday", icon: <Today />, shortLabel: "Mon" },
+        {
+            key: "tuesday",
+            label: "Tuesday",
+            icon: <Today />,
+            shortLabel: "Tue",
+        },
+        {
+            key: "wednesday",
+            label: "Wednesday",
+            icon: <Today />,
+            shortLabel: "Wed",
+        },
+        {
+            key: "thursday",
+            label: "Thursday",
+            icon: <Today />,
+            shortLabel: "Thu",
+        },
+        { key: "friday", label: "Friday", icon: <Today />, shortLabel: "Fri" },
+        {
+            key: "saturday",
+            label: "Saturday",
+            icon: <Weekend />,
+            shortLabel: "Sat",
+        },
+        {
+            key: "sunday",
+            label: "Sunday",
+            icon: <Weekend />,
+            shortLabel: "Sun",
+        },
+    ];
 
     useEffect(() => {
         loadDoctorDetails();
@@ -4026,15 +4103,15 @@ const DoctorDetailPage = () => {
             const response = await axios.get(`${apiUrl}/doctors/${id}`);
             setDoctor(response.data);
         } catch (error) {
-            console.error('Failed to load doctor details:', error);
-            setError('Failed to load doctor details');
+            console.error("Failed to load doctor details:", error);
+            setError("Failed to load doctor details");
         } finally {
             setLoading(false);
         }
     };
 
     const handleBookAppointment = (clinic) => {
-        const token = localStorage.getItem('auth_token');
+        const token = localStorage.getItem("auth_token");
         if (!token) {
             setSelectedClinic(clinic);
             setShowLoginModal(true);
@@ -4043,24 +4120,24 @@ const DoctorDetailPage = () => {
                 state: {
                     doctor: doctor,
                     clinic: clinic,
-                    type: 'doctor'
-                }
+                    type: "doctor",
+                },
             });
         }
     };
 
     const handleLoginSuccess = (userData, token) => {
-        localStorage.setItem('auth_token', token);
-        localStorage.setItem('user_data', JSON.stringify(userData));
+        localStorage.setItem("auth_token", token);
+        localStorage.setItem("user_data", JSON.stringify(userData));
         setShowLoginModal(false);
-        
+
         if (selectedClinic) {
             navigate(`/book-appointment`, {
                 state: {
                     doctor: doctor,
                     clinic: selectedClinic,
-                    type: 'doctor'
-                }
+                    type: "doctor",
+                },
             });
         }
     };
@@ -4068,114 +4145,935 @@ const DoctorDetailPage = () => {
     // Safe number conversion for ratings
     const safeRating = (rating) => {
         if (rating === null || rating === undefined) return 0;
-        const numRating = typeof rating === 'string' ? parseFloat(rating) : rating;
+        const numRating =
+            typeof rating === "string" ? parseFloat(rating) : rating;
         return isNaN(numRating) ? 0 : numRating;
     };
 
-    const renderDoctorInfo = () => (
-        <Grid container spacing={4}>
-            <Grid item xs={12} md={4}>
-                <Card elevation={3} sx={{ textAlign: 'center', p: 3 }}>
-                    <Avatar
-                        src={doctor.profile_image}
-                        sx={{ 
-                            width: 150, 
-                            height: 150, 
-                            mx: 'auto', 
-                            mb: 2,
-                            border: '4px solid',
-                            borderColor: 'primary.main'
+    // Parse available days safely
+    const parseAvailableDays = (availableDays) => {
+        if (!availableDays) return [];
+        try {
+            if (typeof availableDays === "string") {
+                return JSON.parse(availableDays);
+            }
+            return Array.isArray(availableDays) ? availableDays : [];
+        } catch (error) {
+            console.error("Error parsing available days:", error);
+            return [];
+        }
+    };
+
+    // Check if doctor is available on a specific day at any clinic
+    const isDoctorAvailableOnDay = (dayKey) => {
+        if (!doctor || !doctor.clinics) return false;
+
+        return doctor.clinics.some((clinic) => {
+            const availableDays = parseAvailableDays(
+                clinic.pivot?.available_days
+            );
+            return availableDays.includes(dayKey);
+        });
+    };
+
+    // Get clinics where doctor is available on a specific day
+    const getClinicsForDay = (dayKey) => {
+        if (!doctor || !doctor.clinics) return [];
+
+        return doctor.clinics.filter((clinic) => {
+            const availableDays = parseAvailableDays(
+                clinic.pivot?.available_days
+            );
+            return availableDays.includes(dayKey);
+        });
+    };
+
+    // Mobile-friendly Weekly Schedule Section
+    const renderWeeklySchedule = () => (
+        <Box>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 3 }}>
+                <MdEventAvailable
+                    size={28}
+                    color={theme.palette.primary.main}
+                />
+                <Typography
+                    variant={isMobile ? "h6" : "h5"}
+                    sx={{ fontWeight: "bold" }}
+                >
+                    Weekly Schedule
+                </Typography>
+            </Box>
+
+            {/* Summary Cards - Mobile Optimized */}
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid item xs={6} sm={3}>
+                    <Card
+                        elevation={2}
+                        sx={{
+                            textAlign: "center",
+                            p: isMobile ? 1.5 : 2,
+                            bgcolor: "primary.50",
+                            height: "100%",
                         }}
                     >
-                        <Person sx={{ fontSize: 60 }} />
-                    </Avatar>
-                    
-                    <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold' }}>
-                        👨‍⚕️ {doctor.user.name}
+                        <MdLocalHospital
+                            size={isMobile ? 20 : 24}
+                            color={theme.palette.warning.main}
+                        />
+                        <Typography
+                            variant={isMobile ? "h6" : "h4"}
+                            sx={{
+                                fontWeight: "bold",
+                                color: "warning.main",
+                                fontSize: isMobile ? "1.2rem" : "2.5rem",
+                            }}
+                        >
+                            {doctor.clinics.length}
+                        </Typography>
+                        <Typography
+                            variant={isMobile ? "caption" : "body2"}
+                            color="text.secondary"
+                        >
+                            Total Clinics
+                        </Typography>
+                    </Card>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                    <Card
+                        elevation={2}
+                        sx={{
+                            textAlign: "center",
+                            p: isMobile ? 1.5 : 2,
+                            bgcolor: "success.50",
+                            height: "100%",
+                        }}
+                    >
+                        <FaCalendarCheck
+                            size={isMobile ? 20 : 24}
+                            color={theme.palette.success.main}
+                        />
+                        <Typography
+                            variant={isMobile ? "h6" : "h4"}
+                            sx={{
+                                fontWeight: "bold",
+                                color: "success.main",
+                                fontSize: isMobile ? "1.2rem" : "2.5rem",
+                            }}
+                        >
+                            {
+                                daysOfWeek.filter((day) =>
+                                    isDoctorAvailableOnDay(day.key)
+                                ).length
+                            }
+                        </Typography>
+                        <Typography
+                            variant={isMobile ? "caption" : "body2"}
+                            color="text.secondary"
+                        >
+                            Available Days
+                        </Typography>
+                    </Card>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                    <Card
+                        elevation={2}
+                        sx={{
+                            textAlign: "center",
+                            p: isMobile ? 1.5 : 2,
+                            bgcolor: "info.50",
+                            height: "100%",
+                        }}
+                    >
+                        <MdAccessTime
+                            size={isMobile ? 20 : 24}
+                            color={theme.palette.info.main}
+                        />
+                        <Typography
+                            variant={isMobile ? "h6" : "h4"}
+                            sx={{
+                                fontWeight: "bold",
+                                color: "info.main",
+                                fontSize: isMobile ? "1.2rem" : "2.5rem",
+                            }}
+                        >
+                            {doctor.clinics.reduce((total, clinic) => {
+                                const availableDays = parseAvailableDays(
+                                    clinic.pivot?.available_days
+                                );
+                                return total + availableDays.length;
+                            }, 0)}
+                        </Typography>
+                        <Typography
+                            variant={isMobile ? "caption" : "body2"}
+                            color="text.secondary"
+                        >
+                            Total Sessions
+                        </Typography>
+                    </Card>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                    <Card
+                        elevation={2}
+                        sx={{
+                            textAlign: "center",
+                            p: isMobile ? 1.5 : 2,
+                            bgcolor: "warning.50",
+                            height: "100%",
+                        }}
+                    >
+                        <FaMoneyBillWave
+                            size={isMobile ? 20 : 24}
+                            color={theme.palette.secondary.light}
+                        />
+                        <Typography
+                            variant={isMobile ? "h6" : "h4"}
+                            sx={{
+                                fontWeight: "bold",
+                                color: "secondary.light",
+                                fontSize: isMobile ? "1.2rem" : "2.5rem",
+                            }}
+                        >
+                            ₹{doctor.consultation_fee}
+                        </Typography>
+                        <Typography
+                            variant={isMobile ? "caption" : "body2"}
+                            color="text.secondary"
+                        >
+                            Consultation Fee
+                        </Typography>
+                    </Card>
+                </Grid>
+            </Grid>
+
+            {/* Mobile-First Schedule Design */}
+            {isMobile ? renderMobileSchedule() : renderDesktopSchedule()}
+
+            {/* Additional Schedule Information */}
+            <Alert severity="info" elevation={3} sx={{ mt: 2, borderRadius: 2 }} icon={<MdInfo />}>
+                <Typography variant="body2">
+                    <strong>Note:</strong>
+                    <ul
+                        style={{
+                            marginTop: "8px",
+                            marginBottom: "8px",
+                            paddingLeft: "20px",
+                        }}
+                    >
+                        <li>
+                            Schedule may vary during holidays and special
+                            occasions. Please confirm appointment availability
+                            before visiting.
+                        </li>
+                        <li>
+                            Emergency consultations may be available outside
+                            regular hours.
+                        </li>
+                        <li>
+                            If the doctor or healthcare provider cancels a
+                            schedule, we will inform you via email and SMS, and
+                            it will be reflected on our website as well.
+                        </li>
+                    </ul>
+                </Typography>
+            </Alert>
+        </Box>
+    );
+
+    // Mobile Schedule Cards
+    const renderMobileSchedule = () => (
+        <Box sx={{ mb: 3 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+                <MdSchedule size={20} color={theme.palette.primary.main} />
+                <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+                    Day-wise Availability
+                </Typography>
+            </Box>
+
+            <Stack spacing={2}>
+                {daysOfWeek.map((day) => {
+                    const isAvailable = isDoctorAvailableOnDay(day.key);
+                    const clinicsForDay = getClinicsForDay(day.key);
+
+                    return (
+                        <Card
+                            key={day.key}
+                            elevation={5}
+                            sx={{
+                                p: 2,
+                                bgcolor: isAvailable
+                                    ? "rgba(76, 175, 80, 0.05)"
+                                    : "rgba(0,0,0,0.02)",
+                                border: isAvailable
+                                    ? "1px solid rgba(76, 175, 80, 0.2)"
+                                    : "1px solid rgba(0,0,0,0.1)",
+                            }}
+                        >
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "flex-start",
+                                    mb: 1,
+                                }}
+                            >
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 1,
+                                        flex: 1,
+                                    }}
+                                >
+                                    {day.icon}
+                                    <Typography
+                                        variant="subtitle1"
+                                        sx={{ fontWeight: 600 }}
+                                    >
+                                        {day.label}
+                                    </Typography>
+                                </Box>
+
+                                {isAvailable ? (
+                                    <Chip
+                                        icon={<FaCheckCircle size={12} />}
+                                        label="Available"
+                                        color="success"
+                                        size="small"
+                                        sx={{
+                                            fontWeight: 500,
+                                            fontSize: "0.75rem",
+                                            color: "white",
+                                        }}
+                                    />
+                                ) : (
+                                    <Chip
+                                        icon={<FaTimesCircle size={12} />}
+                                        label="Not Available"
+                                        color="error"
+                                        size="small"
+                                        variant="outlined"
+                                        sx={{ fontSize: "0.75rem" }}
+                                    />
+                                )}
+                            </Box>
+
+                            {isAvailable ? (
+                                <Box>
+                                    {clinicsForDay.map((clinic, index) => {
+                                        const startTime =
+                                            clinic.pivot?.start_time || "N/A";
+                                        const endTime =
+                                            clinic.pivot?.end_time || "N/A";
+
+                                        return (
+                                            <Box
+                                                key={clinic.id}
+                                                sx={{
+                                                    mb:
+                                                        index <
+                                                        clinicsForDay.length - 1
+                                                            ? 2
+                                                            : 0,
+                                                }}
+                                            >
+                                                <Box
+                                                    sx={{
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: 1,
+                                                        mb: 0.5,
+                                                    }}
+                                                >
+                                                    <FaHospital
+                                                        size={14}
+                                                        color={
+                                                            theme.palette
+                                                                .primary.main
+                                                        }
+                                                    />
+                                                    <Typography
+                                                        variant="body2"
+                                                        sx={{
+                                                            fontWeight: 600,
+                                                            color: "primary.main",
+                                                            fontSize: "0.9rem",
+                                                        }}
+                                                    >
+                                                        {clinic.name}
+                                                    </Typography>
+                                                </Box>
+                                                <Box
+                                                    sx={{
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: 1,
+                                                        mb: 1,
+                                                    }}
+                                                >
+                                                    <FaClock
+                                                        size={12}
+                                                        color={
+                                                            theme.palette.text
+                                                                .secondary
+                                                        }
+                                                    />
+                                                    <Typography
+                                                        variant="caption"
+                                                        color="text.secondary"
+                                                    >
+                                                        {startTime} - {endTime}
+                                                    </Typography>
+                                                </Box>
+                                                {index <
+                                                    clinicsForDay.length -
+                                                        1 && (
+                                                    <Divider sx={{ my: 1 }} />
+                                                )}
+                                            </Box>
+                                        );
+                                    })}
+
+                                    <Box sx={{ mt: 2 }}>
+                                        <Button
+                                            variant="outlined"
+                                            size="small"
+                                            startIcon={<CalendarToday />}
+                                            onClick={() =>
+                                                handleBookAppointment(
+                                                    clinicsForDay[0]
+                                                )
+                                            }
+                                            sx={{
+                                                textTransform: "none",
+                                                borderRadius: 2,
+                                                fontWeight: 500,
+                                                width: "100%",
+                                            }}
+                                        >
+                                            Book Appointment
+                                        </Button>
+                                    </Box>
+                                </Box>
+                            ) : (
+                                <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                    sx={{ fontSize: "0.9rem" }}
+                                >
+                                    No sessions scheduled for this day
+                                </Typography>
+                            )}
+                        </Card>
+                    );
+                })}
+            </Stack>
+        </Box>
+    );
+
+    // Desktop Schedule Table
+    const renderDesktopSchedule = () => (
+        <Paper elevation={5} sx={{ mb: 3, borderRadius: 3 }}>
+            <Box sx={{ p: 3, pb: 0 }}>
+                <Box
+                    sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        mb: 2,
+                    }}
+                >
+                    <MdSchedule size={24} color={theme.palette.primary.main} />
+                    <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+                        Day-wise Availability
                     </Typography>
-                    
-                    <Typography variant="h6" color="primary" gutterBottom>
+                </Box>
+            </Box>
+
+            <TableContainer>
+                <Table>
+                    <TableHead>
+                        <TableRow>
+                            <TableCell
+                                sx={{ fontWeight: "bold", fontSize: "1rem" }}
+                            >
+                                Day
+                            </TableCell>
+                            <TableCell
+                                sx={{ fontWeight: "bold", fontSize: "1rem" }}
+                            >
+                                Available
+                            </TableCell>
+                            <TableCell
+                                sx={{ fontWeight: "bold", fontSize: "1rem" }}
+                            >
+                                Clinics & Timings
+                            </TableCell>
+                            <TableCell
+                                sx={{ fontWeight: "bold", fontSize: "1rem" }}
+                            >
+                                Action
+                            </TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {daysOfWeek.map((day) => {
+                            const isAvailable = isDoctorAvailableOnDay(day.key);
+                            const clinicsForDay = getClinicsForDay(day.key);
+
+                            return (
+                                <TableRow
+                                    key={day.key}
+                                    sx={{
+                                        "&:hover": {
+                                            bgcolor: "rgba(0,0,0,0.04)",
+                                        },
+                                        bgcolor: isAvailable
+                                            ? "rgba(76, 175, 80, 0.05)"
+                                            : "rgba(0,0,0,0.02)",
+                                    }}
+                                >
+                                    <TableCell>
+                                        <Box
+                                            sx={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 1,
+                                            }}
+                                        >
+                                            {day.icon}
+                                            <Typography
+                                                variant="body1"
+                                                sx={{ fontWeight: 600 }}
+                                            >
+                                                {day.label}
+                                            </Typography>
+                                        </Box>
+                                    </TableCell>
+
+                                    <TableCell>
+                                        {isAvailable ? (
+                                            <Chip
+                                                icon={
+                                                    <FaCheckCircle size={14} />
+                                                }
+                                                label="Available"
+                                                color="success"
+                                                size="small"
+                                                sx={{
+                                                    fontWeight: 500,
+                                                    color: "white",
+                                                }}
+                                            />
+                                        ) : (
+                                            <Chip
+                                                icon={
+                                                    <FaTimesCircle size={14} />
+                                                }
+                                                label="Not Available"
+                                                color="error"
+                                                size="small"
+                                                variant="outlined"
+                                            />
+                                        )}
+                                    </TableCell>
+
+                                    <TableCell>
+                                        {isAvailable ? (
+                                            <Box
+                                                sx={{
+                                                    display: "flex",
+                                                    flexDirection: "column",
+                                                    gap: 1,
+                                                }}
+                                            >
+                                                {clinicsForDay.map(
+                                                    (clinic, index) => {
+                                                        const startTime =
+                                                            clinic.pivot
+                                                                ?.start_time ||
+                                                            "N/A";
+                                                        const endTime =
+                                                            clinic.pivot
+                                                                ?.end_time ||
+                                                            "N/A";
+
+                                                        return (
+                                                            <Box
+                                                                key={clinic.id}
+                                                            >
+                                                                <Box
+                                                                    sx={{
+                                                                        display:
+                                                                            "flex",
+                                                                        alignItems:
+                                                                            "center",
+                                                                        gap: 1,
+                                                                    }}
+                                                                >
+                                                                    <FaHospital
+                                                                        size={
+                                                                            14
+                                                                        }
+                                                                        color={
+                                                                            theme
+                                                                                .palette
+                                                                                .primary
+                                                                                .main
+                                                                        }
+                                                                    />
+                                                                    <Typography
+                                                                        variant="body2"
+                                                                        sx={{
+                                                                            fontWeight: 600,
+                                                                            color: "primary.main",
+                                                                        }}
+                                                                    >
+                                                                        {
+                                                                            clinic.name
+                                                                        }
+                                                                    </Typography>
+                                                                </Box>
+                                                                <Box
+                                                                    sx={{
+                                                                        display:
+                                                                            "flex",
+                                                                        alignItems:
+                                                                            "center",
+                                                                        gap: 1,
+                                                                        ml: 2,
+                                                                    }}
+                                                                >
+                                                                    <FaClock
+                                                                        size={
+                                                                            12
+                                                                        }
+                                                                    />
+                                                                    <Typography variant="caption">
+                                                                        {
+                                                                            startTime
+                                                                        }{" "}
+                                                                        -{" "}
+                                                                        {
+                                                                            endTime
+                                                                        }
+                                                                    </Typography>
+                                                                </Box>
+                                                                {index <
+                                                                    clinicsForDay.length -
+                                                                        1 && (
+                                                                    <Divider
+                                                                        sx={{
+                                                                            my: 1,
+                                                                        }}
+                                                                    />
+                                                                )}
+                                                            </Box>
+                                                        );
+                                                    }
+                                                )}
+                                            </Box>
+                                        ) : (
+                                            <Typography
+                                                variant="body2"
+                                                color="text.secondary"
+                                            >
+                                                No sessions scheduled
+                                            </Typography>
+                                        )}
+                                    </TableCell>
+
+                                    <TableCell>
+                                        {isAvailable &&
+                                            clinicsForDay.length > 0 && (
+                                                <Button
+                                                    variant="outlined"
+                                                    size="small"
+                                                    startIcon={
+                                                        <CalendarToday />
+                                                    }
+                                                    onClick={() =>
+                                                        handleBookAppointment(
+                                                            clinicsForDay[0]
+                                                        )
+                                                    }
+                                                    sx={{
+                                                        textTransform: "none",
+                                                        borderRadius: 2,
+                                                        fontWeight: 500,
+                                                    }}
+                                                >
+                                                    Book
+                                                </Button>
+                                            )}
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })}
+                    </TableBody>
+                </Table>
+            </TableContainer>
+        </Paper>
+    );
+
+    const renderDoctorInfo = () => (
+        <Grid container spacing={isMobile ? 2 : 4}>
+            <Grid item xs={12} md={4}>
+                <Card
+                    elevation={5}
+                    sx={{
+                        textAlign: "center",
+                        p: isMobile ? 2 : 3,
+                        height: "fit-content",
+                    }}
+                >
+                    <Avatar
+                        src={doctor.profile_image}
+                        sx={{
+                            width: isMobile ? 120 : 150,
+                            height: isMobile ? 120 : 150,
+                            mx: "auto",
+                            mb: 3,
+                            border: "4px solid",
+                            borderColor: "primary.main",
+                        }}
+                    >
+                        <FaUserMd size={isMobile ? 40 : 60} />
+                    </Avatar>
+
+                    <Typography
+                        variant={isMobile ? "h5" : "h4"}
+                        gutterBottom
+                        sx={{ fontWeight: "bold", mb: 2 }}
+                    >
+                        {doctor.user.name}
+                    </Typography>
+
+                    <Typography
+                        sx={{ mb: 2 }}
+                        variant="h6"
+                        color="secondary"
+                        gutterBottom
+                    >
                         {doctor.specialization}
                     </Typography>
-                    
+
                     {doctor.is_verified && (
-                        <Chip 
-                            label="✅ Verified Doctor" 
+                        <Chip
+                            label="Verified Doctor"
                             color="success"
-                            icon={<Verified />}
-                            sx={{ mb: 2 }}
+                            icon={<MdVerified />}
+                            sx={{ mb: 3, color: "white" }}
                         />
                     )}
-                    
-                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mb: 2 }}>
-                        <Rating value={safeRating(doctor.rating)} precision={0.1} readOnly />
-                        <Typography variant="body1" sx={{ ml: 1 }}>
-                            ⭐ {safeRating(doctor.rating)} ({doctor.total_reviews} reviews)
+
+                    <Box
+                        sx={{
+                            display: "flex",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            mb: 3,
+                            gap: 1,
+                        }}
+                    >
+                        <Rating
+                            value={safeRating(doctor.rating)}
+                            precision={0.1}
+                            readOnly
+                            size={isMobile ? "small" : "medium"}
+                        />
+                        <Typography variant="body1">
+                            {safeRating(doctor.rating)} ({doctor.total_reviews}{" "}
+                            reviews)
                         </Typography>
                     </Box>
-                    
-                    <Typography variant="caption" color="text.secondary">
-                        📅 {doctor.experience_years} years of experience
-                    </Typography>
+
+                    <Box
+                        sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            mb: 3,
+                            gap: 1,
+                        }}
+                    >
+                        <Work
+                            fontSize="small"
+                            color="action"
+                            sx={{
+                                fontSize: "1.5rem",
+                            }}
+                        />
+                        <Typography
+                            variant="caption"
+                            sx={{
+                                fontSize: "1.3rem",
+                                fontWeight: "bold",
+                            }}
+                            color="text.secondary"
+                        >
+                            {doctor.experience_years} years of experience
+                        </Typography>
+                    </Box>
                 </Card>
             </Grid>
 
             <Grid item xs={12} md={8}>
-                <Card elevation={3} sx={{ p: 3, mb: 3 }}>
-                    <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold' }}>
-                        👨‍⚕️ About Dr. {doctor.user.name}
-                    </Typography>
-                    
-                    <Typography variant="body1" paragraph>
+                <Card elevation={5} sx={{ p: isMobile ? 2 : 3, mb: 3 }}>
+                    <Box
+                        sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                            mb: 1,
+                        }}
+                    >
+                        <FaStethoscope
+                            size={20}
+                            color={theme.palette.primary.main}
+                        />
+                        <Typography
+                            variant={isMobile ? "h6" : "h5"}
+                            sx={{ fontWeight: "bold" }}
+                        >
+                            About {doctor.user.name}
+                        </Typography>
+                    </Box>
+
+                    <Typography
+                        variant="body1"
+                        paragraph
+                        sx={{ lineHeight: 1.6 }}
+                    >
                         {doctor.bio}
                     </Typography>
-                    
+
                     <Grid container spacing={3}>
                         <Grid item xs={12} sm={6}>
-                            <Typography variant="h6" gutterBottom>
-                                🎓 Education
-                            </Typography>
-                            <Typography variant="body2">
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1,
+                                    mb: 1,
+                                }}
+                            >
+                                <FaGraduationCap
+                                    size={16}
+                                    color={theme.palette.primary.main}
+                                />
+                                <Typography variant="h6" gutterBottom>
+                                    Education
+                                </Typography>
+                            </Box>
+                            <Typography
+                                variant="body2"
+                                sx={{ lineHeight: 1.5 }}
+                            >
                                 {doctor.qualification}
                             </Typography>
                             {doctor.education && (
-                                <Typography variant="body2" sx={{ mt: 1 }}>
+                                <Typography
+                                    variant="body2"
+                                    sx={{ mt: 1, lineHeight: 1.5 }}
+                                >
                                     {doctor.education}
                                 </Typography>
                             )}
                         </Grid>
-                        
+
                         <Grid item xs={12} sm={6}>
-                            <Typography variant="h6" gutterBottom>
-                                🗣️ Languages
-                            </Typography>
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                                {doctor.languages && doctor.languages.map((language, index) => (
-                                    <Chip key={index} label={language} size="small" variant="outlined" />
-                                ))}
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1,
+                                    mb: 1,
+                                }}
+                            >
+                                <FaLanguage
+                                    size={16}
+                                    color={theme.palette.primary.main}
+                                />
+                                <Typography variant="h6" gutterBottom>
+                                    Languages
+                                </Typography>
+                            </Box>
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    flexWrap: "wrap",
+                                    gap: 1,
+                                }}
+                            >
+                                {doctor.languages &&
+                                    doctor.languages.map((language, index) => (
+                                        <Chip
+                                            key={index}
+                                            label={language}
+                                            size="small"
+                                            variant="outlined"
+                                        />
+                                    ))}
                             </Box>
                         </Grid>
                     </Grid>
-                    
+
                     {doctor.services && (
-                        <Box sx={{ mt: 3 }}>
-                            <Typography variant="h6" gutterBottom>
-                                🩺 Services
-                            </Typography>
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                        <Box sx={{ mt: 2 }}>
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1,
+                                    mb: 1,
+                                }}
+                            >
+                                <FaMedkit
+                                    size={16}
+                                    color={theme.palette.primary.main}
+                                />
+                                <Typography variant="h6" gutterBottom>
+                                    Services
+                                </Typography>
+                            </Box>
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    flexWrap: "wrap",
+                                    gap: 1,
+                                }}
+                            >
                                 {doctor.services.map((service, index) => (
-                                    <Chip key={index} label={service} color="primary" variant="outlined" />
+                                    <Chip
+                                        key={index}
+                                        label={service}
+                                        color="primary"
+                                        variant="outlined"
+                                    />
                                 ))}
                             </Box>
                         </Box>
                     )}
                 </Card>
 
-                <Card elevation={3} sx={{ p: 3 }}>
-                    <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
-                        💰 Consultation Fee
-                    </Typography>
-                    <Typography variant="h4" color="primary" sx={{ fontWeight: 'bold' }}>
+                <Card elevation={5} sx={{ p: isMobile ? 2 : 3 }}>
+                    <Box
+                        sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                            mb: 0.5,
+                        }}
+                    >
+                        <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+                            Consultation Fee
+                        </Typography>
+                    </Box>
+                    <Typography
+                        variant={isMobile ? "h5" : "h4"}
+                        color="secondary.light"
+                        sx={{ fontWeight: "bold" }}
+                    >
                         ₹{doctor.consultation_fee}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
@@ -4188,24 +5086,60 @@ const DoctorDetailPage = () => {
 
     const renderClinics = () => (
         <Box>
-            <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
-                🏥 Available at Clinics
-            </Typography>
-            
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 3 }}>
+                <FaHospital
+                    size={isMobile ? 20 : 24}
+                    color={theme.palette.primary.main}
+                />
+                <Typography
+                    variant={isMobile ? "h6" : "h5"}
+                    sx={{ fontWeight: "bold" }}
+                >
+                    Available at Clinics
+                </Typography>
+            </Box>
+
             {doctor.clinics.map((clinic, index) => (
-                <Accordion key={clinic.id} elevation={3} sx={{ mb: 2 }}>
-                    <AccordionSummary 
+                <Accordion key={clinic.id} elevation={5} sx={{ mb: 2, borderRadius: 3 }}>
+                    <AccordionSummary
                         expandIcon={<ExpandMore />}
-                        sx={{ '& .MuiAccordionSummary-content': { alignItems: 'center' } }}
+                        sx={{
+                            "& .MuiAccordionSummary-content": {
+                                alignItems: "center",
+                            },
+                        }}
                     >
-                        <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                            <LocalHospital sx={{ mr: 2, color: 'primary.main' }} />
+                        <Box
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                width: "100%",
+                            }}
+                        >
+                            <MdLocalHospital
+                                size={24}
+                                color={theme.palette.primary.main}
+                                style={{ marginRight: 16 }}
+                            />
                             <Box sx={{ flexGrow: 1 }}>
-                                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                                    🏥 {clinic.name}
+                                <Typography
+                                    variant={isMobile ? "subtitle1" : "h6"}
+                                    sx={{ fontWeight: "bold" }}
+                                >
+                                    {clinic.name}
                                 </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                    📍 {clinic.address}
+                                <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 0.5,
+                                        mt: 0.5,
+                                    }}
+                                >
+                                    <MdLocationOn size={14} />
+                                    {clinic.address}
                                 </Typography>
                             </Box>
                         </Box>
@@ -4213,66 +5147,156 @@ const DoctorDetailPage = () => {
                     <AccordionDetails>
                         <Grid container spacing={3}>
                             <Grid item xs={12} md={6}>
-                                <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
-                                    📞 Contact Information
-                                </Typography>
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 1,
+                                        mb: 2,
+                                    }}
+                                >
+                                    <FaPhone
+                                        size={16}
+                                        color={theme.palette.primary.main}
+                                    />
+                                    <Typography
+                                        variant="subtitle1"
+                                        sx={{ fontWeight: "bold" }}
+                                    >
+                                        Contact Information
+                                    </Typography>
+                                </Box>
                                 <List dense>
-                                    <ListItem disablePadding>
+                                    <ListItem disablePadding sx={{ mb: 1 }}>
                                         <ListItemIcon>
-                                            <LocationOn fontSize="small" />
+                                            <FaMapMarkerAlt size={14} />
                                         </ListItemIcon>
-                                        <ListItemText primary={`📍 ${clinic.address}`} />
+                                        <ListItemText
+                                            primary={clinic.address}
+                                            primaryTypographyProps={{
+                                                variant: "body2",
+                                            }}
+                                        />
                                     </ListItem>
                                     <ListItem disablePadding>
                                         <ListItemIcon>
-                                            <MedicalServices fontSize="small" />
+                                            <FaPhone size={14} />
                                         </ListItemIcon>
-                                        <ListItemText primary={`📞 ${clinic.phone}`} />
+                                        <ListItemText
+                                            primary={clinic.phone}
+                                            primaryTypographyProps={{
+                                                variant: "body2",
+                                            }}
+                                        />
                                     </ListItem>
                                 </List>
                             </Grid>
-                            
+
                             <Grid item xs={12} md={6}>
-                                <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
-                                    🕒 Schedule
-                                </Typography>
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 1,
+                                        mb: 2,
+                                    }}
+                                >
+                                    <FaClock
+                                        size={16}
+                                        color={theme.palette.primary.main}
+                                    />
+                                    <Typography
+                                        variant="subtitle1"
+                                        sx={{ fontWeight: "bold" }}
+                                    >
+                                        Schedule
+                                    </Typography>
+                                </Box>
                                 {clinic.pivot && (
                                     <List dense>
                                         <ListItem disablePadding>
                                             <ListItemIcon>
-                                                <Schedule fontSize="small" />
+                                                <MdSchedule size={16} />
                                             </ListItemIcon>
-                                            <ListItemText 
-                                                primary={`⏰ ${clinic.pivot.start_time} - ${clinic.pivot.end_time}`}
-                                                secondary={`Available days: ${JSON.parse(clinic.pivot.available_days || '[]').join(', ')}`}
+                                            <ListItemText
+                                                primary={`${clinic.pivot.start_time} - ${clinic.pivot.end_time}`}
+                                                secondary={`Available days: ${parseAvailableDays(
+                                                    clinic.pivot.available_days
+                                                ).join(", ")}`}
+                                                primaryTypographyProps={{
+                                                    variant: "body2",
+                                                    fontWeight: 600,
+                                                }}
+                                                secondaryTypographyProps={{
+                                                    variant: "caption",
+                                                }}
                                             />
                                         </ListItem>
                                     </List>
                                 )}
                             </Grid>
                         </Grid>
-                        
+
                         {clinic.facilities && (
-                            <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
-                                    🛠️ Facilities
-                                </Typography>
-                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                            <Box sx={{ mt: 3 }}>
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 1,
+                                        mb: 1,
+                                    }}
+                                >
+                                    <BusinessCenter
+                                        fontSize="small"
+                                        color="primary"
+                                    />
+                                    <Typography
+                                        variant="subtitle1"
+                                        sx={{ fontWeight: "bold" }}
+                                    >
+                                        Facilities
+                                    </Typography>
+                                </Box>
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        flexWrap: "wrap",
+                                        gap: 1,
+                                    }}
+                                >
                                     {clinic.facilities.map((facility, idx) => (
-                                        <Chip key={idx} label={facility} size="small" variant="outlined" />
+                                        <Chip
+                                            key={idx}
+                                            label={facility}
+                                            size="small"
+                                            variant="outlined"
+                                        />
                                     ))}
                                 </Box>
                             </Box>
                         )}
-                        
-                        <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
+
+                        <Box
+                            sx={{
+                                mt: 3,
+                                display: "flex",
+                                justifyContent: "center",
+                            }}
+                        >
                             <Button
                                 variant="contained"
                                 startIcon={<CalendarToday />}
                                 onClick={() => handleBookAppointment(clinic)}
-                                sx={{ color: 'white' }}
+                                sx={{
+                                    color: "white",
+                                    borderRadius: 2,
+                                    px: 3,
+                                    py: 1.5,
+                                    fontWeight: 600,
+                                }}
                             >
-                                📅 Book Here
+                                Book Here
                             </Button>
                         </Box>
                     </AccordionDetails>
@@ -4284,7 +5308,7 @@ const DoctorDetailPage = () => {
     if (loading) {
         return (
             <MainLayout>
-                <Container maxWidth="lg" sx={{ py: 10, textAlign: 'center' }}>
+                <Container maxWidth="xl" sx={{ py: 10, textAlign: "center" }}>
                     <CircularProgress size={60} />
                     <Typography variant="h6" sx={{ mt: 2 }}>
                         Loading doctor details...
@@ -4297,9 +5321,9 @@ const DoctorDetailPage = () => {
     if (error || !doctor) {
         return (
             <MainLayout>
-                <Container maxWidth="lg" sx={{ py: 10 }}>
+                <Container maxWidth="xl" sx={{ py: 10 }}>
                     <Alert severity="error">
-                        {error || 'Doctor not found'}
+                        {error || "Doctor not found"}
                     </Alert>
                 </Container>
             </MainLayout>
@@ -4308,16 +5332,51 @@ const DoctorDetailPage = () => {
 
     return (
         <MainLayout>
-            <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 }, mt: { xs: 8, md: 10 } }}>
+            <Container
+                maxWidth="xl"
+                sx={{
+                    py: { xs: 2, md: 4 },
+                    mt: { xs: 6, md: 6 },
+                    px: { xs: 1, sm: 2, md: 3 },
+                }}
+            >
                 <Box sx={{ mb: 4 }}>
-                    <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)}>
-                        <Tab label="👨‍⚕️ Doctor Info" />
-                        <Tab label={`🏥 Clinics (${doctor.clinics.length})`} />
+                    <Tabs
+                        value={tabValue}
+                        onChange={(e, newValue) => setTabValue(newValue)}
+                        variant={isMobile ? "scrollable" : "standard"}
+                        scrollButtons="auto"
+                        sx={{
+                            "& .MuiTab-root": {
+                                textTransform: "none",
+                                fontWeight: 600,
+                                fontSize: isMobile ? "0.9rem" : "1rem",
+                            },
+                        }}
+                    >
+                        <Tab
+                            label="Doctor Info"
+                            icon={<FaUserMd />}
+                            iconPosition="start"
+                        />
+                        <Tab
+                            label="Weekly Schedule"
+                            icon={<FaCalendarAlt />}
+                            iconPosition="start"
+                        />
+                        <Tab
+                            label={`Clinics (${doctor.clinics.length})`}
+                            icon={<FaHospital />}
+                            iconPosition="start"
+                        />
                     </Tabs>
                 </Box>
 
-                {tabValue === 0 && renderDoctorInfo()}
-                {tabValue === 1 && renderClinics()}
+                <Box sx={{ minHeight: "60vh" }}>
+                    {tabValue === 0 && renderDoctorInfo()}
+                    {tabValue === 1 && renderWeeklySchedule()}
+                    {tabValue === 2 && renderClinics()}
+                </Box>
             </Container>
 
             <LoginModal
@@ -4335,8 +5394,8 @@ export default DoctorDetailPage;
 **resources/js/pages/ClinicDetailPage.jsx**
 
 ```jsx
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import {
     Container,
     Typography,
@@ -4353,40 +5412,111 @@ import {
     ListItem,
     ListItemIcon,
     ListItemText,
-    Divider,
     Paper,
     CircularProgress,
     Alert,
     Tabs,
     Tab,
-} from '@mui/material';
+    useTheme,
+    useMediaQuery,
+    IconButton,
+} from "@mui/material";
 import {
-    LocationOn,
-    Phone,
-    Email,
-    Schedule,
-    LocalHospital,
-    Star,
-    Verified,
     CalendarToday,
-    Person,
-} from '@mui/icons-material';
-import MainLayout from '../components/layout/MainLayout';
-import LoginModal from '../components/auth/LoginModal';
-import axios from 'axios';
+    ChevronLeft,
+    ChevronRight,
+    Work,
+    MedicalServices,
+    BusinessCenter,
+    Info,
+} from "@mui/icons-material";
+import {
+    FaUserMd,
+    FaHospital,
+    FaPhone,
+    FaMapMarkerAlt,
+    FaEnvelope,
+    FaClock,
+    FaStethoscope,
+    FaStar,
+    FaAward,
+    FaCalendarAlt,
+    FaMoneyBillWave,
+    FaBusinessTime,
+} from "react-icons/fa";
+import {
+    MdInfo,
+    MdVerified,
+    MdPhone,
+    MdToday,
+    MdWeekend,
+} from "react-icons/md";
+import MainLayout from "../components/layout/MainLayout";
+import LoginModal from "../components/auth/LoginModal";
+import axios from "axios";
 
 const ClinicDetailPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const apiUrl = import.meta.env.VITE_API_URL;
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+    const isTablet = useMediaQuery(theme.breakpoints.down("md"));
 
     const [clinic, setClinic] = useState(null);
     const [doctors, setDoctors] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+    const [error, setError] = useState("");
     const [tabValue, setTabValue] = useState(0);
     const [showLoginModal, setShowLoginModal] = useState(false);
     const [selectedDoctor, setSelectedDoctor] = useState(null);
+    const [currentSlide, setCurrentSlide] = useState(0);
+
+    // Days of the week
+    const daysOfWeek = [
+        {
+            key: "monday",
+            label: "Monday",
+            icon: <MdToday />,
+            shortLabel: "Mon",
+        },
+        {
+            key: "tuesday",
+            label: "Tuesday",
+            icon: <MdToday />,
+            shortLabel: "Tue",
+        },
+        {
+            key: "wednesday",
+            label: "Wednesday",
+            icon: <MdToday />,
+            shortLabel: "Wed",
+        },
+        {
+            key: "thursday",
+            label: "Thursday",
+            icon: <MdToday />,
+            shortLabel: "Thu",
+        },
+        {
+            key: "friday",
+            label: "Friday",
+            icon: <MdToday />,
+            shortLabel: "Fri",
+        },
+        {
+            key: "saturday",
+            label: "Saturday",
+            icon: <MdWeekend />,
+            shortLabel: "Sat",
+        },
+        {
+            key: "sunday",
+            label: "Sunday",
+            icon: <MdWeekend />,
+            shortLabel: "Sun",
+        },
+    ];
 
     useEffect(() => {
         loadClinicDetails();
@@ -4398,8 +5528,8 @@ const ClinicDetailPage = () => {
             const response = await axios.get(`${apiUrl}/clinics/${id}`);
             setClinic(response.data);
         } catch (error) {
-            console.error('Failed to load clinic details:', error);
-            setError('Failed to load clinic details');
+            console.error("Failed to load clinic details:", error);
+            setError("Failed to load clinic details");
         }
     };
 
@@ -4408,15 +5538,15 @@ const ClinicDetailPage = () => {
             const response = await axios.get(`${apiUrl}/clinics/${id}/doctors`);
             setDoctors(response.data);
         } catch (error) {
-            console.error('Failed to load doctors:', error);
-            setError('Failed to load doctors');
+            console.error("Failed to load doctors:", error);
+            setError("Failed to load doctors");
         } finally {
             setLoading(false);
         }
     };
 
     const handleBookAppointment = (doctor) => {
-        const token = localStorage.getItem('auth_token');
+        const token = localStorage.getItem("auth_token");
         if (!token) {
             setSelectedDoctor(doctor);
             setShowLoginModal(true);
@@ -4425,226 +5555,1061 @@ const ClinicDetailPage = () => {
                 state: {
                     doctor: doctor,
                     clinic: clinic,
-                    type: 'clinic'
-                }
+                    type: "clinic",
+                },
             });
         }
     };
 
     const handleLoginSuccess = (userData, token) => {
-        localStorage.setItem('auth_token', token);
-        localStorage.setItem('user_data', JSON.stringify(userData));
+        localStorage.setItem("auth_token", token);
+        localStorage.setItem("user_data", JSON.stringify(userData));
         setShowLoginModal(false);
-        
+
         if (selectedDoctor) {
             navigate(`/book-appointment`, {
                 state: {
                     doctor: selectedDoctor,
                     clinic: clinic,
-                    type: 'clinic'
-                }
+                    type: "clinic",
+                },
             });
         }
     };
 
+    // Safe number conversion for ratings
+    const safeRating = (rating) => {
+        if (rating === null || rating === undefined || rating === "") return 0;
+        const numRating =
+            typeof rating === "string" ? parseFloat(rating) : Number(rating);
+        return isNaN(numRating) ? 0 : numRating;
+    };
+
+    // Parse available days safely
+    const parseAvailableDays = (availableDays) => {
+        if (!availableDays) return [];
+        try {
+            if (typeof availableDays === "string") {
+                return JSON.parse(availableDays);
+            }
+            return Array.isArray(availableDays) ? availableDays : [];
+        } catch (error) {
+            console.error("Error parsing available days:", error);
+            return [];
+        }
+    };
+
+    // Get current day of week in lowercase
+    const getCurrentDayKey = () => {
+        const today = new Date();
+        const dayNames = [
+            "sunday",
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+        ];
+        return dayNames[today.getDay()];
+    };
+
+    // Get today's available doctors
+    const getTodaysAvailableDoctors = () => {
+        const today = getCurrentDayKey();
+        return doctors.filter((doctor) => {
+            if (doctor.pivot) {
+                const availableDays = parseAvailableDays(
+                    doctor.pivot.available_days
+                );
+                return availableDays.includes(today);
+            }
+            return false;
+        });
+    };
+
+    // Get doctor's available days
+    const getDoctorAvailableDays = (doctor) => {
+        if (doctor.pivot) {
+            return parseAvailableDays(doctor.pivot.available_days);
+        }
+        return [];
+    };
+
+    // Check if doctor is available today
+    const isDoctorAvailableToday = (doctor) => {
+        const today = getCurrentDayKey();
+        const availableDays = getDoctorAvailableDays(doctor);
+        return availableDays.includes(today);
+    };
+
+    // Today's Available Doctors Slider - Mobile Optimized
+    const renderTodaysAvailableDoctors = () => {
+        const todaysDoctors = getTodaysAvailableDoctors();
+
+        if (todaysDoctors.length === 0) {
+            return (
+                <Paper
+                    elevation={5}
+                    sx={{ p: isMobile ? 2 : 3, mb: 1, borderRadius: 3 }}
+                >
+                    <Box
+                        sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                            mb: 2,
+                        }}
+                    >
+                        <MdToday
+                            size={isMobile ? 20 : 24}
+                            color={theme.palette.primary.main}
+                        />
+                        <Typography
+                            variant={isMobile ? "subtitle1" : "h6"}
+                            sx={{ fontWeight: "bold" }}
+                        >
+                            Today's Available Doctors
+                        </Typography>
+                    </Box>
+                    <Alert severity="info" icon={<Info />}>
+                        No doctors available today. Please check other days or
+                        contact the clinic directly.
+                    </Alert>
+                </Paper>
+            );
+        }
+
+        const nextSlide = () => {
+            setCurrentSlide((prev) => (prev + 1) % todaysDoctors.length);
+        };
+
+        const prevSlide = () => {
+            setCurrentSlide(
+                (prev) =>
+                    (prev - 1 + todaysDoctors.length) % todaysDoctors.length
+            );
+        };
+
+        const currentDoctor = todaysDoctors[currentSlide];
+
+        return (
+            <Paper
+                elevation={5}
+                sx={{ p: isMobile ? 2 : 3, mb: 2, borderRadius: 3 }}
+            >
+                <Box
+                    sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        mb: 1,
+                    }}
+                >
+                    <MdToday
+                        size={isMobile ? 20 : 24}
+                        color={theme.palette.primary.main}
+                    />
+                    <Typography
+                        variant={isMobile ? "subtitle1" : "h6"}
+                        sx={{ fontWeight: "bold" }}
+                    >
+                        Today's Available Doctors ({todaysDoctors.length})
+                    </Typography>
+                </Box>
+
+                <Box sx={{ position: "relative" }}>
+                    <Card elevation={3} sx={{ p: isMobile ? 1 : 1 }}>
+                        {/* Unified Layout for Both Mobile and Desktop */}
+                        <Box>
+                            {/* Available Today Badge - Top of card */}
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    justifyContent: "center",
+                                    mb: 1,
+                                }}
+                            >
+                                <Chip
+                                    label="Available Today"
+                                    color="success"
+                                    size="small"
+                                    sx={{
+                                        color: "white",
+                                        animation: "pulse 2s infinite",
+                                        "@keyframes pulse": {
+                                            "0%": { transform: "scale(1)" },
+                                            "50%": { transform: "scale(1.05)" },
+                                            "100%": { transform: "scale(1)" },
+                                        },
+                                    }}
+                                />
+                            </Box>
+
+                            {/* Doctor Info - Center aligned */}
+                            <Box sx={{ textAlign: "center", mb: 1 }}>
+                                <Avatar
+                                    src={currentDoctor.profile_image}
+                                    sx={{
+                                        width: isMobile ? 70 : 90,
+                                        height: isMobile ? 70 : 90,
+                                        border: "3px solid",
+                                        borderColor: "primary.main",
+                                        mx: "auto",
+                                        mb: 1,
+                                    }}
+                                >
+                                    <FaUserMd size={isMobile ? 25 : 30} />
+                                </Avatar>
+
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        gap: 1,
+                                        mb: 0.5,
+                                        flexWrap: "wrap",
+                                    }}
+                                >
+                                    <Typography
+                                        variant={isMobile ? "h6" : "h5"}
+                                        sx={{
+                                            fontWeight: "bold",
+                                            fontSize: isMobile
+                                                ? "1.1rem"
+                                                : "1.4rem",
+                                        }}
+                                    >
+                                        {currentDoctor.user?.name ||
+                                            currentDoctor.name ||
+                                            "N/A"}
+                                    </Typography>
+                                    {currentDoctor.is_verified && (
+                                        <Chip
+                                            icon={<MdVerified />}
+                                            label="Verified"
+                                            size={isMobile ? "small" : "medium"}
+                                            color="success"
+                                            sx={{
+                                                color: "white",
+                                                fontSize: isMobile
+                                                    ? "0.7rem"
+                                                    : "0.8rem",
+                                            }}
+                                        />
+                                    )}
+                                </Box>
+
+                                <Typography
+                                    variant={isMobile ? "body2" : "body1"}
+                                    color="secondary.light"
+                                    sx={{ mb: 1 }}
+                                >
+                                    <FaStethoscope
+                                        size={isMobile ? 12 : 14}
+                                        style={{ marginRight: 4 }}
+                                    />
+                                    {currentDoctor.specialization || "N/A"}
+                                </Typography>
+
+                                <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                    sx={{
+                                        display: "block",
+                                        mb: 0.5,
+                                        fontSize: isMobile
+                                            ? "0.75rem"
+                                            : "0.875rem",
+                                    }}
+                                >
+                                    <Work
+                                        fontSize="small"
+                                        sx={{
+                                            mr: 0.5,
+                                            fontSize: isMobile
+                                                ? "12px"
+                                                : "14px",
+                                        }}
+                                    />
+                                    {currentDoctor.experience_years || 0} years
+                                    experience
+                                </Typography>
+                                <Typography
+                                    variant={isMobile ? "h6" : "h5"}
+                                    color="secondary.light"
+                                    sx={{
+                                        fontWeight: "bold",
+                                        mb: 1,
+                                        fontSize: isMobile
+                                            ? "1.1rem"
+                                            : "1.3rem",
+                                    }}
+                                >
+                                    <FaMoneyBillWave
+                                        size={isMobile ? 14 : 16}
+                                        style={{ marginRight: 4 }}
+                                    />
+                                    ₹{currentDoctor.consultation_fee || 0}
+                                </Typography>
+                            </Box>
+
+                            {/* Book Button */}
+                            <Button
+                                fullWidth
+                                variant="contained"
+                                size={isMobile ? "medium" : "large"}
+                                startIcon={<CalendarToday />}
+                                onClick={() =>
+                                    handleBookAppointment(currentDoctor)
+                                }
+                                sx={{
+                                    borderRadius: 2,
+                                    fontWeight: 500,
+                                    color: "white",
+                                    py: isMobile ? 0.5 : 1,
+                                }}
+                            >
+                                Book Now
+                            </Button>
+                        </Box>
+                    </Card>
+
+                    {/* Navigation arrows - show when multiple doctors */}
+                    {todaysDoctors.length > 1 && (
+                        <>
+                            <IconButton
+                                onClick={prevSlide}
+                                sx={{
+                                    position: "absolute",
+                                    left: isMobile ? -8 : -12,
+                                    top: "50%",
+                                    transform: "translateY(-50%)",
+                                    bgcolor: "background.paper",
+                                    boxShadow: 2,
+                                    "&:hover": { bgcolor: "primary.light" },
+                                    width: isMobile ? 32 : 40,
+                                    height: isMobile ? 32 : 40,
+                                }}
+                            >
+                                <ChevronLeft />
+                            </IconButton>
+                            <IconButton
+                                onClick={nextSlide}
+                                sx={{
+                                    position: "absolute",
+                                    right: isMobile ? -8 : -12,
+                                    top: "50%",
+                                    transform: "translateY(-50%)",
+                                    bgcolor: "background.paper",
+                                    boxShadow: 2,
+                                    "&:hover": { bgcolor: "primary.light" },
+                                    width: isMobile ? 32 : 40,
+                                    height: isMobile ? 32 : 40,
+                                }}
+                            >
+                                <ChevronRight />
+                            </IconButton>
+                        </>
+                    )}
+                </Box>
+
+                {/* Dots indicator - show when multiple doctors */}
+                {todaysDoctors.length > 1 && (
+                    <Box
+                        sx={{
+                            display: "flex",
+                            justifyContent: "center",
+                            mt: 2,
+                            gap: 1,
+                        }}
+                    >
+                        {todaysDoctors.map((_, index) => (
+                            <Box
+                                key={index}
+                                sx={{
+                                    width: 8,
+                                    height: 8,
+                                    borderRadius: "50%",
+                                    bgcolor:
+                                        index === currentSlide
+                                            ? "primary.main"
+                                            : "grey.300",
+                                    cursor: "pointer",
+                                }}
+                                onClick={() => setCurrentSlide(index)}
+                            />
+                        ))}
+                    </Box>
+                )}
+            </Paper>
+        );
+    };
+
     const renderClinicInfo = () => (
-        <Grid container spacing={4}>
+        <Grid container spacing={2}>
             <Grid item xs={12} md={8}>
-                <Card elevation={3}>
+                <Card elevation={5}>
                     <CardMedia
                         component="img"
-                        height="300"
-                        image={clinic.image || '/images/clinic-default.jpg'}
+                        height={isMobile ? "200" : "300"}
+                        image={clinic.image || "/images/clinic-default.jpg"}
                         alt={clinic.name}
                     />
-                    <CardContent>
-                        <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold' }}>
-                            🏥 {clinic.name}
-                        </Typography>
-                        
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                            <Rating value={clinic.rating} precision={0.1} readOnly />
-                            <Typography variant="body1">
-                                ⭐ {clinic.rating} ({clinic.total_reviews} reviews)
+                    <CardContent sx={{ p: isMobile ? 2 : 2 }}>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                mb: 2,
+                            }}
+                        >
+                            <FaHospital
+                                size={isMobile ? 24 : 28}
+                                color={theme.palette.primary.main}
+                            />
+                            <Typography
+                                variant={isMobile ? "h5" : "h4"}
+                                sx={{ fontWeight: "bold" }}
+                            >
+                                {clinic.name || "N/A"}
                             </Typography>
                         </Box>
 
-                        <Typography variant="body1" paragraph sx={{ mb: 3 }}>
-                            {clinic.description}
+                        <Box
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 2,
+                                mb: 2,
+                            }}
+                        >
+                            <Rating
+                                value={safeRating(clinic.rating)}
+                                precision={0.1}
+                                readOnly
+                                size={isMobile ? "small" : "medium"}
+                            />
+                            <Typography variant="body1">
+                                {safeRating(clinic.rating)} (
+                                {clinic.total_reviews || 0} reviews)
+                            </Typography>
+                        </Box>
+
+                        <Typography variant="body1" paragraph sx={{ mb: 4 }}>
+                            {clinic.description || "No description available"}
                         </Typography>
 
-                        <Box sx={{ mb: 3 }}>
-                            <Typography variant="h6" gutterBottom>
-                                🏷️ Specialties
-                            </Typography>
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                                {clinic.specialties && clinic.specialties.map((specialty, index) => (
-                                    <Chip key={index} label={specialty} color="primary" variant="outlined" />
-                                ))}
+                        <Box sx={{ mb: 2 }}>
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1,
+                                    mb: 2,
+                                }}
+                            >
+                                <MedicalServices color="primary" />
+                                <Typography
+                                    variant="h6"
+                                    sx={{ fontWeight: "bold" }}
+                                >
+                                    Specialties
+                                </Typography>
+                            </Box>
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    flexWrap: "wrap",
+                                    gap: 1,
+                                }}
+                            >
+                                {clinic.specialties &&
+                                clinic.specialties.length > 0 ? (
+                                    clinic.specialties.map(
+                                        (specialty, index) => (
+                                            <Chip
+                                                key={index}
+                                                label={specialty}
+                                                color="primary"
+                                                variant="outlined"
+                                                size={
+                                                    isMobile
+                                                        ? "small"
+                                                        : "medium"
+                                                }
+                                            />
+                                        )
+                                    )
+                                ) : (
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                    >
+                                        No specialties listed
+                                    </Typography>
+                                )}
                             </Box>
                         </Box>
 
-                        <Box sx={{ mb: 3 }}>
-                            <Typography variant="h6" gutterBottom>
-                                🛠️ Facilities
-                            </Typography>
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                                {clinic.facilities && clinic.facilities.map((facility, index) => (
-                                    <Chip key={index} label={facility} color="success" variant="outlined" />
-                                ))}
+                        <Box sx={{ mb: 1 }}>
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1,
+                                    mb: 2,
+                                }}
+                            >
+                                <BusinessCenter color="primary" />
+                                <Typography
+                                    variant="h6"
+                                    sx={{ fontWeight: "bold" }}
+                                >
+                                    Facilities
+                                </Typography>
+                            </Box>
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    flexWrap: "wrap",
+                                    gap: 1,
+                                }}
+                            >
+                                {clinic.facilities &&
+                                clinic.facilities.length > 0 ? (
+                                    clinic.facilities.map((facility, index) => (
+                                        <Chip
+                                            key={index}
+                                            label={facility}
+                                            color="secondary"
+                                            variant="outlined"
+                                            size={isMobile ? "small" : "medium"}
+                                        />
+                                    ))
+                                ) : (
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                    >
+                                        No facilities listed
+                                    </Typography>
+                                )}
                             </Box>
                         </Box>
                     </CardContent>
                 </Card>
+                <Alert
+                    elevation={3}
+                    severity="info"
+                    sx={{ mt: 1, borderRadius: 4 }}
+                    icon={<MdInfo />}
+                >
+                    <Typography variant="body2">
+                        <strong>Note:</strong>
+                        <ul
+                            style={{
+                                marginTop: "8px",
+                                marginBottom: "8px",
+                                paddingLeft: "20px",
+                            }}
+                        >
+                            <li>
+                                Schedule may vary during holidays and special
+                                occasions. Please confirm appointment
+                                availability before visiting.
+                            </li>
+                            <li>
+                                Emergency consultations may be available outside
+                                regular hours.
+                            </li>
+                            <li>
+                                If the doctor or healthcare provider cancels a
+                                schedule, we will inform you via email and SMS,
+                                and it will be reflected on our website as well.
+                            </li>
+                        </ul>
+                    </Typography>
+                </Alert>
             </Grid>
 
             <Grid item xs={12} md={4}>
-                <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
-                    <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
-                        📞 Contact Information
-                    </Typography>
-                    
+                <Paper
+                    elevation={5}
+                    sx={{ p: isMobile ? 2 : 3, mb: 2, borderRadius: 3 }}
+                >
+                    <Box
+                        sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                            mb: 2,
+                        }}
+                    >
+                        <FaPhone color={theme.palette.primary.main} />
+                        <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+                            Contact Information
+                        </Typography>
+                    </Box>
+
                     <List disablePadding>
-                        <ListItem disablePadding sx={{ mb: 1 }}>
+                        <ListItem disablePadding sx={{ mb: 0.5 }}>
                             <ListItemIcon>
-                                <LocationOn color="primary" />
+                                <FaMapMarkerAlt
+                                    color={theme.palette.primary.main}
+                                />
                             </ListItemIcon>
-                            <ListItemText primary={`📍 ${clinic.address}`} />
+                            <ListItemText
+                                primary={
+                                    clinic.address || "Address not available"
+                                }
+                                primaryTypographyProps={{
+                                    variant: isMobile ? "body2" : "body1",
+                                }}
+                            />
                         </ListItem>
-                        
-                        <ListItem disablePadding sx={{ mb: 1 }}>
+
+                        <ListItem disablePadding sx={{ mb: 0.5 }}>
                             <ListItemIcon>
-                                <Phone color="primary" />
+                                <MdPhone color={theme.palette.primary.main} />
                             </ListItemIcon>
-                            <ListItemText primary={`📞 ${clinic.phone}`} />
+                            <ListItemText
+                                primary={clinic.phone || "Phone not available"}
+                                primaryTypographyProps={{
+                                    variant: isMobile ? "body2" : "body1",
+                                }}
+                            />
                         </ListItem>
-                        
+
                         {clinic.email && (
-                            <ListItem disablePadding sx={{ mb: 1 }}>
+                            <ListItem disablePadding sx={{ mb: 0.5 }}>
                                 <ListItemIcon>
-                                    <Email color="primary" />
+                                    <FaEnvelope
+                                        color={theme.palette.primary.main}
+                                    />
                                 </ListItemIcon>
-                                <ListItemText primary={`📧 ${clinic.email}`} />
+                                <ListItemText
+                                    primary={clinic.email}
+                                    primaryTypographyProps={{
+                                        variant: isMobile ? "body2" : "body1",
+                                    }}
+                                />
                             </ListItem>
                         )}
-                        
+
                         <ListItem disablePadding>
                             <ListItemIcon>
-                                <Schedule color="primary" />
+                                <FaClock color={theme.palette.primary.main} />
                             </ListItemIcon>
-                            <ListItemText 
-                                primary={`🕒 ${clinic.opening_time} - ${clinic.closing_time}`}
+                            <ListItemText
+                                primary={`${clinic.opening_time || "N/A"} - ${
+                                    clinic.closing_time || "N/A"
+                                }`}
                                 secondary="Working Hours"
+                                primaryTypographyProps={{
+                                    variant: isMobile ? "body2" : "body1",
+                                }}
                             />
                         </ListItem>
                     </List>
                 </Paper>
 
-                <Paper elevation={3} sx={{ p: 3 }}>
-                    <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
-                        📊 Quick Stats
-                    </Typography>
-                    
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <Typography>👨‍⚕️ Total Doctors:</Typography>
-                            <Typography fontWeight="bold">{doctors.length}</Typography>
+                <Paper
+                    elevation={5}
+                    sx={{ p: isMobile ? 2 : 3, mb: 2, borderRadius: 3 }}
+                >
+                    <Box
+                        sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                            mb: 1,
+                        }}
+                    >
+                        <FaBusinessTime color={theme.palette.primary.main} />
+                        <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+                            Quick Stats
+                        </Typography>
+                    </Box>
+
+                    <Box
+                        sx={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 1,
+                        }}
+                    >
+                        <Box
+                            sx={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                            }}
+                        >
+                            <Typography variant={isMobile ? "body2" : "body1"}>
+                                <FaUserMd
+                                    size={16}
+                                    style={{ marginRight: 8 }}
+                                />
+                                Total Doctors:
+                            </Typography>
+                            <Typography fontWeight="bold">
+                                {doctors.length}
+                            </Typography>
                         </Box>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <Typography>⭐ Rating:</Typography>
-                            <Typography fontWeight="bold">{clinic.rating}/5</Typography>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                            }}
+                        >
+                            <Typography variant={isMobile ? "body2" : "body1"}>
+                                <FaStar size={16} style={{ marginRight: 8 }} />
+                                Rating:
+                            </Typography>
+                            <Typography fontWeight="bold">
+                                {safeRating(clinic.rating)}/5
+                            </Typography>
                         </Box>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <Typography>📝 Reviews:</Typography>
-                            <Typography fontWeight="bold">{clinic.total_reviews}</Typography>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                            }}
+                        >
+                            <Typography variant={isMobile ? "body2" : "body1"}>
+                                <FaAward size={16} style={{ marginRight: 8 }} />
+                                Reviews:
+                            </Typography>
+                            <Typography fontWeight="bold">
+                                {clinic.total_reviews || 0}
+                            </Typography>
+                        </Box>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                            }}
+                        >
+                            <Typography variant={isMobile ? "body2" : "body1"}>
+                                <MdToday size={16} style={{ marginRight: 8 }} />
+                                Available Today:
+                            </Typography>
+                            <Typography fontWeight="bold" color="success.main">
+                                {getTodaysAvailableDoctors().length}
+                            </Typography>
                         </Box>
                     </Box>
                 </Paper>
+
+                {/* Today's Available Doctors Slider */}
+                {renderTodaysAvailableDoctors()}
             </Grid>
         </Grid>
     );
 
     const renderDoctors = () => (
-        <Grid container spacing={3}>
-            {doctors.map((doctor) => (
-                <Grid item xs={12} sm={6} md={4} key={doctor.id}>
-                    <Card elevation={3} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                        <CardContent sx={{ flexGrow: 1 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                <Avatar
-                                    src={doctor.profile_image}
-                                    sx={{ width: 60, height: 60, mr: 2 }}
+        <Grid container spacing={isMobile ? 2 : 3}>
+            {doctors.map((doctor) => {
+                const availableDays = getDoctorAvailableDays(doctor);
+                const isAvailableToday = isDoctorAvailableToday(doctor);
+
+                return (
+                    <Grid item xs={12} sm={6} md={4} key={doctor.id}>
+                        <Card
+                            elevation={5}
+                            sx={{
+                                height: "100%",
+                                display: "flex",
+                                flexDirection: "column",
+                                border: isAvailableToday ? "2px solid" : "none",
+                                borderColor: isAvailableToday
+                                    ? "success.main"
+                                    : "transparent",
+                                position: "relative",
+                                pt: isAvailableToday ? 5 : 2, // Add padding top when badge is present
+                            }}
+                        >
+                            {isAvailableToday && (
+                                <Box
+                                    sx={{
+                                        position: "absolute",
+                                        top: 8,
+                                        left: 8,
+                                        right: 8,
+                                        display: "flex",
+                                        justifyContent: "center",
+                                        zIndex: 2,
+                                    }}
                                 >
-                                    <Person />
-                                </Avatar>
-                                <Box>
-                                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                                        👨‍⚕️ {doctor.user.name}
-                                    </Typography>
-                                    {doctor.is_verified && (
-                                        <Chip 
-                                            label="✅ Verified" 
-                                            size="small" 
-                                            color="success"
-                                            icon={<Verified />}
-                                        />
-                                    )}
-                                </Box>
-                            </Box>
-
-                            <Typography variant="body2" color="primary" sx={{ mb: 1 }}>
-                                {doctor.specialization}
-                            </Typography>
-
-                            <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
-                                📅 {doctor.experience_years} years experience
-                            </Typography>
-
-                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                <Rating value={doctor.rating} precision={0.1} size="small" readOnly />
-                                <Typography variant="body2" sx={{ ml: 1 }}>
-                                    ⭐ {doctor.rating} ({doctor.total_reviews})
-                                </Typography>
-                            </Box>
-
-                            <Typography variant="h6" color="primary" sx={{ fontWeight: 'bold', mb: 2 }}>
-                                💰 ₹{doctor.consultation_fee}
-                            </Typography>
-
-                            {doctor.clinic_schedule && (
-                                <Box sx={{ mb: 2 }}>
-                                    <Typography variant="caption" color="text.secondary">
-                                        🕒 Available: {doctor.clinic_schedule.start_time} - {doctor.clinic_schedule.end_time}
-                                    </Typography>
+                                    <Chip
+                                        label="Available Today"
+                                        color="success"
+                                        size="small"
+                                        sx={{
+                                            color: "white",
+                                            fontWeight: 600,
+                                            animation: "pulse 2s infinite",
+                                            "@keyframes pulse": {
+                                                "0%": { transform: "scale(1)" },
+                                                "50%": {
+                                                    transform: "scale(1.05)",
+                                                },
+                                                "100%": {
+                                                    transform: "scale(1)",
+                                                },
+                                            },
+                                        }}
+                                    />
                                 </Box>
                             )}
-                        </CardContent>
 
-                        <Box sx={{ p: 2, pt: 0 }}>
-                            <Button
-                                fullWidth
-                                variant="contained"
-                                startIcon={<CalendarToday />}
-                                onClick={() => handleBookAppointment(doctor)}
-                                sx={{ 
-                                    borderRadius: 2,
-                                    fontWeight: 600,
-                                    color: 'white'
-                                }}
-                            >
-                                📅 Book Appointment
-                            </Button>
-                        </Box>
-                    </Card>
-                </Grid>
-            ))}
+                            <CardContent sx={{ flexGrow: 1, pt: 1 }}>
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        mb: 2,
+                                    }}
+                                >
+                                    <Avatar
+                                        src={doctor.profile_image}
+                                        sx={{
+                                            width: isMobile ? 50 : 60,
+                                            height: isMobile ? 50 : 60,
+                                            mr: 2,
+                                        }}
+                                    >
+                                        <FaUserMd />
+                                    </Avatar>
+                                    <Box sx={{ flex: 1 }}>
+                                        <Typography
+                                            variant={
+                                                isMobile ? "subtitle1" : "h6"
+                                            }
+                                            sx={{
+                                                fontWeight: "bold",
+                                                lineHeight: 1.2,
+                                            }}
+                                        >
+                                            {doctor.user?.name ||
+                                                doctor.name ||
+                                                "N/A"}
+                                        </Typography>
+                                        {doctor.is_verified && (
+                                            <Box sx={{ mt: 0.5 }}>
+                                                <Chip
+                                                    label="Verified"
+                                                    size="small"
+                                                    color="success"
+                                                    icon={<MdVerified />}
+                                                    sx={{
+                                                        color: "white",
+                                                        fontSize: "0.7rem",
+                                                        height: "20px",
+                                                    }}
+                                                />
+                                            </Box>
+                                        )}
+                                    </Box>
+                                </Box>
+
+                                <Typography
+                                    variant="body2"
+                                    color="secondary.light"
+                                    sx={{ mb: 1 }}
+                                >
+                                    <FaStethoscope
+                                        size={12}
+                                        style={{ marginRight: 4 }}
+                                    />
+                                    {doctor.specialization || "N/A"}
+                                </Typography>
+
+                                <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                    sx={{ mb: 2, display: "block" }}
+                                >
+                                    <Work fontSize="small" sx={{ mr: 0.5 }} />
+                                    {doctor.experience_years || 0} years
+                                    experience
+                                </Typography>
+
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        mb: 2,
+                                    }}
+                                >
+                                    <Rating
+                                        value={safeRating(doctor.rating)}
+                                        precision={0.1}
+                                        size="small"
+                                        readOnly
+                                    />
+                                    <Typography
+                                        variant="body2"
+                                        sx={{ ml: 1, fontSize: "0.85rem" }}
+                                    >
+                                        {safeRating(doctor.rating)} (
+                                        {doctor.total_reviews || 0} reviews)
+                                    </Typography>
+                                </Box>
+
+                                <Typography
+                                    variant={isMobile ? "subtitle1" : "h6"}
+                                    color="secondary.light"
+                                    sx={{ fontWeight: "bold", mb: 2 }}
+                                >
+                                    <FaMoneyBillWave
+                                        size={14}
+                                        style={{ marginRight: 4 }}
+                                    />
+                                    ₹ {doctor.consultation_fee || 0}
+                                </Typography>
+
+                                {doctor.pivot && (
+                                    <Box sx={{ mb: 2 }}>
+                                        <Typography
+                                            variant="caption"
+                                            color="text.secondary"
+                                            sx={{ display: "block", mb: 1 }}
+                                        >
+                                            <FaClock
+                                                size={10}
+                                                style={{ marginRight: 4 }}
+                                            />
+                                            Available:{" "}
+                                            {doctor.pivot.start_time || "N/A"} -{" "}
+                                            {doctor.pivot.end_time || "N/A"}
+                                        </Typography>
+                                    </Box>
+                                )}
+
+                                {/* Available Days */}
+                                <Box sx={{ mb: 2 }}>
+                                    <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                        sx={{ mb: 1, display: "block" }}
+                                    >
+                                        <FaCalendarAlt
+                                            size={10}
+                                            style={{ marginRight: 4 }}
+                                        />
+                                        Available Days:
+                                    </Typography>
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            flexWrap: "wrap",
+                                            gap: 0.5,
+                                        }}
+                                    >
+                                        {daysOfWeek.map((day) => {
+                                            const isAvailable =
+                                                availableDays.includes(day.key);
+                                            const isToday =
+                                                getCurrentDayKey() === day.key;
+
+                                            return (
+                                                <Chip
+                                                    key={day.key}
+                                                    label={day.shortLabel}
+                                                    size="small"
+                                                    variant={
+                                                        isAvailable
+                                                            ? "filled"
+                                                            : "outlined"
+                                                    }
+                                                    color={
+                                                        isToday && isAvailable
+                                                            ? "success"
+                                                            : "default"
+                                                    } // Removed primary color
+                                                    sx={{
+                                                        fontSize: "0.6rem",
+                                                        height: "20px",
+                                                        // Apply light blue styles for available days
+                                                        backgroundColor:
+                                                            isAvailable
+                                                                ? isToday
+                                                                    ? undefined
+                                                                    : "lightblue"
+                                                                : undefined,
+                                                        color: isAvailable
+                                                            ? isToday
+                                                                ? "white"
+                                                                : "darkblue"
+                                                            : "text.secondary",
+                                                        borderColor: isAvailable
+                                                            ? "lightblue"
+                                                            : undefined,
+                                                        animation:
+                                                            isToday &&
+                                                            isAvailable
+                                                                ? "glow 2s infinite"
+                                                                : "none",
+                                                        "@keyframes glow": {
+                                                            "0%": {
+                                                                boxShadow:
+                                                                    "0 0 5px rgba(76, 175, 80, 0.5)",
+                                                            },
+                                                            "50%": {
+                                                                boxShadow:
+                                                                    "0 0 20px rgba(76, 175, 80, 0.8)",
+                                                            },
+                                                            "100%": {
+                                                                boxShadow:
+                                                                    "0 0 5px rgba(76, 175, 80, 0.5)",
+                                                            },
+                                                        },
+                                                        "&:hover": {
+                                                            backgroundColor:
+                                                                isAvailable
+                                                                    ? "#a3d5f7"
+                                                                    : undefined,
+                                                        },
+                                                    }}
+                                                />
+                                            );
+                                        })}
+                                    </Box>
+                                </Box>
+                            </CardContent>
+
+                            <Box sx={{ p: 2, pt: 0 }}>
+                                <Button
+                                    fullWidth
+                                    variant="contained"
+                                    startIcon={<CalendarToday />}
+                                    onClick={() =>
+                                        handleBookAppointment(doctor)
+                                    }
+                                    sx={{
+                                        borderRadius: 2,
+                                        fontWeight: 600,
+                                        color: "white",
+                                        py: isMobile ? 1.2 : 1,
+                                    }}
+                                >
+                                    Book Appointment
+                                </Button>
+                            </Box>
+                        </Card>
+                    </Grid>
+                );
+            })}
         </Grid>
     );
 
     if (loading) {
         return (
             <MainLayout>
-                <Container maxWidth="lg" sx={{ py: 10, textAlign: 'center' }}>
+                <Container maxWidth="xl" sx={{ py: 10, textAlign: "center" }}>
                     <CircularProgress size={60} />
                     <Typography variant="h6" sx={{ mt: 2 }}>
                         Loading clinic details...
@@ -4657,9 +6622,9 @@ const ClinicDetailPage = () => {
     if (error || !clinic) {
         return (
             <MainLayout>
-                <Container maxWidth="lg" sx={{ py: 10 }}>
+                <Container maxWidth="xl" sx={{ py: 10 }}>
                     <Alert severity="error">
-                        {error || 'Clinic not found'}
+                        {error || "Clinic not found"}
                     </Alert>
                 </Container>
             </MainLayout>
@@ -4668,16 +6633,45 @@ const ClinicDetailPage = () => {
 
     return (
         <MainLayout>
-            <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 }, mt: { xs: 8, md: 10 } }}>
+            <Container
+                maxWidth="xl"
+                sx={{
+                    py: { xs: 2, md: 4 },
+                    mt: { xs: 6, md: 8 },
+                    px: { xs: 1, sm: 2, md: 3 },
+                }}
+            >
                 <Box sx={{ mb: 4 }}>
-                    <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)}>
-                        <Tab label="🏥 Clinic Info" />
-                        <Tab label={`👨‍⚕️ Doctors (${doctors.length})`} />
+                    <Tabs
+                        value={tabValue}
+                        onChange={(e, newValue) => setTabValue(newValue)}
+                        variant={isMobile ? "scrollable" : "standard"}
+                        scrollButtons="auto"
+                        sx={{
+                            "& .MuiTab-root": {
+                                textTransform: "none",
+                                fontWeight: 600,
+                                fontSize: isMobile ? "0.9rem" : "1rem",
+                            },
+                        }}
+                    >
+                        <Tab
+                            label="Clinic Info"
+                            icon={<FaHospital />}
+                            iconPosition="start"
+                        />
+                        <Tab
+                            label={`Doctors (${doctors.length})`}
+                            icon={<FaUserMd />}
+                            iconPosition="start"
+                        />
                     </Tabs>
                 </Box>
 
-                {tabValue === 0 && renderClinicInfo()}
-                {tabValue === 1 && renderDoctors()}
+                <Box sx={{ minHeight: "60vh" }}>
+                    {tabValue === 0 && renderClinicInfo()}
+                    {tabValue === 1 && renderDoctors()}
+                </Box>
             </Container>
 
             <LoginModal
@@ -4708,9 +6702,6 @@ import {
     Button,
     TextField,
     FormControl,
-    InputLabel,
-    Select,
-    MenuItem,
     Alert,
     Avatar,
     Chip,
@@ -4719,15 +6710,52 @@ import {
     Stepper,
     Step,
     StepLabel,
+    useTheme,
+    useMediaQuery,
+    Stack,
+    RadioGroup,
+    FormControlLabel,
+    Radio,
 } from "@mui/material";
 import {
-    Person,
     LocalHospital,
     CalendarToday,
-    Schedule,
     Payment,
     CheckCircle,
+    ArrowBack,
+    ArrowForward,
+    AccessTime,
+    Event,
+    Description,
+    Home,
+    Visibility,
+    Star,
+    CreditCard,
+    AccountBalanceWallet,
 } from "@mui/icons-material";
+import {
+    FaUserMd,
+    FaHospital,
+    FaCalendarAlt,
+    FaClock,
+    FaCheckCircle,
+    FaNotesMedical,
+    FaMoneyBillWave,
+    FaCalendarCheck,
+    FaStethoscope,
+    FaGraduationCap,
+    FaUserCheck,
+} from "react-icons/fa";
+import {
+    MdPayment,
+    MdInfo,
+    MdLocationOn,
+    MdAccessTime,
+    MdVerified,
+    MdLocalHospital,
+    MdEmail,
+    MdPhone,
+} from "react-icons/md";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
@@ -4739,6 +6767,9 @@ const BookAppointmentPage = () => {
     const location = useLocation();
     const navigate = useNavigate();
     const apiUrl = import.meta.env.VITE_API_URL;
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+    const isTablet = useMediaQuery(theme.breakpoints.down("md"));
 
     const { doctor, clinic, type } = location.state || {};
 
@@ -4747,18 +6778,55 @@ const BookAppointmentPage = () => {
     const [selectedTime, setSelectedTime] = useState("");
     const [symptoms, setSymptoms] = useState("");
     const [notes, setNotes] = useState("");
+    // FIXED: Initialize paymentMethod as empty string to prevent premature completion
+    const [paymentMethod, setPaymentMethod] = useState("");
     const [availableSlots, setAvailableSlots] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [booking, setBooking] = useState(false);
     const [appointmentId, setAppointmentId] = useState(null);
+    // NEW: Track visited steps to prevent premature completion
+    const [visitedSteps, setVisitedSteps] = useState([0]);
 
+    // Updated steps with Payment restored
     const steps = [
-        "📅 Select Date & Time",
-        "📋 Details",
-        "💳 Payment",
-        "✅ Confirmation",
+        {
+            label: "Select Date & Time",
+            icon: <Event />,
+        },
+        {
+            label: "Details",
+            icon: <Description />,
+        },
+        {
+            label: "Payment",
+            icon: <Payment />,
+        },
+        {
+            label: "Confirmation",
+            icon: <CheckCircle />,
+        },
     ];
+
+    // FIXED: Updated function to check if a step is completed
+    const isStepCompleted = (stepIndex) => {
+        switch (stepIndex) {
+            case 0:
+                // Date & Time step is completed if both date and time are selected
+                return selectedDate && selectedTime;
+            case 1:
+                // Details step is completed if symptoms are provided
+                return symptoms.trim() !== "";
+            case 2:
+                // Payment step is completed if payment method is selected AND step has been visited
+                return paymentMethod !== "" && visitedSteps.includes(stepIndex);
+            case 3:
+                // Confirmation step is completed when appointment is booked
+                return appointmentId !== null;
+            default:
+                return false;
+        }
+    };
 
     useEffect(() => {
         if (!doctor || !clinic) {
@@ -4809,12 +6877,22 @@ const BookAppointmentPage = () => {
         }
     };
 
+    // UPDATED: Track visited steps when moving forward
     const handleNext = () => {
-        setActiveStep((prevActiveStep) => prevActiveStep + 1);
+        const nextStep = activeStep + 1;
+        if (!visitedSteps.includes(nextStep)) {
+            setVisitedSteps([...visitedSteps, nextStep]);
+        }
+        setActiveStep(nextStep);
     };
 
+    // UPDATED: Track visited steps when moving backward
     const handleBack = () => {
-        setActiveStep((prevActiveStep) => prevActiveStep - 1);
+        const prevStep = activeStep - 1;
+        if (!visitedSteps.includes(prevStep)) {
+            setVisitedSteps([...visitedSteps, prevStep]);
+        }
+        setActiveStep(prevStep);
     };
 
     const handleBookAppointment = async () => {
@@ -4822,6 +6900,9 @@ const BookAppointmentPage = () => {
             setError("Please select date and time");
             return;
         }
+
+        // Set default payment method if none selected
+        const finalPaymentMethod = paymentMethod || "clinic";
 
         setBooking(true);
         setError("");
@@ -4837,6 +6918,7 @@ const BookAppointmentPage = () => {
                     appointment_time: selectedTime,
                     symptoms: symptoms,
                     notes: notes,
+                    payment_method: finalPaymentMethod,
                 },
                 {
                     headers: {
@@ -4864,347 +6946,1688 @@ const BookAppointmentPage = () => {
         return format(date, "EEEE, MMM dd, yyyy");
     };
 
-    const renderStepContent = (step) => {
-        switch (step) {
-            case 0:
-                return (
-                    <Box>
-                        <Typography variant="h6" gutterBottom>
-                            📅 Select Appointment Date & Time
-                        </Typography>
+    // Safe number conversion for ratings
+    const safeRating = (rating) => {
+        if (rating === null || rating === undefined) return 0;
+        const numRating =
+            typeof rating === "string" ? parseFloat(rating) : rating;
+        return isNaN(numRating) ? 0 : numRating;
+    };
 
-                        <Grid container spacing={3}>
-                            <Grid item xs={12} md={6}>
-                                <LocalizationProvider
-                                    dateAdapter={AdapterDateFns}
-                                >
-                                    <DatePicker
-                                        label="Select Date"
-                                        value={selectedDate}
-                                        onChange={(newValue) =>
-                                            setSelectedDate(newValue)
-                                        }
-                                        minDate={new Date()}
-                                        maxDate={
-                                            new Date(
-                                                Date.now() +
-                                                    30 * 24 * 60 * 60 * 1000
-                                            )
-                                        }
-                                        enableAccessibleFieldDOMStructure={false}
-                                        slotProps={{
-                                            textField: {
-                                                fullWidth: true,
-                                                sx: {
-                                                    "& .MuiOutlinedInput-root":
-                                                        {
-                                                            borderRadius: 2,
-                                                        },
-                                                },
-                                            },
-                                        }}
-                                    />
-                                </LocalizationProvider>
-                            </Grid>
-
-                            <Grid item xs={12} md={6}>
-                                <FormControl
-                                    fullWidth
-                                    disabled={!selectedDate || loading}
-                                >
-                                    <InputLabel>Select Time</InputLabel>
-                                    <Select
-                                        value={selectedTime}
-                                        onChange={(e) =>
-                                            setSelectedTime(e.target.value)
-                                        }
-                                        label="Select Time"
-                                    >
-                                        {availableSlots.length === 0 &&
-                                            selectedDate &&
-                                            !loading && (
-                                                <MenuItem disabled>
-                                                    No slots available for
-                                                    selected date
-                                                </MenuItem>
-                                            )}
-                                        {availableSlots.map((slot) => (
-                                            <MenuItem key={slot} value={slot}>
-                                                🕒 {slot}
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
-                                {loading && (
-                                    <Box
-                                        sx={{
-                                            display: "flex",
-                                            justifyContent: "center",
-                                            mt: 2,
-                                        }}
-                                    >
-                                        <CircularProgress size={24} />
-                                    </Box>
-                                )}
-                            </Grid>
-                        </Grid>
-
-                        {selectedDate && (
-                            <Alert severity="info" sx={{ mt: 2 }}>
-                                📅 Selected: {formatDateDisplay(selectedDate)}
-                                {selectedTime && ` at ${selectedTime}`}
-                            </Alert>
-                        )}
-                    </Box>
-                );
-
-            case 1:
-                return (
-                    <Box>
-                        <Typography variant="h6" gutterBottom>
-                            📋 Appointment Details
-                        </Typography>
-
-                        <Grid container spacing={3}>
-                            <Grid item xs={12}>
-                                <TextField
-                                    fullWidth
-                                    label="Symptoms / Reason for Visit"
-                                    multiline
-                                    rows={4}
-                                    value={symptoms}
-                                    onChange={(e) =>
-                                        setSymptoms(e.target.value)
-                                    }
-                                    placeholder="Please describe your symptoms or reason for visiting the doctor..."
-                                    required
-                                    helperText="This information helps the doctor prepare for your visit"
-                                />
-                            </Grid>
-
-                            <Grid item xs={12}>
-                                <TextField
-                                    fullWidth
-                                    label="Additional Notes (Optional)"
-                                    multiline
-                                    rows={2}
-                                    value={notes}
-                                    onChange={(e) => setNotes(e.target.value)}
-                                    placeholder="Any additional information you'd like to share..."
-                                />
-                            </Grid>
-                        </Grid>
-                    </Box>
-                );
-
-            case 2:
-                return (
-                    <Box>
-                        <Typography variant="h6" gutterBottom>
-                            💳 Payment & Review
-                        </Typography>
-
-                        <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
-                            <Typography variant="h6" gutterBottom>
-                                📋 Appointment Summary
-                            </Typography>
-
-                            <Grid container spacing={2}>
-                                <Grid item xs={12} sm={6}>
-                                    <Typography
-                                        variant="body2"
-                                        color="text.secondary"
-                                    >
-                                        Doctor:
-                                    </Typography>
-                                    <Typography
-                                        variant="body1"
-                                        fontWeight="bold"
-                                    >
-                                        👨‍⚕️ {doctor.user.name}
-                                    </Typography>
-                                </Grid>
-
-                                <Grid item xs={12} sm={6}>
-                                    <Typography
-                                        variant="body2"
-                                        color="text.secondary"
-                                    >
-                                        Specialization:
-                                    </Typography>
-                                    <Typography
-                                        variant="body1"
-                                        fontWeight="bold"
-                                    >
-                                        🩺 {doctor.specialization}
-                                    </Typography>
-                                </Grid>
-
-                                <Grid item xs={12} sm={6}>
-                                    <Typography
-                                        variant="body2"
-                                        color="text.secondary"
-                                    >
-                                        Clinic:
-                                    </Typography>
-                                    <Typography
-                                        variant="body1"
-                                        fontWeight="bold"
-                                    >
-                                        🏥 {clinic.name}
-                                    </Typography>
-                                </Grid>
-
-                                <Grid item xs={12} sm={6}>
-                                    <Typography
-                                        variant="body2"
-                                        color="text.secondary"
-                                    >
-                                        Date:
-                                    </Typography>
-                                    <Typography
-                                        variant="body1"
-                                        fontWeight="bold"
-                                    >
-                                        📅{" "}
-                                        {selectedDate
-                                            ? formatDateDisplay(selectedDate)
-                                            : ""}
-                                    </Typography>
-                                </Grid>
-
-                                <Grid item xs={12} sm={6}>
-                                    <Typography
-                                        variant="body2"
-                                        color="text.secondary"
-                                    >
-                                        Time:
-                                    </Typography>
-                                    <Typography
-                                        variant="body1"
-                                        fontWeight="bold"
-                                    >
-                                        🕒 {selectedTime}
-                                    </Typography>
-                                </Grid>
-
-                                <Grid item xs={12} sm={6}>
-                                    <Typography
-                                        variant="body2"
-                                        color="text.secondary"
-                                    >
-                                        Consultation Fee:
-                                    </Typography>
-                                    <Typography
-                                        variant="h5"
-                                        color="primary"
-                                        fontWeight="bold"
-                                    >
-                                        💰 ₹{doctor.consultation_fee}
-                                    </Typography>
-                                </Grid>
-                            </Grid>
-
-                            {symptoms && (
-                                <Box
-                                    sx={{
-                                        mt: 2,
-                                        pt: 2,
-                                        borderTop: "1px solid #e0e0e0",
-                                    }}
-                                >
-                                    <Typography
-                                        variant="body2"
-                                        color="text.secondary"
-                                    >
-                                        Symptoms/Reason:
-                                    </Typography>
-                                    <Typography variant="body2">
-                                        {symptoms}
-                                    </Typography>
-                                </Box>
-                            )}
-
-                            {notes && (
-                                <Box sx={{ mt: 1 }}>
-                                    <Typography
-                                        variant="body2"
-                                        color="text.secondary"
-                                    >
-                                        Additional Notes:
-                                    </Typography>
-                                    <Typography variant="body2">
-                                        {notes}
-                                    </Typography>
-                                </Box>
-                            )}
-                        </Paper>
-
-                        <Alert severity="info" sx={{ mb: 2 }}>
-                            💡 You can pay at the clinic during your visit.
-                            Payment confirmation will be updated after your
-                            appointment.
-                        </Alert>
-                    </Box>
-                );
-
-            case 3:
-                return (
-                    <Box textAlign="center">
+    const renderConfirmationSection = () => {
+        return (
+            <Box sx={{ minHeight: "80vh" }}>
+                {/* Success Header */}
+                <Card
+                    elevation={8}
+                    sx={{
+                        mb: 4,
+                        background: `linear-gradient(135deg, ${theme.palette.success.light} 0%, ${theme.palette.success.main} 100%)`,
+                        color: "white",
+                        borderRadius: 3,
+                    }}
+                >
+                    <CardContent
+                        sx={{ textAlign: "center", py: { xs: 3, md: 5 } }}
+                    >
                         <CheckCircle
-                            sx={{ fontSize: 80, color: "success.main", mb: 2 }}
+                            sx={{ fontSize: { xs: 60, md: 80 }, mb: 2 }}
                         />
-                        <Typography variant="h4" gutterBottom>
-                            🎉 Appointment Booked Successfully!
+                        <Typography
+                            variant={isMobile ? "h5" : "h4"}
+                            gutterBottom
+                            sx={{ fontWeight: "bold" }}
+                        >
+                            Appointment Booked Successfully!
                         </Typography>
                         <Typography
-                            variant="body1"
-                            color="text.secondary"
-                            paragraph
+                            variant={isMobile ? "body1" : "h6"}
+                            sx={{ opacity: 0.9 }}
                         >
-                            Your appointment has been confirmed. You will
-                            receive a confirmation message shortly.
+                            Your healthcare appointment has been confirmed
                         </Typography>
 
                         {appointmentId && (
                             <Paper
-                                elevation={2}
-                                sx={{ p: 2, mb: 3, bgcolor: "success.50" }}
+                                elevation={3}
+                                sx={{
+                                    p: 2,
+                                    mt: 3,
+                                    bgcolor: "rgba(255,255,255,0.95)",
+                                    color: "text.primary",
+                                    display: "inline-block",
+                                    borderRadius: 2,
+                                }}
                             >
                                 <Typography
                                     variant="body2"
                                     color="text.secondary"
                                 >
-                                    Appointment ID:
+                                    Appointment ID
                                 </Typography>
-                                <Typography variant="h6" fontWeight="bold">
+                                <Typography
+                                    variant={isMobile ? "h6" : "h5"}
+                                    sx={{
+                                        fontWeight: "bold",
+                                        color: "success.main",
+                                    }}
+                                >
                                     #{appointmentId.slice(-8).toUpperCase()}
                                 </Typography>
                             </Paper>
                         )}
+                    </CardContent>
+                </Card>
 
-                        <Alert severity="success" sx={{ mb: 3 }}>
-                            📱 Please arrive 15 minutes early for your
-                            appointment.
-                        </Alert>
+                {/* Doctor and Healthcare Information */}
+                <Grid container spacing={3}>
+                    {/* Doctor Information Card */}
+                    <Grid item xs={12} lg={6}>
+                        <Card
+                            elevation={5}
+                            sx={{ height: "100%", borderRadius: 3 }}
+                        >
+                            <CardContent sx={{ p: { xs: 2, md: 3 } }}>
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 1,
+                                        mb: 3,
+                                    }}
+                                >
+                                    <FaUserMd
+                                        size={24}
+                                        color={theme.palette.primary.main}
+                                    />
+                                    <Typography
+                                        variant={isMobile ? "h6" : "h5"}
+                                        sx={{ fontWeight: "bold" }}
+                                    >
+                                        Your Doctor
+                                    </Typography>
+                                </Box>
 
-                        <Box sx={{ mt: 3 }}>
-                            <Button
-                                variant="contained"
-                                onClick={() => navigate("/appointments")}
-                                sx={{ mr: 2, color: "white" }}
+                                {/* Doctor Profile */}
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        flexDirection: {
+                                            xs: "column",
+                                            sm: "row",
+                                        },
+                                        gap: 2,
+                                        mb: 3,
+                                    }}
+                                >
+                                    <Avatar
+                                        src={doctor.profile_image}
+                                        sx={{
+                                            width: { xs: 80, md: 100 },
+                                            height: { xs: 80, md: 100 },
+                                            alignSelf: {
+                                                xs: "center",
+                                                sm: "flex-start",
+                                            },
+                                            border: `3px solid ${theme.palette.primary.main}`,
+                                        }}
+                                    >
+                                        <FaUserMd size={isMobile ? 30 : 40} />
+                                    </Avatar>
+
+                                    <Box
+                                        sx={{
+                                            flex: 1,
+                                            textAlign: {
+                                                xs: "center",
+                                                sm: "left",
+                                            },
+                                        }}
+                                    >
+                                        <Typography
+                                            variant={isMobile ? "h6" : "h5"}
+                                            sx={{ fontWeight: "bold", mb: 1 }}
+                                        >
+                                            {doctor.user.name}
+                                        </Typography>
+
+                                        <Box
+                                            sx={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 1,
+                                                mb: 1,
+                                                justifyContent: {
+                                                    xs: "center",
+                                                    sm: "flex-start",
+                                                },
+                                            }}
+                                        >
+                                            <FaStethoscope
+                                                size={16}
+                                                color={
+                                                    theme.palette.secondary.main
+                                                }
+                                            />
+                                            <Typography
+                                                variant="body1"
+                                                color="secondary"
+                                                sx={{ fontWeight: 600 }}
+                                            >
+                                                {doctor.specialization}
+                                            </Typography>
+                                        </Box>
+
+                                        <Box
+                                            sx={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 1,
+                                                mb: 2,
+                                                justifyContent: {
+                                                    xs: "center",
+                                                    sm: "flex-start",
+                                                },
+                                            }}
+                                        >
+                                            <FaGraduationCap
+                                                size={14}
+                                                color={
+                                                    theme.palette.text.secondary
+                                                }
+                                            />
+                                            <Typography
+                                                variant="body2"
+                                                color="text.secondary"
+                                            >
+                                                {doctor.experience_years} years
+                                                experience
+                                            </Typography>
+                                        </Box>
+
+                                        {doctor.is_verified && (
+                                            <Chip
+                                                icon={<MdVerified />}
+                                                label="Verified Doctor"
+                                                color="success"
+                                                size="small"
+                                                sx={{
+                                                    color: "white",
+                                                    fontWeight: 500,
+                                                }}
+                                            />
+                                        )}
+                                    </Box>
+                                </Box>
+
+                                {/* Doctor Details */}
+                                <Stack spacing={2}>
+                                    {doctor.qualification && (
+                                        <Box>
+                                            <Typography
+                                                variant="subtitle2"
+                                                color="text.secondary"
+                                                sx={{
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: 1,
+                                                    mb: 0.5,
+                                                }}
+                                            >
+                                                <FaGraduationCap size={14} />
+                                                Qualification
+                                            </Typography>
+                                            <Typography
+                                                variant="body2"
+                                                sx={{ pl: 2.5 }}
+                                            >
+                                                {doctor.qualification}
+                                            </Typography>
+                                        </Box>
+                                    )}
+
+                                    {doctor.rating && (
+                                        <Box>
+                                            <Typography
+                                                variant="subtitle2"
+                                                color="text.secondary"
+                                                sx={{
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: 1,
+                                                    mb: 0.5,
+                                                }}
+                                            >
+                                                <Star fontSize="small" />
+                                                Rating
+                                            </Typography>
+                                            <Box
+                                                sx={{
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: 1,
+                                                    pl: 2.5,
+                                                }}
+                                            >
+                                                <Typography
+                                                    variant="body2"
+                                                    sx={{ fontWeight: 600 }}
+                                                >
+                                                    {safeRating(
+                                                        doctor.rating
+                                                    ).toFixed(1)}
+                                                </Typography>
+                                                <Typography
+                                                    variant="body2"
+                                                    color="text.secondary"
+                                                >
+                                                    ({doctor.total_reviews || 0}{" "}
+                                                    reviews)
+                                                </Typography>
+                                            </Box>
+                                        </Box>
+                                    )}
+
+                                    <Box>
+                                        <Typography
+                                            variant="subtitle2"
+                                            color="text.secondary"
+                                            sx={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 1,
+                                                mb: 0.5,
+                                            }}
+                                        >
+                                            <FaMoneyBillWave size={14} />
+                                            Consultation Fee
+                                        </Typography>
+                                        <Typography
+                                            variant="h6"
+                                            color="primary"
+                                            sx={{ fontWeight: "bold", pl: 2.5 }}
+                                        >
+                                            ₹{doctor.consultation_fee}
+                                        </Typography>
+                                    </Box>
+                                </Stack>
+                            </CardContent>
+                        </Card>
+                    </Grid>
+
+                    {/* Healthcare/Clinic Information Card */}
+                    <Grid item xs={12} lg={6}>
+                        <Card
+                            elevation={5}
+                            sx={{ height: "100%", borderRadius: 3 }}
+                        >
+                            <CardContent sx={{ p: { xs: 2, md: 3 } }}>
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 1,
+                                        mb: 3,
+                                    }}
+                                >
+                                    <FaHospital
+                                        size={24}
+                                        color={theme.palette.primary.main}
+                                    />
+                                    <Typography
+                                        variant={isMobile ? "h6" : "h5"}
+                                        sx={{ fontWeight: "bold" }}
+                                    >
+                                        Healthcare Facility
+                                    </Typography>
+                                </Box>
+
+                                {/* Clinic Profile */}
+                                <Box sx={{ mb: 3 }}>
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 1,
+                                            mb: 2,
+                                        }}
+                                    >
+                                        <MdLocalHospital
+                                            size={20}
+                                            color={theme.palette.primary.main}
+                                        />
+                                        <Typography
+                                            variant={isMobile ? "h6" : "h5"}
+                                            sx={{ fontWeight: "bold" }}
+                                        >
+                                            {clinic.name}
+                                        </Typography>
+                                    </Box>
+                                </Box>
+
+                                {/* Clinic Details */}
+                                <Stack spacing={2}>
+                                    <Box>
+                                        <Typography
+                                            variant="subtitle2"
+                                            color="text.secondary"
+                                            sx={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 1,
+                                                mb: 0.5,
+                                            }}
+                                        >
+                                            <MdLocationOn size={16} />
+                                            Address
+                                        </Typography>
+                                        <Typography
+                                            variant="body2"
+                                            sx={{ pl: 2.5, lineHeight: 1.5 }}
+                                        >
+                                            {clinic.address}
+                                        </Typography>
+                                    </Box>
+
+                                    {clinic.phone && (
+                                        <Box>
+                                            <Typography
+                                                variant="subtitle2"
+                                                color="text.secondary"
+                                                sx={{
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: 1,
+                                                    mb: 0.5,
+                                                }}
+                                            >
+                                                <MdPhone size={16} />
+                                                Contact
+                                            </Typography>
+                                            <Typography
+                                                variant="body2"
+                                                sx={{ pl: 2.5 }}
+                                            >
+                                                {clinic.phone}
+                                            </Typography>
+                                        </Box>
+                                    )}
+
+                                    {clinic.email && (
+                                        <Box>
+                                            <Typography
+                                                variant="subtitle2"
+                                                color="text.secondary"
+                                                sx={{
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: 1,
+                                                    mb: 0.5,
+                                                }}
+                                            >
+                                                <MdEmail size={16} />
+                                                Email
+                                            </Typography>
+                                            <Typography
+                                                variant="body2"
+                                                sx={{ pl: 2.5 }}
+                                            >
+                                                {clinic.email}
+                                            </Typography>
+                                        </Box>
+                                    )}
+
+                                    {clinic.facilities &&
+                                        clinic.facilities.length > 0 && (
+                                            <Box>
+                                                <Typography
+                                                    variant="subtitle2"
+                                                    color="text.secondary"
+                                                    sx={{
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: 1,
+                                                        mb: 1,
+                                                    }}
+                                                >
+                                                    <MdLocalHospital
+                                                        size={16}
+                                                    />
+                                                    Facilities
+                                                </Typography>
+                                                <Box
+                                                    sx={{
+                                                        display: "flex",
+                                                        flexWrap: "wrap",
+                                                        gap: 1,
+                                                        pl: 2.5,
+                                                    }}
+                                                >
+                                                    {clinic.facilities
+                                                        .slice(0, 4)
+                                                        .map(
+                                                            (
+                                                                facility,
+                                                                index
+                                                            ) => (
+                                                                <Chip
+                                                                    key={index}
+                                                                    label={
+                                                                        facility
+                                                                    }
+                                                                    size="small"
+                                                                    variant="outlined"
+                                                                    color="primary"
+                                                                />
+                                                            )
+                                                        )}
+                                                    {clinic.facilities.length >
+                                                        4 && (
+                                                        <Chip
+                                                            label={`+${
+                                                                clinic
+                                                                    .facilities
+                                                                    .length - 4
+                                                            } more`}
+                                                            size="small"
+                                                            variant="outlined"
+                                                        />
+                                                    )}
+                                                </Box>
+                                            </Box>
+                                        )}
+                                </Stack>
+                            </CardContent>
+                        </Card>
+                    </Grid>
+                </Grid>
+
+                {/* Appointment Summary Card */}
+                <Card elevation={5} sx={{ mt: 3, borderRadius: 3 }}>
+                    <CardContent sx={{ p: { xs: 2, md: 3 } }}>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                mb: 3,
+                            }}
+                        >
+                            <FaCalendarCheck
+                                size={24}
+                                color={theme.palette.primary.main}
+                            />
+                            <Typography
+                                variant={isMobile ? "h6" : "h5"}
+                                sx={{ fontWeight: "bold" }}
                             >
-                                📋 View My Appointments
-                            </Button>
-                            <Button
-                                variant="outlined"
-                                onClick={() => navigate("/")}
-                            >
-                                🏠 Go Home
-                            </Button>
+                                Appointment Summary
+                            </Typography>
                         </Box>
-                    </Box>
+
+                        <Grid container spacing={3}>
+                            <Grid item xs={12} sm={6} md={3}>
+                                <Paper
+                                    elevation={2}
+                                    sx={{
+                                        p: 2,
+                                        textAlign: "center",
+                                        bgcolor: "primary.50",
+                                        borderRadius: 2,
+                                    }}
+                                >
+                                    <FaCalendarAlt
+                                        size={20}
+                                        color={theme.palette.primary.main}
+                                    />
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                        sx={{ mt: 1 }}
+                                    >
+                                        Date
+                                    </Typography>
+                                    <Typography
+                                        variant="body1"
+                                        sx={{ fontWeight: "bold" }}
+                                    >
+                                        {selectedDate
+                                            ? formatDateDisplay(selectedDate)
+                                            : ""}
+                                    </Typography>
+                                </Paper>
+                            </Grid>
+
+                            <Grid item xs={12} sm={6} md={3}>
+                                <Paper
+                                    elevation={2}
+                                    sx={{
+                                        p: 2,
+                                        textAlign: "center",
+                                        bgcolor: "secondary.50",
+                                        borderRadius: 2,
+                                    }}
+                                >
+                                    <FaClock
+                                        size={20}
+                                        color={theme.palette.secondary.main}
+                                    />
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                        sx={{ mt: 1 }}
+                                    >
+                                        Time
+                                    </Typography>
+                                    <Typography
+                                        variant="body1"
+                                        sx={{ fontWeight: "bold" }}
+                                    >
+                                        {selectedTime}
+                                    </Typography>
+                                </Paper>
+                            </Grid>
+
+                            <Grid item xs={12} sm={6} md={3}>
+                                <Paper
+                                    elevation={2}
+                                    sx={{
+                                        p: 2,
+                                        textAlign: "center",
+                                        bgcolor: "success.50",
+                                        borderRadius: 2,
+                                    }}
+                                >
+                                    <FaMoneyBillWave
+                                        size={20}
+                                        color={theme.palette.success.main}
+                                    />
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                        sx={{ mt: 1 }}
+                                    >
+                                        Fee
+                                    </Typography>
+                                    <Typography
+                                        variant="body1"
+                                        sx={{ fontWeight: "bold" }}
+                                    >
+                                        ₹{doctor.consultation_fee}
+                                    </Typography>
+                                </Paper>
+                            </Grid>
+
+                            <Grid item xs={12} sm={6} md={3}>
+                                <Paper
+                                    elevation={2}
+                                    sx={{
+                                        p: 2,
+                                        textAlign: "center",
+                                        bgcolor: "warning.50",
+                                        borderRadius: 2,
+                                    }}
+                                >
+                                    <FaUserCheck
+                                        size={20}
+                                        color={theme.palette.warning.main}
+                                    />
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                        sx={{ mt: 1 }}
+                                    >
+                                        Status
+                                    </Typography>
+                                    <Typography
+                                        variant="body1"
+                                        sx={{
+                                            fontWeight: "bold",
+                                            color: "success.main",
+                                        }}
+                                    >
+                                        Confirmed
+                                    </Typography>
+                                </Paper>
+                            </Grid>
+                        </Grid>
+
+                        {symptoms && (
+                            <Box
+                                sx={{
+                                    mt: 3,
+                                    p: 2,
+                                    bgcolor: "grey.50",
+                                    borderRadius: 2,
+                                }}
+                            >
+                                <Typography
+                                    variant="subtitle2"
+                                    color="text.secondary"
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 1,
+                                        mb: 1,
+                                    }}
+                                >
+                                    <FaNotesMedical size={14} />
+                                    Symptoms/Reason for Visit
+                                </Typography>
+                                <Typography variant="body2" sx={{ pl: 2.5 }}>
+                                    {symptoms}
+                                </Typography>
+                            </Box>
+                        )}
+
+                        {/* Payment Method Display */}
+                        <Box
+                            sx={{
+                                mt: 3,
+                                p: 2,
+                                bgcolor: "info.50",
+                                borderRadius: 2,
+                            }}
+                        >
+                            <Typography
+                                variant="subtitle2"
+                                color="text.secondary"
+                                sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1,
+                                    mb: 1,
+                                }}
+                            >
+                                <MdPayment size={14} />
+                                Payment Method
+                            </Typography>
+                            <Typography
+                                variant="body2"
+                                sx={{ pl: 2.5, fontWeight: "bold" }}
+                            >
+                                {paymentMethod === "clinic"
+                                    ? "Pay at Clinic"
+                                    : paymentMethod === "online"
+                                    ? "Online Payment"
+                                    : paymentMethod === "cash"
+                                    ? "Cash Payment"
+                                    : "Pay at Clinic"}
+                            </Typography>
+                        </Box>
+                    </CardContent>
+                </Card>
+
+                {/* Important Notes */}
+                <Stack spacing={2} sx={{ mt: 3 }}>
+                    <Alert
+                        severity="success"
+                        icon={<FaCheckCircle />}
+                        sx={{ borderRadius: 2 }}
+                    >
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                            <strong>Confirmation sent!</strong> You will receive
+                            appointment details via email and SMS.
+                        </Typography>
+                    </Alert>
+
+                    <Alert
+                        severity="info"
+                        icon={<MdAccessTime />}
+                        sx={{ borderRadius: 2 }}
+                    >
+                        <Typography variant="body2">
+                            <strong>Please arrive 15 minutes early</strong> for
+                            your appointment to complete any necessary
+                            paperwork.
+                        </Typography>
+                    </Alert>
+
+                    <Alert
+                        severity="warning"
+                        icon={<MdInfo />}
+                        sx={{ borderRadius: 2 }}
+                    >
+                        <Typography variant="body2">
+                            <strong>Payment:</strong>{" "}
+                            {paymentMethod === "clinic" || !paymentMethod
+                                ? "You can pay at the clinic during your visit. Payment confirmation will be updated after your appointment."
+                                : paymentMethod === "online"
+                                ? "Your online payment has been processed successfully."
+                                : "Please bring exact cash amount for your appointment."}
+                        </Typography>
+                    </Alert>
+                </Stack>
+
+                {/* Action Buttons */}
+                <Box
+                    sx={{
+                        mt: 4,
+                        display: "flex",
+                        gap: 2,
+                        flexDirection: { xs: "column", sm: "row" },
+                        justifyContent: "center",
+                    }}
+                >
+                    <Button
+                        variant="contained"
+                        size="large"
+                        startIcon={<Visibility />}
+                        onClick={() => navigate("/appointments")}
+                        sx={{
+                            color: "white",
+                            px: 4,
+                            py: 1.5,
+                            borderRadius: 2,
+                            fontWeight: 600,
+                        }}
+                    >
+                        View My Appointments
+                    </Button>
+                    <Button
+                        variant="outlined"
+                        size="large"
+                        startIcon={<Home />}
+                        onClick={() => navigate("/")}
+                        sx={{
+                            px: 4,
+                            py: 1.5,
+                            borderRadius: 2,
+                            fontWeight: 600,
+                        }}
+                    >
+                        Go Home
+                    </Button>
+                </Box>
+            </Box>
+        );
+    };
+
+    const renderStepContent = (step) => {
+        switch (step) {
+            case 0:
+                return (
+                    <Card elevation={2} sx={{ borderRadius: 2 }}>
+                        <CardContent sx={{ p: { xs: 2, md: 3 } }}>
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1,
+                                    mb: 3,
+                                }}
+                            >
+                                <Event color="primary" />
+                                <Typography
+                                    variant={isMobile ? "h6" : "h5"}
+                                    sx={{ fontWeight: "bold" }}
+                                >
+                                    Select Appointment Date & Time
+                                </Typography>
+                            </Box>
+
+                            <Grid container spacing={3}>
+                                <Grid item xs={12} md={6}>
+                                    <LocalizationProvider
+                                        dateAdapter={AdapterDateFns}
+                                    >
+                                        <DatePicker
+                                            label="Select Date"
+                                            value={selectedDate}
+                                            onChange={(newValue) => {
+                                                setSelectedDate(newValue);
+                                                setSelectedTime(""); // Reset time when date changes
+                                            }}
+                                            minDate={new Date()}
+                                            maxDate={
+                                                new Date(
+                                                    Date.now() +
+                                                        30 * 24 * 60 * 60 * 1000
+                                                )
+                                            }
+                                            enableAccessibleFieldDOMStructure={
+                                                false
+                                            }
+                                            slotProps={{
+                                                textField: {
+                                                    fullWidth: true,
+                                                    sx: {
+                                                        "& .MuiOutlinedInput-root":
+                                                            {
+                                                                borderRadius: 2,
+                                                            },
+                                                    },
+                                                },
+                                            }}
+                                        />
+                                    </LocalizationProvider>
+                                </Grid>
+
+                                {/* Time Selection - Show as buttons when date is selected */}
+                                <Grid item xs={12} md={6}>
+                                    {selectedDate && (
+                                        <Box>
+                                            <Typography
+                                                variant="h6"
+                                                sx={{
+                                                    mb: 2,
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: 1,
+                                                    fontWeight: "bold",
+                                                }}
+                                            >
+                                                <AccessTime color="primary" />
+                                                Select Time Slot
+                                            </Typography>
+
+                                            {loading ? (
+                                                <Box
+                                                    sx={{
+                                                        display: "flex",
+                                                        justifyContent:
+                                                            "center",
+                                                        alignItems: "center",
+                                                        py: 4,
+                                                    }}
+                                                >
+                                                    <CircularProgress
+                                                        size={32}
+                                                    />
+                                                    <Typography
+                                                        sx={{ ml: 2 }}
+                                                        color="text.secondary"
+                                                    >
+                                                        Loading available
+                                                        slots...
+                                                    </Typography>
+                                                </Box>
+                                            ) : availableSlots.length === 0 ? (
+                                                <Alert
+                                                    severity="warning"
+                                                    sx={{ borderRadius: 2 }}
+                                                >
+                                                    No time slots available for
+                                                    the selected date. Please
+                                                    choose another date.
+                                                </Alert>
+                                            ) : (
+                                                <Box
+                                                    sx={{
+                                                        display: "flex",
+                                                        flexWrap: "wrap",
+                                                        gap: 1.5,
+                                                        maxHeight: "200px",
+                                                        overflowY: "auto",
+                                                        p: 1,
+                                                    }}
+                                                >
+                                                    {availableSlots.map(
+                                                        (slot) => (
+                                                            <Button
+                                                                key={slot}
+                                                                variant={
+                                                                    selectedTime ===
+                                                                    slot
+                                                                        ? "contained"
+                                                                        : "outlined"
+                                                                }
+                                                                onClick={() =>
+                                                                    setSelectedTime(
+                                                                        slot
+                                                                    )
+                                                                }
+                                                                startIcon={
+                                                                    <FaClock
+                                                                        size={
+                                                                            14
+                                                                        }
+                                                                    />
+                                                                }
+                                                                sx={{
+                                                                    minWidth:
+                                                                        "120px",
+                                                                    height: "40px",
+                                                                    borderRadius: 2,
+                                                                    fontWeight: 600,
+                                                                    color:
+                                                                        selectedTime ===
+                                                                        slot
+                                                                            ? "white"
+                                                                            : "primary.main",
+                                                                    "&:hover": {
+                                                                        transform:
+                                                                            "translateY(-2px)",
+                                                                        boxShadow: 2,
+                                                                    },
+                                                                    transition:
+                                                                        "all 0.2s ease-in-out",
+                                                                }}
+                                                            >
+                                                                {slot}
+                                                            </Button>
+                                                        )
+                                                    )}
+                                                </Box>
+                                            )}
+                                        </Box>
+                                    )}
+                                </Grid>
+                            </Grid>
+
+                            {selectedDate && selectedTime && (
+                                <Alert
+                                    severity="success"
+                                    sx={{ mt: 3, borderRadius: 2 }}
+                                    icon={<CheckCircle />}
+                                >
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 1,
+                                        }}
+                                    >
+                                        <FaCalendarCheck
+                                            color={theme.palette.success.main}
+                                        />
+                                        <Typography sx={{ fontWeight: 600 }}>
+                                            Selected:{" "}
+                                            {formatDateDisplay(selectedDate)} at{" "}
+                                            {selectedTime}
+                                        </Typography>
+                                    </Box>
+                                </Alert>
+                            )}
+                        </CardContent>
+                    </Card>
                 );
+
+            case 1:
+                return (
+                    <Card elevation={2} sx={{ borderRadius: 2 }}>
+                        <CardContent sx={{ p: { xs: 2, md: 3 } }}>
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1,
+                                    mb: 3,
+                                }}
+                            >
+                                <FaNotesMedical
+                                    size={20}
+                                    color={theme.palette.primary.main}
+                                />
+                                <Typography
+                                    variant={isMobile ? "h6" : "h5"}
+                                    sx={{ fontWeight: "bold" }}
+                                >
+                                    Appointment Details
+                                </Typography>
+                            </Box>
+
+                            <Grid container spacing={3}>
+                                <Grid item xs={12}>
+                                    <TextField
+                                        fullWidth
+                                        label="Symptoms / Reason for Visit"
+                                        multiline
+                                        rows={4}
+                                        value={symptoms}
+                                        onChange={(e) =>
+                                            setSymptoms(e.target.value)
+                                        }
+                                        placeholder="Please describe your symptoms or reason for visiting the doctor..."
+                                        required
+                                        helperText="This information helps the doctor prepare for your visit"
+                                        InputProps={{
+                                            startAdornment: (
+                                                <FaStethoscope
+                                                    size={16}
+                                                    color={
+                                                        theme.palette.primary
+                                                            .main
+                                                    }
+                                                    style={{ marginRight: 8 }}
+                                                />
+                                            ),
+                                        }}
+                                        sx={{
+                                            "& .MuiOutlinedInput-root": {
+                                                borderRadius: 2,
+                                            },
+                                        }}
+                                    />
+                                </Grid>
+
+                                <Grid item xs={12}>
+                                    <TextField
+                                        fullWidth
+                                        label="Additional Notes (Optional)"
+                                        multiline
+                                        rows={2}
+                                        value={notes}
+                                        onChange={(e) =>
+                                            setNotes(e.target.value)
+                                        }
+                                        placeholder="Any additional information you'd like to share..."
+                                        InputProps={{
+                                            startAdornment: (
+                                                <Description
+                                                    fontSize="small"
+                                                    color="primary"
+                                                    sx={{ mr: 1 }}
+                                                />
+                                            ),
+                                        }}
+                                        sx={{
+                                            "& .MuiOutlinedInput-root": {
+                                                borderRadius: 2,
+                                            },
+                                        }}
+                                    />
+                                </Grid>
+                            </Grid>
+
+                            {/* Summary of selected date and time */}
+                            <Paper
+                                elevation={2}
+                                sx={{
+                                    mt: 3,
+                                    p: 2,
+                                    bgcolor: "grey.50",
+                                    borderRadius: 2,
+                                }}
+                            >
+                                <Typography
+                                    variant="subtitle1"
+                                    sx={{
+                                        fontWeight: "bold",
+                                        mb: 1,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 1,
+                                    }}
+                                >
+                                    <FaCalendarCheck
+                                        color={theme.palette.primary.main}
+                                    />
+                                    Appointment Schedule
+                                </Typography>
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        gap: 3,
+                                        flexWrap: "wrap",
+                                    }}
+                                >
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 1,
+                                        }}
+                                    >
+                                        <FaCalendarAlt
+                                            size={14}
+                                            color={theme.palette.primary.main}
+                                        />
+                                        <Typography
+                                            variant="body2"
+                                            color="text.secondary"
+                                        >
+                                            Date:
+                                        </Typography>
+                                        <Typography
+                                            variant="body2"
+                                            sx={{ fontWeight: "bold" }}
+                                        >
+                                            {selectedDate
+                                                ? formatDateDisplay(
+                                                      selectedDate
+                                                  )
+                                                : ""}
+                                        </Typography>
+                                    </Box>
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 1,
+                                        }}
+                                    >
+                                        <FaClock
+                                            size={14}
+                                            color={theme.palette.secondary.main}
+                                        />
+                                        <Typography
+                                            variant="body2"
+                                            color="text.secondary"
+                                        >
+                                            Time:
+                                        </Typography>
+                                        <Typography
+                                            variant="body2"
+                                            sx={{ fontWeight: "bold" }}
+                                        >
+                                            {selectedTime}
+                                        </Typography>
+                                    </Box>
+                                </Box>
+                            </Paper>
+                        </CardContent>
+                    </Card>
+                );
+
+            case 2:
+                return (
+                    <Card elevation={2} sx={{ borderRadius: 2 }}>
+                        <CardContent sx={{ p: { xs: 2, md: 3 } }}>
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1,
+                                    mb: 3,
+                                }}
+                            >
+                                <MdPayment
+                                    size={20}
+                                    color={theme.palette.primary.main}
+                                />
+                                <Typography
+                                    variant={isMobile ? "h6" : "h5"}
+                                    sx={{ fontWeight: "bold" }}
+                                >
+                                    Payment & Review
+                                </Typography>
+                            </Box>
+
+                            {/* Appointment Summary */}
+                            <Paper
+                                elevation={2}
+                                sx={{ p: 3, mb: 3, borderRadius: 2 }}
+                            >
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 1,
+                                        mb: 2,
+                                    }}
+                                >
+                                    <Description color="primary" />
+                                    <Typography
+                                        variant="h6"
+                                        sx={{ fontWeight: "bold" }}
+                                    >
+                                        Appointment Summary
+                                    </Typography>
+                                </Box>
+
+                                <Grid container spacing={2}>
+                                    <Grid item xs={12} sm={6}>
+                                        <Typography
+                                            variant="body2"
+                                            color="text.secondary"
+                                        >
+                                            Doctor:
+                                        </Typography>
+                                        <Box
+                                            sx={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 1,
+                                            }}
+                                        >
+                                            <FaUserMd
+                                                size={16}
+                                                color={
+                                                    theme.palette.primary.main
+                                                }
+                                            />
+                                            <Typography
+                                                variant="body1"
+                                                fontWeight="bold"
+                                            >
+                                                {doctor.user.name}
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+
+                                    <Grid item xs={12} sm={6}>
+                                        <Typography
+                                            variant="body2"
+                                            color="text.secondary"
+                                        >
+                                            Specialization:
+                                        </Typography>
+                                        <Box
+                                            sx={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 1,
+                                            }}
+                                        >
+                                            <FaStethoscope
+                                                size={16}
+                                                color={
+                                                    theme.palette.primary.main
+                                                }
+                                            />
+                                            <Typography
+                                                variant="body1"
+                                                fontWeight="bold"
+                                            >
+                                                {doctor.specialization}
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+
+                                    <Grid item xs={12} sm={6}>
+                                        <Typography
+                                            variant="body2"
+                                            color="text.secondary"
+                                        >
+                                            Clinic:
+                                        </Typography>
+                                        <Box
+                                            sx={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 1,
+                                            }}
+                                        >
+                                            <FaHospital
+                                                size={16}
+                                                color={
+                                                    theme.palette.primary.main
+                                                }
+                                            />
+                                            <Typography
+                                                variant="body1"
+                                                fontWeight="bold"
+                                            >
+                                                {clinic.name}
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+
+                                    <Grid item xs={12} sm={6}>
+                                        <Typography
+                                            variant="body2"
+                                            color="text.secondary"
+                                        >
+                                            Date:
+                                        </Typography>
+                                        <Box
+                                            sx={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 1,
+                                            }}
+                                        >
+                                            <FaCalendarAlt
+                                                size={16}
+                                                color={
+                                                    theme.palette.primary.main
+                                                }
+                                            />
+                                            <Typography
+                                                variant="body1"
+                                                fontWeight="bold"
+                                            >
+                                                {selectedDate
+                                                    ? formatDateDisplay(
+                                                          selectedDate
+                                                      )
+                                                    : ""}
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+
+                                    <Grid item xs={12} sm={6}>
+                                        <Typography
+                                            variant="body2"
+                                            color="text.secondary"
+                                        >
+                                            Time:
+                                        </Typography>
+                                        <Box
+                                            sx={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 1,
+                                            }}
+                                        >
+                                            <FaClock
+                                                size={16}
+                                                color={
+                                                    theme.palette.primary.main
+                                                }
+                                            />
+                                            <Typography
+                                                variant="body1"
+                                                fontWeight="bold"
+                                            >
+                                                {selectedTime}
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+
+                                    <Grid item xs={12} sm={6}>
+                                        <Typography
+                                            variant="body2"
+                                            color="text.secondary"
+                                        >
+                                            Consultation Fee:
+                                        </Typography>
+                                        <Box
+                                            sx={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 1,
+                                            }}
+                                        >
+                                            <FaMoneyBillWave
+                                                size={16}
+                                                color={
+                                                    theme.palette.success.main
+                                                }
+                                            />
+                                            <Typography
+                                                variant="h5"
+                                                color="primary"
+                                                fontWeight="bold"
+                                            >
+                                                ₹{doctor.consultation_fee}
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+                                </Grid>
+
+                                {symptoms && (
+                                    <Box
+                                        sx={{
+                                            mt: 2,
+                                            pt: 2,
+                                            borderTop: "1px solid #e0e0e0",
+                                        }}
+                                    >
+                                        <Typography
+                                            variant="body2"
+                                            color="text.secondary"
+                                        >
+                                            Symptoms/Reason:
+                                        </Typography>
+                                        <Typography variant="body2">
+                                            {symptoms}
+                                        </Typography>
+                                    </Box>
+                                )}
+
+                                {notes && (
+                                    <Box sx={{ mt: 1 }}>
+                                        <Typography
+                                            variant="body2"
+                                            color="text.secondary"
+                                        >
+                                            Additional Notes:
+                                        </Typography>
+                                        <Typography variant="body2">
+                                            {notes}
+                                        </Typography>
+                                    </Box>
+                                )}
+                            </Paper>
+
+                            {/* FIXED: Payment Method Selection with Responsive Layout */}
+                            <Paper
+                                elevation={2}
+                                sx={{ p: 3, mb: 3, borderRadius: 2 }}
+                            >
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 1,
+                                        mb: 2,
+                                    }}
+                                >
+                                    <Payment color="primary" />
+                                    <Typography
+                                        variant="h6"
+                                        sx={{ fontWeight: "bold" }}
+                                    >
+                                        Payment Method
+                                    </Typography>
+                                </Box>
+
+                                <FormControl component="fieldset">
+                                    <RadioGroup
+                                        value={paymentMethod}
+                                        onChange={(e) =>
+                                            setPaymentMethod(e.target.value)
+                                        }
+                                        sx={{
+                                            mt: 1,
+                                            // RESPONSIVE LAYOUT: Row on desktop, column on mobile
+                                            display: "flex",
+                                            flexDirection: {
+                                                xs: "column",
+                                                md: "row",
+                                            },
+                                            gap: 2,
+                                        }}
+                                    >
+                                        <FormControlLabel
+                                            value="clinic"
+                                            control={<Radio />}
+                                            label={
+                                                <Box
+                                                    sx={{
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: 1,
+                                                    }}
+                                                >
+                                                    <LocalHospital color="primary" />
+                                                    <Box>
+                                                        <Typography
+                                                            variant="body1"
+                                                            sx={{
+                                                                fontWeight: 600,
+                                                            }}
+                                                        >
+                                                            Pay at Clinic
+                                                        </Typography>
+                                                        <Typography
+                                                            variant="body2"
+                                                            color="text.secondary"
+                                                        >
+                                                            Pay during your
+                                                            visit at the clinic
+                                                        </Typography>
+                                                    </Box>
+                                                </Box>
+                                            }
+                                            sx={{
+                                                p: 2,
+                                                border:
+                                                    paymentMethod === "clinic"
+                                                        ? "2px solid"
+                                                        : "1px solid",
+                                                borderColor:
+                                                    paymentMethod === "clinic"
+                                                        ? "primary.main"
+                                                        : "grey.300",
+                                                borderRadius: 2,
+                                                bgcolor:
+                                                    paymentMethod === "clinic"
+                                                        ? "primary.50"
+                                                        : "transparent",
+                                                flex: { md: 1 }, // Equal width on desktop
+                                                m: 0, // Remove default margin
+                                            }}
+                                        />
+
+                                        <FormControlLabel
+                                            value="online"
+                                            control={<Radio />}
+                                            label={
+                                                <Box
+                                                    sx={{
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: 1,
+                                                    }}
+                                                >
+                                                    <CreditCard color="primary" />
+                                                    <Box>
+                                                        <Typography
+                                                            variant="body1"
+                                                            sx={{
+                                                                fontWeight: 600,
+                                                            }}
+                                                        >
+                                                            Online Payment
+                                                        </Typography>
+                                                        <Typography
+                                                            variant="body2"
+                                                            color="text.secondary"
+                                                        >
+                                                            Pay now using card,
+                                                            UPI, or net banking
+                                                        </Typography>
+                                                    </Box>
+                                                </Box>
+                                            }
+                                            sx={{
+                                                p: 2,
+                                                border:
+                                                    paymentMethod === "online"
+                                                        ? "2px solid"
+                                                        : "1px solid",
+                                                borderColor:
+                                                    paymentMethod === "online"
+                                                        ? "primary.main"
+                                                        : "grey.300",
+                                                borderRadius: 2,
+                                                bgcolor:
+                                                    paymentMethod === "online"
+                                                        ? "primary.50"
+                                                        : "transparent",
+                                                flex: { md: 1 }, // Equal width on desktop
+                                                m: 0, // Remove default margin
+                                            }}
+                                        />
+
+                                        <FormControlLabel
+                                            value="cash"
+                                            control={<Radio />}
+                                            label={
+                                                <Box
+                                                    sx={{
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: 1,
+                                                    }}
+                                                >
+                                                    <AccountBalanceWallet color="primary" />
+                                                    <Box>
+                                                        <Typography
+                                                            variant="body1"
+                                                            sx={{
+                                                                fontWeight: 600,
+                                                            }}
+                                                        >
+                                                            Cash Payment
+                                                        </Typography>
+                                                        <Typography
+                                                            variant="body2"
+                                                            color="text.secondary"
+                                                        >
+                                                            Pay with cash at the
+                                                            clinic
+                                                        </Typography>
+                                                    </Box>
+                                                </Box>
+                                            }
+                                            sx={{
+                                                p: 2,
+                                                border:
+                                                    paymentMethod === "cash"
+                                                        ? "2px solid"
+                                                        : "1px solid",
+                                                borderColor:
+                                                    paymentMethod === "cash"
+                                                        ? "primary.main"
+                                                        : "grey.300",
+                                                borderRadius: 2,
+                                                bgcolor:
+                                                    paymentMethod === "cash"
+                                                        ? "primary.50"
+                                                        : "transparent",
+                                                flex: { md: 1 }, // Equal width on desktop
+                                                m: 0, // Remove default margin
+                                            }}
+                                        />
+                                    </RadioGroup>
+                                </FormControl>
+                            </Paper>
+
+                            {/* Payment Info Alert */}
+                            <Alert
+                                severity={
+                                    paymentMethod === "online"
+                                        ? "success"
+                                        : "info"
+                                }
+                                sx={{ mb: 2, borderRadius: 2 }}
+                                icon={<MdPayment />}
+                            >
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 1,
+                                    }}
+                                >
+                                    {(paymentMethod === "clinic" ||
+                                        !paymentMethod) && (
+                                        <>
+                                            <LocalHospital />
+                                            You can pay at the clinic during
+                                            your visit. Payment confirmation
+                                            will be updated after your
+                                            appointment.
+                                        </>
+                                    )}
+                                    {paymentMethod === "online" && (
+                                        <>
+                                            <CreditCard />
+                                            Secure online payment. You will be
+                                            redirected to payment gateway after
+                                            confirmation.
+                                        </>
+                                    )}
+                                    {paymentMethod === "cash" && (
+                                        <>
+                                            <AccountBalanceWallet />
+                                            Please bring exact cash amount (₹
+                                            {doctor.consultation_fee}) for your
+                                            appointment.
+                                        </>
+                                    )}
+                                </Box>
+                            </Alert>
+                        </CardContent>
+                    </Card>
+                );
+
+            case 3:
+                return renderConfirmationSection();
 
             default:
                 return null;
@@ -5225,163 +8648,286 @@ const BookAppointmentPage = () => {
 
     return (
         <MainLayout>
-            <Container
-                maxWidth="md"
-                sx={{ py: { xs: 2, md: 4 }, mt: { xs: 8, md: 10 } }}
-            >
-                <Typography
-                    variant="h4"
-                    gutterBottom
-                    textAlign="center"
-                    sx={{ fontWeight: "bold" }}
-                >
-                    📅 Book Appointment
-                </Typography>
-
-                {/* Doctor & Clinic Info */}
-                <Card elevation={3} sx={{ mb: 4 }}>
-                    <CardContent>
-                        <Grid container spacing={3} alignItems="center">
-                            <Grid item xs={12} sm={6}>
-                                <Box
-                                    sx={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                    }}
-                                >
-                                    <Avatar
-                                        src={doctor.profile_image}
-                                        sx={{ width: 60, height: 60, mr: 2 }}
-                                    >
-                                        <Person />
-                                    </Avatar>
-                                    <Box>
-                                        <Typography
-                                            variant="h6"
-                                            sx={{ fontWeight: "bold" }}
-                                        >
-                                            👨‍⚕️ {doctor.user.name}
-                                        </Typography>
-                                        <Typography
-                                            variant="body2"
-                                            color="primary"
-                                        >
-                                            {doctor.specialization}
-                                        </Typography>
-                                        <Chip
-                                            label={`💰 ₹${doctor.consultation_fee}`}
-                                            size="small"
-                                            color="primary"
-                                        />
-                                    </Box>
-                                </Box>
-                            </Grid>
-
-                            <Grid item xs={12} sm={6}>
-                                <Box
-                                    sx={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                    }}
-                                >
-                                    <LocalHospital
-                                        sx={{ mr: 2, color: "primary.main" }}
-                                    />
-                                    <Box>
-                                        <Typography
-                                            variant="h6"
-                                            sx={{ fontWeight: "bold" }}
-                                        >
-                                            🏥 {clinic.name}
-                                        </Typography>
-                                        <Typography
-                                            variant="body2"
-                                            color="text.secondary"
-                                        >
-                                            📍 {clinic.address}
-                                        </Typography>
-                                    </Box>
-                                </Box>
-                            </Grid>
-                        </Grid>
-                    </CardContent>
-                </Card>
-
-                {/* Stepper */}
-                <Box sx={{ mb: 4 }}>
-                    <Stepper activeStep={activeStep} alternativeLabel>
-                        {steps.map((label) => (
-                            <Step key={label}>
-                                <StepLabel>{label}</StepLabel>
-                            </Step>
-                        ))}
-                    </Stepper>
-                </Box>
-
-                {/* Error Alert */}
-                {error && (
-                    <Alert severity="error" sx={{ mb: 3 }}>
-                        {error}
-                    </Alert>
-                )}
-
-                {/* Step Content */}
-                <Card elevation={3} sx={{ mb: 4 }}>
-                    <CardContent sx={{ p: 4 }}>
-                        {renderStepContent(activeStep)}
-                    </CardContent>
-                </Card>
-
-                {/* Navigation Buttons */}
+            <Container maxWidth="xl" sx={{ py: 10 }}>
                 {activeStep < 3 && (
-                    <Box
-                        sx={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                        }}
-                    >
-                        <Button
-                            disabled={activeStep === 0}
-                            onClick={handleBack}
-                            variant="outlined"
+                    <>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                position: "relative",
+                                width: "100vw",
+                                marginLeft: "calc(-50vw + 50%)",
+                                marginRight: "calc(-50vw + 50%)",
+                                gap: 1,
+                                mb: 4,
+                            }}
                         >
-                            ← Back
-                        </Button>
+                            <CalendarToday color="primary" fontSize="large" />
+                            <Typography
+                                variant={isMobile ? "h5" : "h4"}
+                                textAlign="center"
+                                sx={{ fontWeight: "bold" }}
+                            >
+                                Book Appointment
+                            </Typography>
+                        </Box>
 
-                        {activeStep === 2 ? (
-                            <Button
-                                variant="contained"
-                                onClick={handleBookAppointment}
-                                disabled={
-                                    booking || !selectedDate || !selectedTime
-                                }
-                                startIcon={
-                                    booking ? (
-                                        <CircularProgress size={20} />
-                                    ) : (
-                                        <CheckCircle />
-                                    )
-                                }
-                                sx={{ color: "white" }}
-                            >
-                                {booking ? "Booking..." : "✅ Confirm Booking"}
-                            </Button>
-                        ) : (
-                            <Button
-                                variant="contained"
-                                onClick={handleNext}
-                                disabled={
-                                    (activeStep === 0 &&
-                                        (!selectedDate || !selectedTime)) ||
-                                    (activeStep === 1 && !symptoms.trim())
-                                }
-                                sx={{ color: "white" }}
-                            >
-                                Next →
-                            </Button>
+                        {/* Doctor & Clinic Info */}
+                        <Card elevation={5} sx={{ mb: 4, borderRadius: 3 }}>
+                            <CardContent>
+                                <Grid container spacing={3} alignItems="center">
+                                    {/* Doctor Info */}
+                                    <Grid item xs={12} sm={6}>
+                                        <Box
+                                            sx={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                            }}
+                                        >
+                                            <Avatar
+                                                src={doctor.profile_image}
+                                                sx={{
+                                                    width: 65,
+                                                    height: 65,
+                                                    mr: 2,
+                                                }}
+                                            >
+                                                <FaUserMd size={50} />
+                                            </Avatar>
+
+                                            <Box>
+                                                <Typography
+                                                    variant="h6"
+                                                    sx={{
+                                                        fontWeight: "bold",
+                                                        mb: 0.5,
+                                                    }}
+                                                >
+                                                    {doctor.user.name}
+                                                </Typography>
+                                                <Typography
+                                                    variant="body2"
+                                                    color="text.secondary"
+                                                    sx={{ mb: 1 }}
+                                                >
+                                                    {doctor.specialization}
+                                                </Typography>
+                                                <Chip
+                                                    label={`₹${doctor.consultation_fee}`}
+                                                    size="small"
+                                                    color="primary"
+                                                    sx={{
+                                                        color: "white",
+                                                        fontWeight: "bold",
+                                                    }}
+                                                />
+                                            </Box>
+                                        </Box>
+                                    </Grid>
+
+                                    {/* Clinic Info */}
+                                    <Grid item xs={12} sm={6}>
+                                        <Box
+                                            sx={{
+                                                display: "flex",
+                                                alignItems: "flex-start",
+                                            }}
+                                        >
+                                            <LocalHospital
+                                                sx={{
+                                                    mr: 2,
+                                                    color: "primary.main",
+                                                    fontSize: 32,
+                                                }}
+                                            />
+                                            <Box>
+                                                <Typography
+                                                    variant="h6"
+                                                    color="text.secondary"
+                                                    sx={{
+                                                        fontWeight: "bold",
+                                                        mb: 0.5,
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: 1,
+                                                    }}
+                                                >
+                                                    <FaHospital
+                                                        size={16}
+                                                        color="primary"
+                                                    />
+                                                    {clinic.name}
+                                                </Typography>
+                                                <Typography
+                                                    variant="body2"
+                                                    color="text.secondary"
+                                                    sx={{
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: 0.5,
+                                                    }}
+                                                >
+                                                    <MdLocationOn
+                                                        size={
+                                                            isMobile ? 50 : 30
+                                                        }
+                                                    />
+                                                    {clinic.address}
+                                                </Typography>
+                                            </Box>
+                                        </Box>
+                                    </Grid>
+                                </Grid>
+                            </CardContent>
+                        </Card>
+
+                        {/* FIXED: Updated Stepper with proper completion logic */}
+                        <Card
+                            elevation={5}
+                            sx={{ p: 2, mb: 3, borderRadius: 3 }}
+                        >
+                            <Box sx={{ mb: 2 }}>
+                                <Stepper
+                                    activeStep={activeStep}
+                                    alternativeLabel={!isMobile}
+                                    orientation={
+                                        isMobile ? "vertical" : "horizontal"
+                                    }
+                                >
+                                    {steps.map((step, index) => {
+                                        const isCompleted =
+                                            index < activeStep ||
+                                            isStepCompleted(index);
+                                        const isActive = index === activeStep;
+
+                                        return (
+                                            <Step
+                                                key={step.label}
+                                                completed={isCompleted}
+                                            >
+                                                <StepLabel
+                                                    icon={step.icon}
+                                                    sx={{
+                                                        "& .MuiStepLabel-label":
+                                                            {
+                                                                fontSize:
+                                                                    isMobile
+                                                                        ? "0.9rem"
+                                                                        : "1rem",
+                                                                fontWeight:
+                                                                    isActive ||
+                                                                    isCompleted
+                                                                        ? "bold"
+                                                                        : "normal",
+                                                                color:
+                                                                    isCompleted &&
+                                                                    !isActive
+                                                                        ? "success.main"
+                                                                        : "inherit",
+                                                            },
+                                                        "& .MuiStepIcon-root": {
+                                                            color: isCompleted
+                                                                ? "success.main"
+                                                                : isActive
+                                                                ? "primary.main"
+                                                                : "grey.400",
+                                                            fontSize: "1.5rem",
+                                                        },
+                                                        "& .MuiStepIcon-text": {
+                                                            fill: isCompleted
+                                                                ? "white"
+                                                                : "inherit",
+                                                        },
+                                                    }}
+                                                >
+                                                    {step.label}
+                                                </StepLabel>
+                                            </Step>
+                                        );
+                                    })}
+                                </Stepper>
+                            </Box>
+                        </Card>
+                        {/* Error Alert */}
+                        {error && (
+                            <Alert severity="error" sx={{ mb: 3 }}>
+                                {error}
+                            </Alert>
                         )}
-                    </Box>
+
+                        {/* Step Content - Now wrapped in cards */}
+                        <Box sx={{ mb: 4 }}>
+                            {renderStepContent(activeStep)}
+                        </Box>
+
+                        {/* Navigation Buttons */}
+                        <Box
+                            sx={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                flexDirection: isMobile ? "column" : "row",
+                                gap: isMobile ? 2 : 0,
+                            }}
+                        >
+                            <Button
+                                disabled={activeStep === 0}
+                                onClick={handleBack}
+                                variant="outlined"
+                                startIcon={<ArrowBack />}
+                                sx={{ width: isMobile ? "100%" : "auto" }}
+                            >
+                                Back
+                            </Button>
+
+                            {activeStep === 2 ? (
+                                <Button
+                                    variant="contained"
+                                    onClick={handleBookAppointment}
+                                    disabled={
+                                        booking ||
+                                        !selectedDate ||
+                                        !selectedTime ||
+                                        !symptoms.trim()
+                                    }
+                                    startIcon={
+                                        booking ? (
+                                            <CircularProgress size={20} />
+                                        ) : (
+                                            <CheckCircle />
+                                        )
+                                    }
+                                    sx={{
+                                        color: "white",
+                                        width: isMobile ? "100%" : "auto",
+                                    }}
+                                >
+                                    {booking ? "Booking..." : "Confirm Booking"}
+                                </Button>
+                            ) : (
+                                <Button
+                                    variant="contained"
+                                    onClick={handleNext}
+                                    disabled={
+                                        (activeStep === 0 &&
+                                            (!selectedDate || !selectedTime)) ||
+                                        (activeStep === 1 && !symptoms.trim())
+                                    }
+                                    endIcon={<ArrowForward />}
+                                    sx={{
+                                        color: "white",
+                                        width: isMobile ? "100%" : "auto",
+                                    }}
+                                >
+                                    Next
+                                </Button>
+                            )}
+                        </Box>
+                    </>
                 )}
+
+                {activeStep === 3 && renderConfirmationSection()}
             </Container>
         </MainLayout>
     );
@@ -6052,8 +9598,6 @@ import {
     MenuItem,
     TextField,
     Button,
-    Card,
-    CardContent,
     Avatar,
     Chip,
     Rating,
@@ -6288,17 +9832,21 @@ const SearchSection = () => {
     return (
         <>
             <Box
-                sx={{
-                    background: '#fff',
-                    color: '#1a2a32',
-                    boxShadow: '0 8px 32px 0 rgba(16,217,21,0.10), 0 1.5px 4px 0 rgba(60,60,60,0.10)',
-                    borderRadius: 5,
-                    py: { xs: 8, md: 12 },
-                    position: 'relative',
-                    overflow: 'hidden',
-                }}
-            >
-                <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1 }}>
+            sx={{
+                background: '#fff',
+                color: '#1a2a32',
+                boxShadow: '0 8px 32px 0 rgba(16,217,21,0.10), 0 1.5px 4px 0 rgba(60,60,60,0.10)',
+                borderRadius: 2,
+                py: { xs: 8, md: 12 },
+                position: 'relative',
+                overflow: 'hidden',
+                // Make this section full width
+                width: '100vw',
+                marginLeft: 'calc(-50vw + 50%)',
+                marginRight: 'calc(-50vw + 50%)',
+            }}
+        >
+                <Container maxWidth="xl" sx={{ position: 'relative', zIndex: 1 }}>
                     {/* OLD: Hero Content with Typewriter Animation */}
                     <Box textAlign="center" mb={6}>
                         <Typography 
@@ -6535,7 +10083,7 @@ const SearchSection = () => {
                                                                                     <Chip 
                                                                                         label={`₹${result.fee}`}
                                                                                         size="small"
-                                                                                        color="primary"
+                                                                                        color="secondary"
                                                                                         variant="outlined"
                                                                                         sx={{ 
                                                                                             fontSize: { xs: '0.7rem', md: '0.75rem' },
@@ -6554,7 +10102,7 @@ const SearchSection = () => {
                                                                     ) : (
                                                                         <>
                                                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                                                                                <LocationOn fontSize="small" color="action" sx={{ fontSize: { xs: '1rem', md: '1.2rem' } }} />
+                                                                                <LocationOn fontSize="small" color="primary" sx={{ fontSize: { xs: '1rem', md: '1.2rem' } }} />
                                                                                 <Typography variant="body2" sx={{ fontSize: { xs: '0.8rem', md: '0.875rem' } }}>
                                                                                     {result.address}
                                                                                 </Typography>
@@ -6679,403 +10227,608 @@ export default SearchSection;
 **resources/js/components/home/NearbySection.jsx**
 
 ```jsx
-import React from 'react';
+import React from "react";
 import {
-  Box,
-  Container,
-  Typography,
-  Grid,
-  Card,
-  CardMedia,
-  CardContent,
-  CardActions,
-  Button,
-  Chip,
-  Rating,
-  Avatar,
-  Paper,
-  Divider,
-} from '@mui/material';
+    Box,
+    Container,
+    Typography,
+    Grid,
+    Card,
+    CardMedia,
+    CardContent,
+    CardActions,
+    Button,
+    Chip,
+    Rating,
+    Avatar,
+    Paper,
+    Divider,
+} from "@mui/material";
 import {
-  LocationOn,
-  Verified,
-  LocalHospital,
-  AccessTime,
-  CheckCircle,
-  Phone,
-  Star,
-} from '@mui/icons-material';
-import MedicalInformationTwoToneIcon from '@mui/icons-material/MedicalInformationTwoTone';
-import Diversity1TwoToneIcon from '@mui/icons-material/Diversity1TwoTone';
-import { clinics, doctors } from '../../data/dummyData';
+    LocationOn,
+    Verified,
+    LocalHospital,
+    AccessTime,
+    CheckCircle,
+} from "@mui/icons-material";
+import MedicalInformationTwoToneIcon from "@mui/icons-material/MedicalInformationTwoTone";
+import Diversity1TwoToneIcon from "@mui/icons-material/Diversity1TwoTone";
+import { clinics, doctors } from "../../data/dummyData";
 
 const NearbySection = () => {
-  return (
-    <Box sx={{ py: { xs: 6, md: 10 }, bgcolor: '#fafbfc' }}>
-      <Container maxWidth="lg">
-
-        {/* Nearby Clinics */}
-        <Box sx={{ mb: { xs: 6, md: 10 } }}>
-          <Box textAlign="center" sx={{ mb: { xs: 4, md: 6 } }}>
-            <Typography
-              variant="h3"
-              component="h2"
-              gutterBottom
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: { xs: 1, sm: 1.25, md: 1.5 },
-                fontWeight: 'bold',
-                fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
-                background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }}
-            >
-              <MedicalInformationTwoToneIcon
-                sx={{
-                  fontSize: { xs: 40, sm: 50, md: 60 },
-                  color: '#2196F3',
-                  filter: 'drop-shadow(0 2px 6px rgba(33,150,243,0.25))',
-                }}
-              />
-              <Box component="span" sx={{ lineHeight: 1 }}>
-                🏥 Nearby Clinics
-              </Box>
-            </Typography>
-            <Typography
-              variant="h6"
-              color="text.secondary"
-              sx={{
-                maxWidth: 600,
-                mx: 'auto',
-                fontSize: { xs: '1rem', md: '1.25rem' },
-                px: { xs: 2, md: 0 }
-              }}
-            >
-              🏆 Top-rated medical facilities in your area with comprehensive healthcare services
-            </Typography>
-          </Box>
-
-          <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
-            {clinics.map((clinic) => (
-              <Grid item xs={12} sm={6} md={6} lg={4} xl={3} key={clinic.id}>
-                <Card
-                  elevation={0}
-                  sx={{
-                    height: '100%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    border: '1px solid',
-                    borderColor: 'grey.200',
-                    borderRadius: { xs: 3, md: 2 },
-                    overflow: 'hidden',
-                    background: 'linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%)',
-                    '&:hover': {
-                      transform: 'translateY(-8px)',
-                      boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
-                      borderColor: 'primary.main',
-                    },
-                    transition: 'all 0.3s ease',
-                  }}
-                >
-                  <Box sx={{ position: 'relative' }}>
-                    <CardMedia
-                      component="img"
-                      height={180}
-                      image={clinic.image}
-                      alt={clinic.name}
-                      sx={{ objectFit: 'cover' }}
-                    />
-                    <Box
-                      sx={{
-                        position: 'absolute',
-                        top: 12,
-                        right: 12,
-                        display: 'flex',
-                        gap: 1
-                      }}
-                    >
-                      {clinic.isOpen && (
-                        <Chip
-                          label="🟢 Open Now"
-                          size="small"
-                          icon={<CheckCircle />}
-                          sx={{
-                            bgcolor: 'success.main',
-                            color: 'white',
-                            fontWeight: 600,
-                            '& .MuiChip-icon': { color: 'white' }
-                          }}
-                        />
-                      )}
-                      <Chip
-                        label={`📍 ${clinic.distance}`}
-                        size="small"
-                        sx={{
-                          bgcolor: 'rgba(255,255,255,0.9)',
-                          fontWeight: 600,
-                          backdropFilter: 'blur(10px)'
-                        }}
-                      />
-                    </Box>
-                  </Box>
-
-                  <CardContent sx={{ flexGrow: 1, p: { xs: 1, md: 2 } }}>
-                    <Typography
-                      variant="h6"
-                      component="h3"
-                      sx={{
-                        fontWeight: 'bold',
-                        mb: 1,
-                        fontSize: { xs: '1.25rem', md: '1.35rem' },
-                      }}
-                    >
-                      🏥 {clinic.name}
-                    </Typography>
-
-                    <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 1 }}>
-                      <LocationOn sx={{ color: 'text.secondary', mr: 1, fontSize: 18 }} />
-                      <Typography variant="body2" color="text.secondary">
-                        📍 {clinic.address}
-                      </Typography>
+    return (
+        <Box
+            sx={{
+                py: { xs: 6, md: 10 },
+                position: "relative",
+                width: "100vw",
+                marginLeft: "calc(-50vw + 50%)",
+                marginRight: "calc(-50vw + 50%)",
+                bgcolor: "#fafbfc",
+            }}
+        >
+            <Container maxWidth="xl">
+                {/* Nearby Clinics */}
+                <Box sx={{ mb: { xs: 6, md: 10 } }}>
+                    <Box textAlign="center" sx={{ mb: { xs: 4, md: 6 } }}>
+                        <Typography
+                            variant="h3"
+                            component="h2"
+                            gutterBottom
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: { xs: 1, sm: 1.25, md: 1.5 },
+                                fontWeight: "bold",
+                                fontSize: {
+                                    xs: "2rem",
+                                    sm: "2.5rem",
+                                    md: "3rem",
+                                },
+                                background:
+                                    "linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)",
+                                backgroundClip: "text",
+                                WebkitBackgroundClip: "text",
+                                WebkitTextFillColor: "transparent",
+                            }}
+                        >
+                            <MedicalInformationTwoToneIcon
+                                sx={{
+                                    fontSize: { xs: 40, sm: 50, md: 60 },
+                                    color: "#2196F3",
+                                    filter: "drop-shadow(0 2px 6px rgba(33,150,243,0.25))",
+                                }}
+                            />
+                            <Box component="span" sx={{ lineHeight: 1 }}>
+                                Nearby Clinics
+                            </Box>
+                        </Typography>
+                        <Typography
+                            variant="h6"
+                            color="text.secondary"
+                            sx={{
+                                maxWidth: 600,
+                                mx: "auto",
+                                fontSize: { xs: "1rem", md: "1.25rem" },
+                                px: { xs: 2, md: 0 },
+                            }}
+                        >
+                            Top-rated medical facilities in your area with
+                            comprehensive healthcare services
+                        </Typography>
                     </Box>
 
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                      <Rating value={clinic.rating} precision={0.1} size="small" readOnly />
-                      <Typography variant="body2" sx={{ ml: 1, fontWeight: 600 }}>
-                        ⭐ {clinic.rating} ({clinic.reviewCount} reviews)
-                      </Typography>
-                    </Box>
+                    <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
+                        {clinics.map((clinic) => (
+                            <Grid
+                                item
+                                xs={12}
+                                sm={6}
+                                md={6}
+                                lg={4}
+                                xl={3}
+                                key={clinic.id}
+                            >
+                                <Card
+                                    elevation={0}
+                                    sx={{
+                                        height: "100%",
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        border: "1px solid",
+                                        borderColor: "grey.200",
+                                        borderRadius: { xs: 3, md: 2 },
+                                        overflow: "hidden",
+                                        background:
+                                            "linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%)",
+                                        "&:hover": {
+                                            transform: "translateY(-8px)",
+                                            boxShadow:
+                                                "0 20px 40px rgba(0,0,0,0.1)",
+                                            borderColor: "primary.main",
+                                        },
+                                        transition: "all 0.3s ease",
+                                    }}
+                                >
+                                    {/* Clinic Image */}
+                                    <Box sx={{ position: "relative" }}>
+                                        <CardMedia
+                                            component="img"
+                                            height={180}
+                                            image={clinic.image}
+                                            alt={clinic.name}
+                                            sx={{ objectFit: "cover" }}
+                                        />
+                                        <Box
+                                            sx={{
+                                                position: "absolute",
+                                                top: 12,
+                                                right: 12,
+                                                display: "flex",
+                                                gap: 1,
+                                            }}
+                                        >
+                                            {clinic.isOpen && (
+                                                <Chip
+                                                    label="Open Now"
+                                                    size="small"
+                                                    icon={<CheckCircle />}
+                                                    sx={{
+                                                        bgcolor: "success.main",
+                                                        color: "white",
+                                                        fontWeight: 600,
+                                                        "& .MuiChip-icon": {
+                                                            color: "white",
+                                                        },
+                                                    }}
+                                                />
+                                            )}
+                                            <Chip
+                                                label={clinic.distance}
+                                                size="small"
+                                                sx={{
+                                                    bgcolor:
+                                                        "rgba(255,255,255,0.9)",
+                                                    fontWeight: 600,
+                                                    backdropFilter:
+                                                        "blur(10px)",
+                                                }}
+                                            />
+                                        </Box>
+                                    </Box>
 
-                    <Box sx={{ mb: 1.5 }}>
-                      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                        🛠️ Facilities
-                      </Typography>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
-                        {clinic.facilities.slice(0, 2).map((facility, idx) => (
-                          <Chip key={idx} label={facility} size="small" variant="outlined" />
+                                    {/* Clinic Content */}
+                                    <CardContent
+                                        sx={{
+                                            flexGrow: 1,
+                                            p: { xs: 1, md: 2 },
+                                        }}
+                                    >
+                                        <Typography
+                                            variant="h6"
+                                            component="h3"
+                                            sx={{
+                                                fontWeight: "bold",
+                                                mb: 1,
+                                                fontSize: {
+                                                    xs: "1.25rem",
+                                                    md: "1.35rem",
+                                                },
+                                            }}
+                                        >
+                                            {clinic.name}
+                                        </Typography>
+
+                                        {/* Address */}
+                                        <Box
+                                            sx={{
+                                                display: "flex",
+                                                alignItems: "flex-start",
+                                                mb: 1,
+                                            }}
+                                        >
+                                            <LocationOn
+                                                sx={{
+                                                    color: "text.secondary",
+                                                    mr: 1,
+                                                    fontSize: 18,
+                                                }}
+                                            />
+                                            <Typography
+                                                variant="body2"
+                                                color="text.secondary"
+                                            >
+                                                {clinic.address}
+                                            </Typography>
+                                        </Box>
+
+                                        {/* Rating */}
+                                        <Box
+                                            sx={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                mb: 1,
+                                            }}
+                                        >
+                                            <Rating
+                                                value={clinic.rating}
+                                                precision={0.1}
+                                                size="small"
+                                                readOnly
+                                            />
+                                            <Typography
+                                                variant="body2"
+                                                sx={{ ml: 1, fontWeight: 600 }}
+                                            >
+                                                {clinic.rating}
+                                            </Typography>
+                                        </Box>
+
+                                        {/* Facilities */}
+                                        <Box sx={{ mb: 1.5 }}>
+                                            <Typography
+                                                variant="caption"
+                                                color="text.secondary"
+                                                sx={{ fontWeight: 600 }}
+                                            >
+                                                Facilities
+                                            </Typography>
+                                            <Box
+                                                sx={{
+                                                    display: "flex",
+                                                    flexWrap: "wrap",
+                                                    gap: 0.5,
+                                                    mt: 1,
+                                                }}
+                                            >
+                                                {clinic.facilities
+                                                    .slice(0, 2)
+                                                    .map((facility, idx) => (
+                                                        <Chip
+                                                            key={idx}
+                                                            label={facility}
+                                                            size="small"
+                                                            variant="outlined"
+                                                        />
+                                                    ))}
+                                                {clinic.facilities.length >
+                                                    2 && (
+                                                    <Chip
+                                                        label={`+${
+                                                            clinic.facilities
+                                                                .length - 2
+                                                        }`}
+                                                        size="small"
+                                                    />
+                                                )}
+                                            </Box>
+                                        </Box>
+
+                                        {/* Timings */}
+                                        <Box
+                                            sx={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                            }}
+                                        >
+                                            <AccessTime
+                                                sx={{
+                                                    color: "text.secondary",
+                                                    fontSize: 18,
+                                                    mr: 1,
+                                                }}
+                                            />
+                                            <Typography
+                                                variant="caption"
+                                                color="text.secondary"
+                                            >
+                                                {clinic.openTime === "24/7"
+                                                    ? "Open 24/7"
+                                                    : `${clinic.openTime} - ${clinic.closeTime}`}
+                                            </Typography>
+                                        </Box>
+                                    </CardContent>
+
+                                    <Divider />
+
+                                    {/* Button */}
+                                    <CardActions sx={{ p: { xs: 1, md: 1 } }}>
+                                        <Button
+                                            variant="contained"
+                                            fullWidth
+                                            startIcon={<LocalHospital />}
+                                            sx={{
+                                                borderRadius: 3,
+                                                py: { xs: 1.5, md: 1.8 },
+                                                fontWeight: 600,
+                                                color: "white",
+                                                background:
+                                                    "linear-gradient(45deg, #0cb010 30%, #10d915 90%)",
+                                            }}
+                                        >
+                                            View Details
+                                        </Button>
+                                    </CardActions>
+                                </Card>
+                            </Grid>
                         ))}
-                        {clinic.facilities.length > 2 && (
-                          <Chip 
-                            label={`+${clinic.facilities.length - 2} more`} 
-                            size="small" 
-                            color="primary"
-                          />
-                        )}
-                      </Box>
+                    </Grid>
+                </Box>
+
+                {/* Doctors Section */}
+                <Box>
+                    <Box textAlign="center" sx={{ mb: { xs: 4, md: 6 } }}>
+                        <Typography
+                            variant="h3"
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: { xs: 1, sm: 1.25, md: 1.5 },
+                                fontWeight: "bold",
+                                fontSize: {
+                                    xs: "2rem",
+                                    sm: "2.5rem",
+                                    md: "3rem",
+                                },
+                                background:
+                                    "linear-gradient(45deg, #FF6B6B 30%, #FF8E8E 90%)",
+                                backgroundClip: "text",
+                                WebkitBackgroundClip: "text",
+                                WebkitTextFillColor: "transparent",
+                                mb: 1,
+                            }}
+                        >
+                            <Diversity1TwoToneIcon
+                                sx={{
+                                    fontSize: { xs: 30, sm: 40, md: 50 },
+                                    color: "#FF6B6B",
+                                    filter: "drop-shadow(0 2px 6px rgba(255,107,107,0.25))",
+                                }}
+                            />
+                            <Box component="span" sx={{ lineHeight: 1 }}>
+                                Available Doctors
+                            </Box>
+                        </Typography>
+                        <Typography
+                            variant="h6"
+                            color="text.secondary"
+                            sx={{
+                                maxWidth: 600,
+                                mx: "auto",
+                                fontSize: { xs: "1rem", md: "1.25rem" },
+                            }}
+                        >
+                            Experienced healthcare professionals ready to
+                            provide quality medical care
+                        </Typography>
                     </Box>
 
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <AccessTime sx={{ color: 'text.secondary', fontSize: 18, mr: 1 }} />
-                      <Typography variant="caption" color="text.secondary">
-                        🕒 {clinic.openTime === '24/7'
-                          ? 'Open 24/7'
-                          : `${clinic.openTime} - ${clinic.closeTime}`}
-                      </Typography>
-                    </Box>
-                  </CardContent>
+                    <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
+                        {doctors.map((doctor) => (
+                            <Grid
+                                item
+                                xs={12}
+                                sm={6}
+                                md={4}
+                                lg={3}
+                                key={doctor.id}
+                            >
+                                <Card
+                                    elevation={0}
+                                    sx={{
+                                        textAlign: "center",
+                                        p: { xs: 1, md: 1 },
+                                        height: "100%",
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        position: "relative",
+                                        border: "1px solid",
+                                        borderColor: "grey.200",
+                                        borderRadius: 3,
+                                        background:
+                                            "linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%)",
+                                        "&:hover": {
+                                            transform: "translateY(-8px)",
+                                            boxShadow:
+                                                "0 20px 40px rgba(0,0,0,0.1)",
+                                            borderColor: "primary.main",
+                                        },
+                                        transition: "all 0.3s ease",
+                                    }}
+                                >
+                                    {/* Avatar + Verified Badge */}
+                                    <Box
+                                        sx={{
+                                            position: "relative",
+                                            mb: { xs: 1.5, md: 2.5 },
+                                            width: "100%",
+                                        }}
+                                    >
+                                        <Avatar
+                                            src={doctor.image}
+                                            alt={doctor.name}
+                                            sx={{
+                                                width: {
+                                                    xs: 88,
+                                                    sm: 92,
+                                                    md: 104,
+                                                },
+                                                height: {
+                                                    xs: 88,
+                                                    sm: 92,
+                                                    md: 104,
+                                                },
+                                                mx: "auto",
+                                                border: 3,
+                                                borderColor: "primary.main",
+                                                boxShadow:
+                                                    "0 8px 20px rgba(0,0,0,0.08)",
+                                            }}
+                                        />
+                                        {doctor.isVerified && (
+                                            <Box
+                                                sx={{
+                                                    position: "absolute",
+                                                    right: "50%",
+                                                    bottom: {
+                                                        xs: -10,
+                                                        sm: -10,
+                                                        md: -8,
+                                                    },
+                                                    transform:
+                                                        "translateX(50%)",
+                                                    bgcolor: "success.main",
+                                                    borderRadius: "50%",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                    border: "2px solid white",
+                                                    boxShadow:
+                                                        "0 2px 8px rgba(0,0,0,0.2)",
+                                                    width: {
+                                                        xs: 26,
+                                                        sm: 28,
+                                                        md: 30,
+                                                    },
+                                                    height: {
+                                                        xs: 26,
+                                                        sm: 28,
+                                                        md: 30,
+                                                    },
+                                                }}
+                                            >
+                                                <Verified
+                                                    sx={{
+                                                        color: "white",
+                                                        fontSize: {
+                                                            xs: 18,
+                                                            sm: 20,
+                                                            md: 22,
+                                                        },
+                                                        lineHeight: 1,
+                                                    }}
+                                                />
+                                            </Box>
+                                        )}
+                                    </Box>
 
-                  <Divider />
+                                    {/* Name + Specialty */}
+                                    <Typography
+                                        variant="h6"
+                                        sx={{
+                                            fontWeight: "bold",
+                                            lineHeight: 1.2,
+                                        }}
+                                    >
+                                        {doctor.name}
+                                    </Typography>
+                                    <Typography
+                                        variant="body2"
+                                        color="primary"
+                                        sx={{ fontWeight: 600, mb: 0.5 }}
+                                    >
+                                        {doctor.specialty}
+                                    </Typography>
 
-                  <CardActions sx={{ p: { xs: 1, md: 1 } }}>
-                    <Button
-                      variant="contained"
-                      fullWidth
-                      startIcon={<LocalHospital />}
-                      sx={{
-                        borderRadius: 3,
-                        py: { xs: 1.5, md: 1.8 },
-                        fontWeight: 600,
-                        color: "white",
-                        background: 'linear-gradient(45deg, #0cb010 30%, #10d915 90%)',
-                      }}
-                    >
-                      🔍 View Details
-                    </Button>
-                  </CardActions>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
+                                    {/* Experience */}
+                                    <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                        sx={{ mb: 1 }}
+                                    >
+                                        {doctor.experience} years exp.
+                                    </Typography>
+
+                                    {/* Rating */}
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            mb: 1,
+                                        }}
+                                    >
+                                        <Rating
+                                            value={doctor.rating}
+                                            precision={0.1}
+                                            size="small"
+                                            readOnly
+                                        />
+                                        <Typography
+                                            variant="body2"
+                                            sx={{ ml: 0.75, fontWeight: 600 }}
+                                        >
+                                            {doctor.rating}
+                                        </Typography>
+                                    </Box>
+
+                                    {/* Fee */}
+                                    <Paper
+                                        variant="outlined"
+                                        sx={{
+                                            p: { xs: 0.5, md: 1 },
+                                            mb: 1,
+                                            background:
+                                                "linear-gradient(45deg, #E3F2FD 30%, #F3E5F5 90%)",
+                                            borderColor: "primary.200",
+                                            borderRadius: 3,
+                                        }}
+                                    >
+                                        <Typography
+                                            variant="h6"
+                                            color="primary"
+                                            sx={{ fontWeight: "bold" }}
+                                        >
+                                            ${doctor.fee}
+                                        </Typography>
+                                        <Typography
+                                            variant="caption"
+                                            color="text.secondary"
+                                        >
+                                            Consultation
+                                        </Typography>
+                                    </Paper>
+
+                                    {/* Next availability */}
+                                    <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                        sx={{ mb: "auto" }}
+                                    >
+                                        Available: {doctor.nextAvailable}
+                                    </Typography>
+
+                                    {/* CTA */}
+                                    <Button
+                                        variant="contained"
+                                        fullWidth
+                                        sx={{
+                                            mt: { xs: 1, md: 1.5 },
+                                            borderRadius: 3,
+                                            fontWeight: 600,
+                                            py: { xs: 0.9, md: 1.05 },
+                                            background:
+                                                "linear-gradient(45deg, #FF6B6B 30%, #FF8E8E 90%)",
+                                            boxShadow:
+                                                "0 4px 20px rgba(255, 107, 107, 0.3)",
+                                            "&:hover": {
+                                                boxShadow:
+                                                    "0 6px 25px rgba(255, 107, 107, 0.4)",
+                                            },
+                                        }}
+                                    >
+                                        Book Now
+                                    </Button>
+                                </Card>
+                            </Grid>
+                        ))}
+                    </Grid>
+                </Box>
+            </Container>
         </Box>
-
-        {/* Doctors Section */}
-        <Box>
-          <Box textAlign="center" sx={{ mb: { xs: 4, md: 6 } }}>
-            <Typography
-              variant="h3"
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: { xs: 1, sm: 1.25, md: 1.5 },
-                fontWeight: 'bold',
-                fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
-                background: 'linear-gradient(45deg, #FF6B6B 30%, #FF8E8E 90%)',
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                mb: 1
-              }}
-            >
-              <Diversity1TwoToneIcon
-                sx={{
-                  fontSize: { xs: 30, sm: 40, md: 50 },
-                  color: '#FF6B6B',
-                  filter: 'drop-shadow(0 2px 6px rgba(255,107,107,0.25))',
-                }}
-              />
-              <Box component="span" sx={{ lineHeight: 1 }}>
-                👨‍⚕️ Available Doctors
-              </Box>
-            </Typography>
-            <Typography
-              variant="h6"
-              color="text.secondary"
-              sx={{ maxWidth: 600, mx: 'auto', fontSize: { xs: '1rem', md: '1.25rem' } }}
-            >
-              🩺 Experienced healthcare professionals ready to provide quality medical care
-            </Typography>
-          </Box>
-
-          <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
-            {doctors.map((doctor) => (
-              <Grid item xs={12} sm={6} md={4} lg={3} key={doctor.id}>
-                <Card
-                  elevation={0}
-                  sx={{
-                    textAlign: 'center',
-                    p: { xs: 1, md: 1 },
-                    height: '100%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    position: 'relative',
-                    border: '1px solid',
-                    borderColor: 'grey.200',
-                    borderRadius: 3,
-                    background: 'linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%)',
-                    '&:hover': {
-                      transform: 'translateY(-8px)',
-                      boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
-                      borderColor: 'primary.main',
-                    },
-                    transition: 'all 0.3s ease',
-                  }}
-                >
-                  <Box sx={{ position: 'relative', mb: { xs: 1.5, md: 2.5 }, width: '100%' }}>
-                    <Avatar
-                      src={doctor.image}
-                      alt={doctor.name}
-                      sx={{
-                        width: { xs: 88, sm: 92, md: 104 },
-                        height: { xs: 88, sm: 92, md: 104 },
-                        mx: 'auto',
-                        border: 3,
-                        borderColor: 'primary.main',
-                        boxShadow: '0 8px 20px rgba(0,0,0,0.08)',
-                      }}
-                    />
-                    {doctor.isVerified && (
-                      <Box
-                        sx={{
-                          position: 'absolute',
-                          right: '50%',
-                          bottom: { xs: -10, sm: -10, md: -8 },
-                          transform: 'translateX(50%)',
-                          bgcolor: 'success.main',
-                          borderRadius: '50%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          border: '2px solid white',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-                          width: { xs: 26, sm: 28, md: 30 },
-                          height: { xs: 26, sm: 28, md: 30 },
-                        }}
-                      >
-                        <Verified
-                          sx={{
-                            color: 'white',
-                            fontSize: { xs: 18, sm: 20, md: 22 },
-                            lineHeight: 1,
-                          }}
-                        />
-                      </Box>
-                    )}
-                  </Box>
-
-                  <Typography variant="h6" sx={{ fontWeight: 'bold', lineHeight: 1.2 }}>
-                    👨‍⚕️ {doctor.name}
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    color="primary"
-                    sx={{ fontWeight: 600, mb: 0.5 }}
-                  >
-                    {doctor.specialty}
-                  </Typography>
-
-                  <Typography variant="caption" color="text.secondary" sx={{ mb: 1 }}>
-                    📅 {doctor.experience} years experience
-                  </Typography>
-
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
-                    <Rating value={doctor.rating} precision={0.1} size="small" readOnly />
-                    <Typography variant="body2" sx={{ ml: 0.75, fontWeight: 600 }}>
-                      ⭐ {doctor.rating}
-                    </Typography>
-                  </Box>
-
-                  <Paper
-                    variant="outlined"
-                    sx={{
-                      p: { xs: 0.5, md: 1 },
-                      mb: 1,
-                      background: 'linear-gradient(45deg, #E3F2FD 30%, #F3E5F5 90%)',
-                      borderColor: 'primary.200',
-                      borderRadius: 3
-                    }}
-                  >
-                    <Typography variant="h6" color="primary" sx={{ fontWeight: 'bold' }}>
-                      💰 ${doctor.fee}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Consultation Fee
-                    </Typography>
-                  </Paper>
-
-                  <Typography variant="caption" color="text.secondary" sx={{ mb: 'auto' }}>
-                    🕒 Available: {doctor.nextAvailable}
-                  </Typography>
-
-                  <Button
-                    variant="contained"
-                    fullWidth
-                    sx={{
-                      mt: { xs: 1, md: 1.5 },
-                      borderRadius: 3,
-                      fontWeight: 600,
-                      py: { xs: 0.9, md: 1.05 },
-                      background: 'linear-gradient(45deg, #FF6B6B 30%, #FF8E8E 90%)',
-                      boxShadow: '0 4px 20px rgba(255, 107, 107, 0.3)',
-                      '&:hover': {
-                        boxShadow: '0 6px 25px rgba(255, 107, 107, 0.4)',
-                      }
-                    }}
-                  >
-                    📅 Book Now
-                  </Button>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
-        </Box>
-      </Container>
-    </Box>
-  );
+    );
 };
 
 export default NearbySection;
@@ -7087,7 +10840,7 @@ export default NearbySection;
 **resources/js/components/home/StatsSection.jsx**
 
 ```jsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from "react";
 import {
     Box,
     Container,
@@ -7096,15 +10849,8 @@ import {
     Card,
     CardContent,
     Avatar,
-} from '@mui/material';
-import {
-    VerifiedUser,
-    LocalHospital,
-    Event,
-    Star,
-    TrendingUp,
-    People,
-} from '@mui/icons-material';
+} from "@mui/material";
+import { VerifiedUser, LocalHospital, Event, Star } from "@mui/icons-material";
 
 const StatsSection = () => {
     const [isVisible, setIsVisible] = useState(false);
@@ -7114,46 +10860,43 @@ const StatsSection = () => {
     const stats = [
         {
             icon: <VerifiedUser fontSize="large" />,
-            count: '500+',
+            count: "500+",
             targetValue: 500,
-            suffix: '+',
-            label: '✅ Verified Doctors',
-            color: 'success.main',
-            bgColor: 'success.50',
-            emoji: '👨‍⚕️'
+            suffix: "+",
+            label: "Verified Doctors",
+            color: "success.main",
+            bgColor: "success.50",
         },
         {
             icon: <LocalHospital fontSize="large" />,
-            count: '100+',
+            count: "100+",
             targetValue: 100,
-            suffix: '+',
-            label: '🏥 Healthcare Facilities',
-            color: 'primary.main',
-            bgColor: 'primary.50',
-            emoji: '🏥'
+            suffix: "+",
+            label: "Healthcare Facilities",
+            color: "primary.main",
+            bgColor: "primary.50",
         },
         {
             icon: <Event fontSize="large" />,
-            count: '10,000+',
+            count: "10,000+",
             targetValue: 10000,
-            suffix: '+',
-            label: '📅 Appointments Booked',
-            color: 'secondary.main',
-            bgColor: 'secondary.50',
-            emoji: '📋'
+            suffix: "+",
+            label: "Appointments Booked",
+            color: "secondary.main",
+            bgColor: "secondary.50",
         },
         {
             icon: <Star fontSize="large" />,
-            count: '4.8/5',
+            count: "4.8/5",
             targetValue: 4.8,
-            suffix: '/5',
-            label: '⭐ Average Rating',
-            color: 'warning.main',
-            bgColor: 'warning.50',
-            emoji: '🌟'
-        }
+            suffix: "/5",
+            label: "Average Rating",
+            color: "warning.main",
+            bgColor: "warning.50",
+        },
     ];
 
+    // Intersection Observer to detect when section comes into view
     useEffect(() => {
         const observer = new IntersectionObserver(
             ([entry]) => {
@@ -7175,6 +10918,7 @@ const StatsSection = () => {
         };
     }, [isVisible]);
 
+    // Animation function for counting numbers
     useEffect(() => {
         if (!isVisible) return;
 
@@ -7185,11 +10929,13 @@ const StatsSection = () => {
             const updateCount = () => {
                 const elapsed = Date.now() - startTime;
                 const progress = Math.min(elapsed / duration, 1);
-                
+
+                // Easing function for smooth animation
                 const easeOutQuart = 1 - Math.pow(1 - progress, 4);
-                const currentValue = startValue + (targetValue - startValue) * easeOutQuart;
-                
-                setAnimatedCounts(prev => {
+                const currentValue =
+                    startValue + (targetValue - startValue) * easeOutQuart;
+
+                setAnimatedCounts((prev) => {
                     const newCounts = [...prev];
                     newCounts[index] = currentValue;
                     return newCounts;
@@ -7203,6 +10949,7 @@ const StatsSection = () => {
             requestAnimationFrame(updateCount);
         };
 
+        // Start animations with slight delays for each stat
         stats.forEach((stat, index) => {
             setTimeout(() => {
                 animateCount(index, stat.targetValue, 2000);
@@ -7210,122 +10957,145 @@ const StatsSection = () => {
         });
     }, [isVisible]);
 
+    // Format the animated count values
     const formatCount = (value, index) => {
         const stat = stats[index];
         if (index === 3) {
+            // Rating stat
             return value.toFixed(1);
         } else if (index === 2 && value >= 1000) {
-            return (value / 1000).toFixed(value >= 10000 ? 0 : 1) + 'k';
+            // Appointments stat
+            return (value / 1000).toFixed(value >= 10000 ? 0 : 1) + "k";
         }
         return Math.floor(value).toString();
     };
 
     return (
-        <Box 
-            ref={sectionRef}
-            sx={{ 
+        <Box
+            sx={{
                 py: { xs: 6, md: 10 },
-                background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
-                position: 'relative'
+                background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
+                position: "relative",
+                width: "100vw",
+                marginLeft: "calc(-50vw + 50%)",
+                marginRight: "calc(-50vw + 50%)",
             }}
         >
-            <Container maxWidth="lg">
+            <Container maxWidth="xl">
                 <Box textAlign="center" sx={{ mb: { xs: 4, md: 6 } }}>
-                    <Typography 
-                        variant="h3" 
-                        component="h2" 
+                    <Typography
+                        variant="h3"
+                        component="h2"
                         gutterBottom
-                        sx={{ 
-                            fontWeight: 'bold', 
-                            color: 'text.primary',
-                            fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: 2,
+                        sx={{
+                            fontWeight: "bold",
+                            color: "text.primary",
+                            fontSize: { xs: "2rem", sm: "2.5rem", md: "3rem" },
                         }}
                     >
-                        <TrendingUp sx={{ fontSize: { xs: '2rem', md: '3rem' }, color: 'primary.main' }} />
-                        📊 Our Impact in Numbers
+                        Our Impact in Numbers
                     </Typography>
-                    <Typography 
-                        variant="h6" 
+                    <Typography
+                        variant="h6"
                         color="text.secondary"
-                        sx={{ 
-                            maxWidth: 600, 
-                            mx: 'auto',
-                            fontSize: { xs: '1rem', md: '1.25rem' },
-                            px: { xs: 2, md: 0 }
+                        sx={{
+                            maxWidth: 600,
+                            mx: "auto",
+                            fontSize: { xs: "1rem", md: "1.25rem" },
+                            px: { xs: 2, md: 0 },
                         }}
                     >
-                        🤝 Trusted by thousands of patients for quality healthcare services and professional medical care
+                        Trusted by thousands of patients for quality healthcare
+                        services and professional medical care
                     </Typography>
                 </Box>
 
                 <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
                     {stats.map((stat, index) => (
                         <Grid item xs={6} md={3} key={index}>
-                            <Card 
+                            <Card
                                 elevation={4}
-                                sx={{ 
-                                    textAlign: 'center',
+                                sx={{
+                                    textAlign: "center",
                                     p: { xs: 2, sm: 3, md: 4 },
-                                    height: '100%',
+                                    height: "100%",
                                     minHeight: { xs: 180, sm: 200, md: 220 },
-                                    background: 'linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%)',
-                                    border: '1px solid rgba(0,0,0,0.05)',
+                                    background:
+                                        "linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%)",
+                                    border: "1px solid rgba(0,0,0,0.05)",
                                     borderRadius: { xs: 3, md: 2 },
-                                    '&:hover': {
-                                        transform: 'translateY(-8px)',
+                                    "&:hover": {
+                                        transform: "translateY(-8px)",
                                         boxShadow: { xs: 4, md: 6 },
                                     },
-                                    transition: 'all 0.3s ease-in-out',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    justifyContent: 'center'
+                                    transition: "all 0.3s ease-in-out",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    justifyContent: "center",
                                 }}
                             >
-                                <CardContent sx={{ p: 0, flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                                    <Box sx={{ position: 'relative', mb: { xs: 2, md: 3 } }}>
-                                        <Avatar
-                                            sx={{
-                                                width: { xs: 50, sm: 60, md: 80 },
-                                                height: { xs: 50, sm: 60, md: 80 },
-                                                mx: 'auto',
-                                                bgcolor: stat.bgColor,
-                                                color: stat.color,
-                                                boxShadow: 2,
-                                                fontSize: { xs: '1.5rem', md: '2rem' }
-                                            }}
-                                        >
-                                            {stat.emoji}
-                                        </Avatar>
-                                    </Box>
-
-                                    <Typography 
-                                        variant="h3" 
-                                        component="div"
-                                        sx={{ 
-                                            fontWeight: 'bold',
+                                <CardContent
+                                    sx={{
+                                        p: 0,
+                                        flexGrow: 1,
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        justifyContent: "center",
+                                    }}
+                                >
+                                    <Avatar
+                                        sx={{
+                                            width: { xs: 50, sm: 60, md: 80 },
+                                            height: { xs: 50, sm: 60, md: 80 },
+                                            mx: "auto",
+                                            mb: { xs: 2, md: 3 },
+                                            bgcolor: stat.bgColor,
                                             color: stat.color,
-                                            mb: { xs: 0.5, md: 1 },
-                                            fontSize: { xs: '1.5rem', sm: '1.8rem', md: '2.5rem' },
-                                            lineHeight: 1.2,
-                                            fontFamily: 'monospace',
-                                            minHeight: { xs: '2rem', md: '2.5rem' }
+                                            boxShadow: 2,
                                         }}
                                     >
-                                        {formatCount(animatedCounts[index], index)}{stat.suffix}
+                                        {stat.icon}
+                                    </Avatar>
+
+                                    <Typography
+                                        variant="h3"
+                                        component="div"
+                                        sx={{
+                                            fontWeight: "bold",
+                                            color: stat.color,
+                                            mb: { xs: 0.5, md: 1 },
+                                            fontSize: {
+                                                xs: "1.5rem",
+                                                sm: "1.8rem",
+                                                md: "2.5rem",
+                                            },
+                                            lineHeight: 1.2,
+                                            fontFamily: "monospace", // Better for counting animation
+                                            minHeight: {
+                                                xs: "2rem",
+                                                md: "2.5rem",
+                                            }, // Prevent layout shift
+                                        }}
+                                    >
+                                        {formatCount(
+                                            animatedCounts[index],
+                                            index
+                                        )}
+                                        {stat.suffix}
                                     </Typography>
 
-                                    <Typography 
+                                    <Typography
                                         variant="h6"
                                         color="text.secondary"
-                                        sx={{ 
+                                        sx={{
                                             fontWeight: 500,
-                                            fontSize: { xs: '0.75rem', sm: '0.85rem', md: '1.1rem' },
+                                            fontSize: {
+                                                xs: "0.75rem",
+                                                sm: "0.85rem",
+                                                md: "1.1rem",
+                                            },
                                             lineHeight: 1.3,
-                                            px: { xs: 0.5, md: 0 }
+                                            px: { xs: 0.5, md: 0 },
                                         }}
                                     >
                                         {stat.label}
@@ -7336,33 +11106,20 @@ const StatsSection = () => {
                     ))}
                 </Grid>
 
-                <Box sx={{ mt: { xs: 4, md: 6 }, textAlign: 'center' }}>
-                    <Box
+                {/* Additional Info */}
+                <Box sx={{ mt: { xs: 4, md: 6 }, textAlign: "center" }}>
+                    <Typography
+                        variant="body1"
+                        color="text.secondary"
                         sx={{
-                            p: 3,
-                            background: 'rgba(255, 255, 255, 0.9)',
-                            borderRadius: 3,
-                            border: '1px solid rgba(16, 217, 21, 0.2)',
-                            boxShadow: '0 4px 20px rgba(16, 217, 21, 0.1)',
+                            fontStyle: "italic",
+                            fontSize: { xs: "0.9rem", md: "1rem" },
+                            px: { xs: 2, md: 0 },
                         }}
                     >
-                        <Typography 
-                            variant="body1" 
-                            color="text.secondary" 
-                            sx={{ 
-                                fontStyle: 'italic',
-                                fontSize: { xs: '0.9rem', md: '1rem' },
-                                px: { xs: 2, md: 0 },
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: 1,
-                            }}
-                        >
-                            <People sx={{ color: 'primary.main' }} />
-                            🤝 Join thousands of satisfied patients who trust Visit Care for their healthcare needs
-                        </Typography>
-                    </Box>
+                        Join thousands of satisfied patients who trust Visit
+                        Care for their healthcare needs
+                    </Typography>
                 </Box>
             </Container>
         </Box>
@@ -7378,7 +11135,7 @@ export default StatsSection;
 **resources/js/components/home/WhyChooseSection.jsx**
 
 ```jsx
-import React from 'react';
+import React from "react";
 import {
     Box,
     Container,
@@ -7387,7 +11144,7 @@ import {
     Card,
     CardContent,
     Avatar,
-} from '@mui/material';
+} from "@mui/material";
 import {
     LocationOn,
     Schedule,
@@ -7395,8 +11152,8 @@ import {
     PhoneIphone,
     Security,
     NotificationImportant,
-} from '@mui/icons-material';
-import { whyChooseFeatures } from '../../data/dummyData';
+} from "@mui/icons-material";
+import { whyChooseFeatures } from "../../data/dummyData";
 
 const WhyChooseSection = () => {
     const iconMap = {
@@ -7405,121 +11162,110 @@ const WhyChooseSection = () => {
         VerifiedUser: <VerifiedUser fontSize="large" />,
         PhoneIphone: <PhoneIphone fontSize="large" />,
         Security: <Security fontSize="large" />,
-        NotificationImportant: <NotificationImportant fontSize="large" />
+        NotificationImportant: <NotificationImportant fontSize="large" />,
     };
 
     const colors = [
-        { main: 'primary.main', bg: 'primary.50', emoji: '📍' },
-        { main: 'success.main', bg: 'success.50', emoji: '⏰' },
-        { main: 'info.main', bg: 'info.50', emoji: '✅' },
-        { main: 'warning.main', bg: 'warning.50', emoji: '📱' },
-        { main: 'error.main', bg: 'error.50', emoji: '🔒' },
-        { main: 'secondary.main', bg: 'secondary.50', emoji: '🔔' }
+        { main: "primary.main", bg: "primary.50" },
+        { main: "success.main", bg: "success.50" },
+        { main: "info.main", bg: "info.50" },
+        { main: "warning.main", bg: "warning.50" },
+        { main: "error.main", bg: "error.50" },
+        { main: "secondary.main", bg: "secondary.50" },
     ];
 
     return (
-        <Box sx={{ py: { xs: 6, md: 10 }, bgcolor: 'background.paper' }}>
-            <Container maxWidth="lg">
+        <Box
+            sx={{
+                py: { xs: 6, md: 10 },
+                position: "relative",
+                width: "100vw",
+                marginLeft: "calc(-50vw + 50%)",
+                marginRight: "calc(-50vw + 50%)",
+                bgcolor: "background.paper",
+            }}
+        >
+            <Container maxWidth="xl">
                 <Box textAlign="center" sx={{ mb: 8 }}>
-                    <Typography 
-                        variant="h3" 
-                        component="h2" 
+                    <Typography
+                        variant="h3"
+                        component="h2"
                         gutterBottom
-                        sx={{ 
-                            fontWeight: 'bold', 
-                            color: 'text.primary',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: 2,
-                        }}
+                        sx={{ fontWeight: "bold", color: "text.primary" }}
                     >
-                        🌟 Why Choose Visit Care?
+                        Why Choose Visit Care?
                     </Typography>
-                    <Typography 
-                        variant="h6" 
+                    <Typography
+                        variant="h6"
                         color="text.secondary"
-                        sx={{ maxWidth: 800, mx: 'auto', lineHeight: 1.6 }}
+                        sx={{ maxWidth: 800, mx: "auto", lineHeight: 1.6 }}
                     >
-                        🚀 We're revolutionizing healthcare with cutting-edge technology and a patient-first approach 
-                        that puts your health and convenience at the center of everything we do
+                        We're revolutionizing healthcare with cutting-edge
+                        technology and a patient-first approach that puts your
+                        health and convenience at the center of everything we do
                     </Typography>
                 </Box>
 
                 <Grid container spacing={4}>
                     {whyChooseFeatures.map((feature, index) => (
                         <Grid item xs={12} sm={6} lg={4} key={index}>
-                            <Card 
+                            <Card
                                 elevation={0}
-                                sx={{ 
-                                    textAlign: 'center',
+                                sx={{
+                                    textAlign: "center",
                                     p: { xs: 3, md: 4 },
-                                    height: '100%',
-                                    background: 'linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%)',
-                                    border: '1px solid rgba(0,0,0,0.05)',
+                                    height: "100%",
+                                    background:
+                                        "linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%)",
+                                    border: "1px solid rgba(0,0,0,0.05)",
                                     borderRadius: 3,
-                                    '&:hover': {
-                                        transform: 'translateY(-8px)',
+                                    "&:hover": {
+                                        transform: "translateY(-8px)",
                                         boxShadow: 8,
-                                        '& .feature-avatar': {
-                                            transform: 'scale(1.1)',
+                                        "& .feature-avatar": {
+                                            transform: "scale(1.1)",
                                         },
-                                        '& .feature-emoji': {
-                                            transform: 'rotate(360deg)',
-                                        }
                                     },
-                                    transition: 'all 0.4s ease-in-out'
+                                    transition: "all 0.4s ease-in-out",
                                 }}
                             >
                                 <CardContent>
-                                    <Box sx={{ position: 'relative', mb: 3 }}>
-                                        <Avatar
-                                            className="feature-avatar"
-                                            sx={{
-                                                width: 80,
-                                                height: 80,
-                                                mx: 'auto',
-                                                bgcolor: colors[index].bg,
-                                                color: colors[index].main,
-                                                boxShadow: 3,
-                                                transition: 'transform 0.3s ease-in-out'
-                                            }}
-                                        >
-                                            {iconMap[feature.icon]}
-                                        </Avatar>
-                                        <Typography
-                                            className="feature-emoji"
-                                            sx={{
-                                                position: 'absolute',
-                                                top: -10,
-                                                right: -10,
-                                                fontSize: '2rem',
-                                                transition: 'transform 0.6s ease-in-out',
-                                            }}
-                                        >
-                                            {colors[index].emoji}
-                                        </Typography>
-                                    </Box>
+                                    <Avatar
+                                        className="feature-avatar"
+                                        sx={{
+                                            width: 80,
+                                            height: 80,
+                                            mx: "auto",
+                                            mb: 3,
+                                            bgcolor: colors[index].bg,
+                                            color: colors[index].main,
+                                            boxShadow: 3,
+                                            transition:
+                                                "transform 0.3s ease-in-out",
+                                        }}
+                                    >
+                                        {iconMap[feature.icon]}
+                                    </Avatar>
 
-                                    <Typography 
-                                        variant="h5" 
+                                    <Typography
+                                        variant="h5"
                                         component="h3"
                                         gutterBottom
-                                        sx={{ 
-                                            fontWeight: 'bold',
-                                            color: 'text.primary',
-                                            mb: 2
+                                        sx={{
+                                            fontWeight: "bold",
+                                            color: "text.primary",
+                                            mb: 2,
                                         }}
                                     >
                                         {feature.title}
                                     </Typography>
 
-                                    <Typography 
+                                    <Typography
                                         variant="body1"
                                         color="text.secondary"
-                                        sx={{ 
+                                        sx={{
                                             lineHeight: 1.6,
-                                            fontSize: '1rem'
+                                            fontSize: "1rem",
                                         }}
                                     >
                                         {feature.description}
@@ -7543,7 +11289,7 @@ export default WhyChooseSection;
 **resources/js/components/home/TestimonialsSection.jsx**
 
 ```jsx
-import React from 'react';
+import React from "react";
 import {
     Box,
     Container,
@@ -7555,58 +11301,56 @@ import {
     Rating,
     Paper,
     Chip,
-} from '@mui/material';
-import { FormatQuote, LocationOn, Favorite } from '@mui/icons-material';
-import { testimonials } from '../../data/dummyData';
+} from "@mui/material";
+import { FormatQuote, LocationOn } from "@mui/icons-material";
+import { testimonials } from "../../data/dummyData";
 
 const TestimonialsSection = () => {
     return (
         <Box
             sx={{
                 py: { xs: 6, md: 10 },
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                color: 'white',
-                position: 'relative',
-                '&::before': {
+                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                color: "white",
+                padding: "0px",
+                position: "relative",
+                width: "100vw",
+                marginLeft: "calc(-50vw + 50%)",
+                marginRight: "calc(-50vw + 50%)",
+                "&::before": {
                     content: '""',
-                    position: 'absolute',
+                    position: "absolute",
                     top: 0,
                     left: 0,
                     right: 0,
                     bottom: 0,
                     background:
-                        'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.05\'%3E%3Ccircle cx=\'30\' cy=\'30\' r=\'2\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")',
+                        "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")",
                     opacity: 0.3,
-                }
+                },
             }}
         >
-            <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1 }}>
+            <Container maxWidth="xl" sx={{ position: "relative", zIndex: 1 }}>
                 <Box textAlign="center" sx={{ mb: 8 }}>
                     <Typography
                         variant="h3"
                         component="h2"
                         gutterBottom
-                        sx={{ 
-                            fontWeight: 'bold', 
-                            color: 'white',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: 2,
-                        }}
+                        sx={{ fontWeight: "bold", color: "white" }}
                     >
-                        💬 What Our Users Say
+                        What Our Users Say
                     </Typography>
                     <Typography
                         variant="h6"
                         sx={{
                             maxWidth: 600,
-                            mx: 'auto',
+                            mx: "auto",
                             opacity: 0.9,
-                            lineHeight: 1.6
+                            lineHeight: 1.6,
                         }}
                     >
-                        ⭐ Real stories from satisfied patients who found their perfect healthcare match through Visit Care
+                        Real stories from satisfied patients who found their
+                        perfect healthcare match through Visit Care
                     </Typography>
                 </Box>
 
@@ -7616,121 +11360,146 @@ const TestimonialsSection = () => {
                             <Card
                                 elevation={8}
                                 sx={{
-                                    height: '100%',
-                                    background: 'rgba(255, 255, 255, 0.95)',
-                                    backdropFilter: 'blur(10px)',
-                                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                                    height: "100%",
+                                    background: "rgba(255, 255, 255, 0.95)",
+                                    backdropFilter: "blur(10px)",
+                                    border: "1px solid rgba(255, 255, 255, 0.2)",
                                     borderRadius: 3,
-                                    '&:hover': {
-                                        transform: 'translateY(-8px)',
+                                    "&:hover": {
+                                        transform: "translateY(-8px)",
                                         boxShadow: 12,
                                     },
-                                    transition: 'all 0.3s ease-in-out',
-                                    position: 'relative',
-                                    overflow: 'visible'
+                                    transition: "all 0.3s ease-in-out",
+                                    position: "relative",
+                                    overflow: "visible",
                                 }}
                             >
+                                {/* Perfect Quote Icon Circle */}
                                 <Box
                                     sx={{
-                                        position: 'absolute',
+                                        position: "absolute",
                                         top: -22,
                                         left: 20,
                                         width: 44,
                                         height: 44,
-                                        bgcolor: 'primary.main',
-                                        borderRadius: '50%',
+                                        bgcolor: "primary.main",
+                                        borderRadius: "50%",
                                         boxShadow: 3,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
                                         zIndex: 2,
                                     }}
                                 >
-                                    <FormatQuote sx={{ color: 'white', fontSize: 24 }} />
+                                    <FormatQuote
+                                        sx={{ color: "white", fontSize: 24 }}
+                                    />
                                 </Box>
 
                                 <CardContent sx={{ p: 4, pt: 5 }}>
-                                    <Box sx={{ mb: 3, display: 'flex', justifyContent: 'center' }}>
+                                    {/* Rating */}
+                                    <Box
+                                        sx={{
+                                            mb: 3,
+                                            display: "flex",
+                                            justifyContent: "center",
+                                        }}
+                                    >
                                         <Rating
                                             value={testimonial.rating}
                                             readOnly
                                             size="small"
                                             sx={{
-                                                '& .MuiRating-iconFilled': {
-                                                    color: 'warning.main',
-                                                }
+                                                "& .MuiRating-iconFilled": {
+                                                    color: "warning.main",
+                                                },
                                             }}
                                         />
                                     </Box>
 
+                                    {/* Comment */}
                                     <Typography
                                         variant="body1"
                                         sx={{
                                             mb: 4,
-                                            fontStyle: 'italic',
-                                            color: 'text.secondary',
+                                            fontStyle: "italic",
+                                            color: "text.secondary",
                                             lineHeight: 1.6,
                                             minHeight: 80,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            position: 'relative',
-                                            '&::before': {
-                                                content: '"💬"',
-                                                position: 'absolute',
-                                                left: -20,
-                                                top: 0,
-                                                fontSize: '1.5rem',
-                                                opacity: 0.3,
-                                            }
+                                            display: "flex",
+                                            alignItems: "center",
                                         }}
                                     >
                                         "{testimonial.comment}"
                                     </Typography>
 
-                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    {/* User Info */}
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                        }}
+                                    >
                                         <Avatar
                                             src={testimonial.avatar}
                                             sx={{
                                                 width: 50,
                                                 height: 50,
                                                 mr: 2,
-                                                border: '2px solid',
-                                                borderColor: 'primary.main'
+                                                border: "2px solid",
+                                                borderColor: "primary.main",
                                             }}
                                         />
-                                        <Box sx={{ textAlign: 'left' }}>
+                                        <Box sx={{ textAlign: "left" }}>
                                             <Typography
                                                 variant="h6"
                                                 sx={{
-                                                    fontWeight: 'bold',
-                                                    color: 'text.primary',
-                                                    fontSize: '1rem'
+                                                    fontWeight: "bold",
+                                                    color: "text.primary",
+                                                    fontSize: "1rem",
                                                 }}
                                             >
-                                                👤 {testimonial.name}
+                                                {testimonial.name}
                                             </Typography>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
+                                            <Box
+                                                sx={{
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    mt: 0.5,
+                                                }}
+                                            >
                                                 <LocationOn
                                                     fontSize="small"
-                                                    sx={{ color: 'text.secondary', mr: 0.5 }}
+                                                    sx={{
+                                                        color: "text.secondary",
+                                                        mr: 0.5,
+                                                    }}
                                                 />
                                                 <Typography
                                                     variant="caption"
                                                     color="text.secondary"
                                                 >
-                                                    📍 {testimonial.location}
+                                                    {testimonial.location}
                                                 </Typography>
                                             </Box>
                                         </Box>
                                     </Box>
 
-                                    <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+                                    {/* Verified Badge */}
+                                    <Box
+                                        sx={{
+                                            mt: 2,
+                                            display: "flex",
+                                            justifyContent: "center",
+                                        }}
+                                    >
                                         <Chip
-                                            label="✅ Verified Patient"
+                                            label="Verified Patient"
                                             size="small"
                                             color="success"
                                             variant="outlined"
-                                            sx={{ fontSize: '0.7rem' }}
+                                            sx={{ fontSize: "0.7rem" }}
                                         />
                                     </Box>
                                 </CardContent>
@@ -7739,24 +11508,25 @@ const TestimonialsSection = () => {
                     ))}
                 </Grid>
 
-                <Box sx={{ mt: 8, textAlign: 'center' }}>
+                {/* Additional Info */}
+                <Box sx={{ mt: 8, textAlign: "center" }}>
                     <Paper
                         elevation={4}
                         sx={{
                             p: 4,
-                            bgcolor: 'rgba(255, 255, 255, 0.1)',
-                            backdropFilter: 'blur(10px)',
-                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                            bgcolor: "rgba(255, 255, 255, 0.1)",
+                            backdropFilter: "blur(10px)",
+                            border: "1px solid rgba(255, 255, 255, 0.2)",
                             borderRadius: 3,
-                            color: 'white'
+                            color: "white",
                         }}
                     >
-                        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
-                            <Favorite sx={{ color: 'red' }} />
-                            👥 Join 50,000+ Happy Patients
+                        <Typography variant="h6" gutterBottom>
+                            Join 50,000+ Happy Patients
                         </Typography>
                         <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                            📊 Over 98% of our users recommend Visit Care to their friends and family
+                            Over 98% of our users recommend Visit Care to their
+                            friends and family
                         </Typography>
                     </Paper>
                 </Box>
@@ -11865,5 +15635,3 @@ npm run dev
 - Performance optimizations
 
 **🚀 Your Visit Care application is ready for deployment and use!**
-
-
