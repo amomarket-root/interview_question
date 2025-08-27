@@ -4,7 +4,7 @@
 
 A comprehensive medical appointment booking system with Laravel backend integrated with Vite + React frontend using Material-UI, featuring doctor/clinic search, availability management, and appointment booking with beautiful icons and enhanced UI. All primary keys use UUIDs with proper Sanctum authentication support.
 
-***
+---
 
 ## 📁 Project Structure
 
@@ -36,9 +36,11 @@ visit_care/
 │   ├── migrations/
 │   │   ├── xxxx_create_users_table.php
 |   |   ├── xxxx_create_social_providers.php
+|   |   ├── xxxx_create_clinic_connection_requests.php
 │   │   ├── xxxx_create_cache_table.php
 │   │   ├── xxxx_create_jobs_table.php
 │   │   ├── xxxx_create_clinics_table.php
+│   │   ├── xxxx_add_owner_to_clinics_table.php
 │   │   ├── xxxx_create_doctors_table.php
 │   │   ├── xxxx_create_clinic_doctor_table.php
 │   │   ├── xxxx_create_appointments_table.php
@@ -59,6 +61,11 @@ visit_care/
 │   │   │   ├── common/
 │   │   │   │   ├── Header.jsx
 │   │   │   │   └── Footer.jsx
+│   │   │   └── doctor/
+│   │   │   │   ├── ProfileSetupModal.jsx
+│   │   │   |   └── ClinicSearchModal.jsx
+│   │   │   └── healthcare/
+│   │   │   |   └── HealthcareProfileSetupModal.jsx
 │   │   │   ├── home/
 │   │   │   │   ├── SearchSection.jsx
 │   │   │   │   ├── NearbySection.jsx
@@ -111,8 +118,7 @@ visit_care/
     └── README.md
 ```
 
-
-***
+---
 
 ## 🚀 Step-by-Step Installation Guide
 
@@ -130,7 +136,6 @@ composer require intervention/image
 composer require ramsey/uuid
 php artisan vendor:publish --provider="Laravel\Sanctum\SanctumServiceProvider"
 ```
-
 
 ### Step 2: Configuration Files
 
@@ -195,10 +200,7 @@ php artisan vendor:publish --provider="Laravel\Sanctum\SanctumServiceProvider"
             "Composer\\Config::disableProcessTimeout",
             "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1\" \"php artisan pail --timeout=0\" \"npm run dev\" --names=server,queue,logs,vite"
         ],
-        "test": [
-            "@php artisan config:clear --ansi",
-            "@php artisan test"
-        ]
+        "test": ["@php artisan config:clear --ansi", "@php artisan test"]
     },
     "extra": {
         "laravel": {
@@ -218,7 +220,6 @@ php artisan vendor:publish --provider="Laravel\Sanctum\SanctumServiceProvider"
     "prefer-stable": true
 }
 ```
-
 
 ### Step 3: Environment Configuration
 
@@ -356,7 +357,6 @@ APPLE_CLIENT_ID=your_apple_service_id
 APPLE_CLIENT_SECRET=your_apple_client_secret
 ```
 
-
 ### Step 4: CORS Configuration
 
 **config/cors.php**
@@ -376,8 +376,7 @@ return [
 ];
 ```
 
-
-***
+---
 
 ## 🔧 Backend Implementation
 
@@ -413,7 +412,6 @@ trait HasUuid
     }
 }
 ```
-
 
 ### Step 6: Database Migrations
 
@@ -508,10 +506,10 @@ return new class extends Migration
                   ->references('id')
                   ->on('users')
                   ->onDelete('cascade');
-                  
+
             // Unique constraint to prevent duplicate provider accounts
             $table->unique(['provider', 'provider_id']);
-            
+
             // Index for better performance
             $table->index(['user_id', 'provider']);
         });
@@ -565,6 +563,40 @@ return new class extends Migration
 };
 ```
 
+**database/migrations/xxxx_clinic_connection_requests.php**
+
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('clinic_connection_requests', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignUuid('doctor_id')->constrained('doctors')->onDelete('cascade');
+            $table->foreignUuid('clinic_id')->constrained('clinics')->onDelete('cascade');
+            $table->enum('status', ['pending', 'approved', 'rejected'])->default('pending');
+            $table->text('message')->nullable();
+            $table->text('rejection_reason')->nullable();
+            $table->json('proposed_schedule')->nullable(); // Doctor's proposed schedule
+            $table->timestamps();
+
+            $table->unique(['doctor_id', 'clinic_id']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('clinic_connection_requests');
+    }
+};
+```
+
 **database/migrations/xxxx_create_clinics_table.php**
 
 ```php
@@ -610,6 +642,45 @@ return new class extends Migration
 };
 ```
 
+**database/migrations/xxxx_add_owner_to_clinics_table.php**
+
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('clinics', function (Blueprint $table) {
+            $table->foreignUuid('owner_id')->nullable()->after('id')->constrained('users')->onDelete('cascade');
+            $table->string('registration_number')->nullable()->after('name');
+            $table->string('license_number')->nullable()->after('registration_number');
+            $table->enum('organization_type', ['hospital', 'clinic', 'diagnostic_center', 'pharmacy', 'nursing_home'])->default('clinic')->after('license_number');
+            $table->date('established_date')->nullable()->after('organization_type');
+            $table->integer('bed_count')->nullable()->after('established_date');
+            $table->json('certifications')->nullable()->after('bed_count');
+            $table->boolean('is_verified')->default(false)->after('certifications');
+            $table->string('logo')->nullable()->after('is_verified');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('clinics', function (Blueprint $table) {
+            $table->dropForeign(['owner_id']);
+            $table->dropColumn([
+                'owner_id', 'registration_number', 'license_number', 'organization_type',
+                'established_date', 'bed_count', 'certifications', 'is_verified', 'logo'
+            ]);
+        });
+    }
+};
+```
+
 **database/migrations/xxxx_create_clinic_doctor_table.php**
 
 ```php
@@ -634,7 +705,7 @@ return new class extends Migration
             $table->integer('slot_duration')->default(30);
             $table->boolean('is_active')->default(true);
             $table->timestamps();
-            
+
             $table->primary(['doctor_id', 'clinic_id']);
         });
     }
@@ -804,7 +875,6 @@ return new class () extends Migration {
 };
 ```
 
-
 ### Step 7: Models Implementation
 
 **app/Models/User.php**
@@ -826,9 +896,18 @@ class User extends Authenticatable
     use HasApiTokens, HasRoles, HasUuid;
 
     protected $fillable = [
-        'name', 'email', 'phone', 'user_type', 'password',
-        'avatar', 'address', 'latitude', 'longitude',
-        'login_time', 'logout_time', 'is_social_user'
+        'name',
+        'email',
+        'phone',
+        'user_type',
+        'password',
+        'avatar',
+        'address',
+        'latitude',
+        'longitude',
+        'login_time',
+        'logout_time',
+        'is_social_user'
     ];
 
     protected $hidden = ['password', 'remember_token'];
@@ -863,6 +942,25 @@ class User extends Authenticatable
     public function getSocialProvider(string $provider): ?SocialProvider
     {
         return $this->socialProviders()->where('provider', $provider)->first();
+    }
+
+    // Add this relationship method
+    public function doctorConnectionRequests()
+    {
+        return $this->hasManyThrough(
+            ClinicConnectionRequest::class,
+            Doctor::class,
+            'user_id', // Foreign key on doctors table
+            'doctor_id', // Foreign key on clinic_connection_requests table
+            'id', // Local key on users table
+            'id' // Local key on doctors table
+        );
+    }
+
+    // Add this relationship method
+    public function ownedClinics()
+    {
+        return $this->hasMany(Clinic::class, 'owner_id');
     }
 }
 ```
@@ -918,8 +1016,8 @@ class Doctor extends Model
 
     protected $fillable = [
         'user_id', 'specialization', 'license_number', 'experience_years',
-        'bio', 'education', 'consultation_fee', 'qualification', 
-        'languages', 'services', 'rating', 'total_reviews', 
+        'bio', 'education', 'consultation_fee', 'qualification',
+        'languages', 'services', 'rating', 'total_reviews',
         'is_verified', 'is_available', 'profile_image'
     ];
 
@@ -967,6 +1065,29 @@ class Doctor extends Model
         // Logic to calculate next available slot
         return now()->addDays(1)->format('Y-m-d H:i');
     }
+
+    // NEW: Connection requests
+    public function connectionRequests()
+    {
+        return $this->hasMany(ClinicConnectionRequest::class);
+    }
+
+    // NEW: Check if profile is complete
+    public function isProfileComplete()
+    {
+        $requiredFields = [
+            'specialization', 'license_number', 'experience_years',
+            'bio', 'consultation_fee', 'qualification'
+        ];
+
+        foreach ($requiredFields as $field) {
+            if (empty($this->$field)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
 }
 ```
 
@@ -985,10 +1106,34 @@ class Clinic extends Model
     use HasUuid;
 
     protected $fillable = [
-        'name', 'description', 'address', 'latitude', 'longitude',
-        'phone', 'email', 'website', 'facilities', 'specialties', 
-        'image', 'images', 'opening_time', 'closing_time', 
-        'working_days', 'rating', 'total_reviews', 'is_active', 'is_featured'
+        'owner_id',
+        'name',
+        'registration_number',
+        'license_number',
+        'organization_type',
+        'description',
+        'address',
+        'latitude',
+        'longitude',
+        'phone',
+        'email',
+        'website',
+        'facilities',
+        'specialties',
+        'image',
+        'images',
+        'opening_time',
+        'closing_time',
+        'working_days',
+        'rating',
+        'total_reviews',
+        'is_active',
+        'is_featured',
+        'established_date',
+        'bed_count',
+        'certifications',
+        'is_verified',
+        'logo'
     ];
 
     protected $casts = [
@@ -996,18 +1141,27 @@ class Clinic extends Model
         'specialties' => 'array',
         'images' => 'array',
         'working_days' => 'array',
+        'certifications' => 'array',
         'latitude' => 'decimal:8',
         'longitude' => 'decimal:8',
         'rating' => 'decimal:2',
         'is_active' => 'boolean',
-        'is_featured' => 'boolean'
+        'is_featured' => 'boolean',
+        'is_verified' => 'boolean',
+        'established_date' => 'date'
     ];
+
+    // Owner relationship
+    public function owner()
+    {
+        return $this->belongsTo(User::class, 'owner_id');
+    }
 
     public function doctors()
     {
         return $this->belongsToMany(Doctor::class, 'clinic_doctor')
-                    ->withPivot(['available_days', 'start_time', 'end_time', 'slot_duration', 'is_active'])
-                    ->withTimestamps();
+            ->withPivot(['available_days', 'start_time', 'end_time', 'slot_duration', 'is_active'])
+            ->withTimestamps();
     }
 
     public function appointments()
@@ -1024,8 +1178,8 @@ class Clinic extends Model
         $lonDelta = deg2rad($longitude - $this->longitude);
 
         $a = sin($latDelta / 2) * sin($latDelta / 2) +
-             cos(deg2rad($this->latitude)) * cos(deg2rad($latitude)) *
-             sin($lonDelta / 2) * sin($lonDelta / 2);
+            cos(deg2rad($this->latitude)) * cos(deg2rad($latitude)) *
+            sin($lonDelta / 2) * sin($lonDelta / 2);
 
         $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
 
@@ -1042,6 +1196,79 @@ class Clinic extends Model
     public function scopeFeatured($query)
     {
         return $query->where('is_featured', true);
+    }
+
+    // Scope for owned clinics
+    public function scopeOwnedBy($query, $userId)
+    {
+        return $query->where('owner_id', $userId);
+    }
+
+    // Connection requests for this clinic
+    public function connectionRequests()
+    {
+        return $this->hasMany(ClinicConnectionRequest::class);
+    }
+
+    // Check if profile is complete for healthcare providers
+    public function isProfileComplete()
+    {
+        $requiredFields = [
+            'name',
+            'registration_number',
+            'organization_type',
+            'description',
+            'address',
+            'phone',
+            'license_number'
+        ];
+
+        foreach ($requiredFields as $field) {
+            if (empty($this->$field)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+}
+```
+
+**app/Models/ClinicConnectionRequest.php**
+
+```php
+<?php
+
+namespace App\Models;
+
+use App\Traits\HasUuid;
+use Illuminate\Database\Eloquent\Model;
+
+class ClinicConnectionRequest extends Model
+{
+    use HasUuid;
+
+    protected $fillable = [
+        'doctor_id',
+        'clinic_id',
+        'status',
+        'message',
+        'rejection_reason',
+        'proposed_schedule'
+    ];
+
+    protected $casts = [
+        'proposed_schedule' => 'array'
+    ];
+
+    public function doctor()
+    {
+        return $this->belongsTo(Doctor::class);
+    }
+
+    public function clinic()
+    {
+        return $this->belongsTo(Clinic::class);
     }
 }
 ```
@@ -1074,7 +1301,7 @@ class Appointment extends Model
     protected static function boot()
     {
         parent::boot();
-        
+
         static::creating(function ($model) {
             $model->appointment_number = 'APT' . str_pad(mt_rand(1, 99999), 5, '0', STR_PAD_LEFT);
         });
@@ -1112,9 +1339,9 @@ class ClinicDoctor extends Pivot
     use HasUuid;
 
     protected $table = 'clinic_doctor';
-    
+
     protected $fillable = [
-        'doctor_id', 'clinic_id', 'available_days', 'start_time', 
+        'doctor_id', 'clinic_id', 'available_days', 'start_time',
         'end_time', 'slot_duration', 'is_active'
     ];
 
@@ -1124,7 +1351,6 @@ class ClinicDoctor extends Pivot
     ];
 }
 ```
-
 
 ### Step 8: API Controllers
 
@@ -1206,10 +1432,10 @@ class AuthController extends Controller
     {
         // Update logout time
         $request->user()->update(['logout_time' => Carbon::now()]);
-        
+
         // Delete current token
         $request->user()->currentAccessToken()->delete();
-        
+
         return response()->json(['message' => 'Logged out successfully']);
     }
 
@@ -1273,7 +1499,7 @@ class SocialAuthController extends Controller
 
             // Add proper scopes for GitHub
             $driver = Socialite::driver($provider)->stateless();
-            
+
             // Set specific scopes for different providers
             if ($provider === 'github') {
                 $driver->scopes(['user:email', 'read:user']);
@@ -1287,7 +1513,7 @@ class SocialAuthController extends Controller
                 'mode' => $mode,
                 'timestamp' => time()
             ]));
-            
+
             $driver->with(['state' => $state]);
 
             $redirectUrl = $driver->redirect()->getTargetUrl();
@@ -1319,7 +1545,7 @@ class SocialAuthController extends Controller
             // CRITICAL FIX: Extract user type from state parameter properly
             $userType = 'patient'; // default
             $mode = 'login'; // default
-            
+
             $state = $request->get('state');
             if ($state) {
                 try {
@@ -1347,7 +1573,7 @@ class SocialAuthController extends Controller
 
             // Add specific scopes during callback as well
             $driver = Socialite::driver($provider)->stateless();
-            
+
             if ($provider === 'github') {
                 $driver->scopes(['user:email', 'read:user']);
             } elseif ($provider === 'google') {
@@ -1373,7 +1599,7 @@ class SocialAuthController extends Controller
 
         } catch (\Exception $e) {
             Log::error("OAuth callback error for {$provider}: " . $e->getMessage());
-            
+
             // Check if this is an API request
             if (request()->expectsJson() || request()->header('Accept') === 'application/json') {
                 return response()->json([
@@ -1411,7 +1637,7 @@ class SocialAuthController extends Controller
                     'token_type' => 'Bearer',
                     'provider' => $provider,
                     'is_new_user' => $result['is_new_user'],
-                    'message' => $result['is_new_user'] 
+                    'message' => $result['is_new_user']
                         ? 'Account created successfully via ' . ucfirst($provider)
                         : 'Logged in successfully via ' . ucfirst($provider)
                 ]);
@@ -1431,7 +1657,7 @@ class SocialAuthController extends Controller
 
         } catch (\Exception $e) {
             Log::error("OAuth user processing error for {$provider}: " . $e->getMessage());
-            
+
             // Check if this is an API request
             if (request()->expectsJson() || request()->header('Accept') === 'application/json') {
                 return response()->json([
@@ -1453,7 +1679,7 @@ class SocialAuthController extends Controller
     public function linkProvider(Request $request, string $provider): JsonResponse
     {
         $user = $request->user();
-        
+
         if (!$this->socialAuthService->isProviderAllowed($provider)) {
             return response()->json([
                 'error' => 'Provider not supported'
@@ -1471,11 +1697,11 @@ class SocialAuthController extends Controller
             $driver = Socialite::driver($provider)
                 ->stateless()
                 ->with(['state' => 'link_' . $user->id]);
-                
+
             if ($provider === 'github') {
                 $driver->scopes(['user:email', 'read:user']);
             }
-            
+
             $redirectUrl = $driver->redirect()->getTargetUrl();
 
             return response()->json([
@@ -1494,7 +1720,7 @@ class SocialAuthController extends Controller
     public function unlinkProvider(Request $request, string $provider): JsonResponse
     {
         $user = $request->user();
-        
+
         if (!$this->socialAuthService->isProviderAllowed($provider)) {
             return response()->json([
                 'error' => 'Provider not supported'
@@ -1502,7 +1728,7 @@ class SocialAuthController extends Controller
         }
 
         $socialProvider = $user->getSocialProvider($provider);
-        
+
         if (!$socialProvider) {
             return response()->json([
                 'error' => 'Provider not linked',
@@ -1528,7 +1754,7 @@ class SocialAuthController extends Controller
     public function getUserProviders(Request $request): JsonResponse
     {
         $user = $request->user();
-        
+
         $providers = $user->socialProviders()
             ->select('provider', 'avatar', 'created_at')
             ->get()
@@ -1551,26 +1777,31 @@ class SocialAuthController extends Controller
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Appointment;
 use App\Models\Clinic;
+use App\Models\ClinicConnectionRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
+
 
 class ClinicController extends Controller
 {
     public function index(Request $request)
     {
         $query = Clinic::with(['doctors.user'])
-                      ->active();
+            ->active();
 
         // Search by name, address, or specialties
         if ($request->has('search') && !empty($request->search)) {
             $search = $request->search;
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', '%' . $search . '%')
-                  ->orWhere('address', 'like', '%' . $search . '%')
-                  ->orWhere('description', 'like', '%' . $search . '%')
-                  ->orWhereJsonContains('specialties', $search)
-                  ->orWhereJsonContains('facilities', $search);
+                    ->orWhere('address', 'like', '%' . $search . '%')
+                    ->orWhere('description', 'like', '%' . $search . '%')
+                    ->orWhereJsonContains('specialties', $search)
+                    ->orWhereJsonContains('facilities', $search);
             });
         }
 
@@ -1590,12 +1821,12 @@ class ClinicController extends Controller
             $lng = $request->longitude;
             $radius = $request->radius ?? 10; // Default 10km radius
 
-            $query->selectRaw("*, 
-                (6371 * acos(cos(radians(?)) * cos(radians(latitude)) * 
-                cos(radians(longitude) - radians(?)) + sin(radians(?)) * 
+            $query->selectRaw("*,
+                (6371 * acos(cos(radians(?)) * cos(radians(latitude)) *
+                cos(radians(longitude) - radians(?)) + sin(radians(?)) *
                 sin(radians(latitude)))) AS distance", [$lat, $lng, $lat])
-                  ->havingRaw('distance < ?', [$radius])
-                  ->orderBy('distance');
+                ->havingRaw('distance < ?', [$radius])
+                ->orderBy('distance');
         } else {
             // Order by rating if no location provided
             $query->orderBy('rating', 'desc');
@@ -1608,7 +1839,7 @@ class ClinicController extends Controller
         if ($request->has('latitude') && $request->has('longitude')) {
             $clinics->getCollection()->transform(function ($clinic) use ($request) {
                 $clinic->distance_km = $clinic->getDistanceFromPoint(
-                    $request->latitude, 
+                    $request->latitude,
                     $request->longitude
                 );
                 return $clinic;
@@ -1622,7 +1853,7 @@ class ClinicController extends Controller
     {
         $clinic = Clinic::with([
             'doctors.user',
-            'doctors' => function($query) {
+            'doctors' => function ($query) {
                 $query->verified()->available();
             }
         ])->findOrFail($id);
@@ -1633,11 +1864,11 @@ class ClinicController extends Controller
     public function getDoctors($id, Request $request)
     {
         $clinic = Clinic::findOrFail($id);
-        
+
         $query = $clinic->doctors()
-                       ->with('user')
-                       ->verified()
-                       ->available();
+            ->with('user')
+            ->verified()
+            ->available();
 
         // Filter by specialization
         if ($request->has('specialization')) {
@@ -1665,13 +1896,453 @@ class ClinicController extends Controller
     public function featured()
     {
         $clinics = Clinic::with(['doctors.user'])
-                        ->featured()
-                        ->active()
-                        ->orderBy('rating', 'desc')
-                        ->limit(6)
-                        ->get();
+            ->featured()
+            ->active()
+            ->orderBy('rating', 'desc')
+            ->limit(6)
+            ->get();
 
         return response()->json($clinics);
+    }
+
+    // NEW: Get healthcare profile (using primary clinic as profile)
+    public function getHealthcareProfile(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->user_type !== 'healthcare') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $primaryClinic = $user->ownedClinics()->first();
+
+        return response()->json([
+            'profile' => $primaryClinic,
+            'total_clinics' => $user->ownedClinics()->count(),
+            'is_complete' => $primaryClinic ? $primaryClinic->isProfileComplete() : false
+        ]);
+    }
+
+  // FIXED: Update healthcare profile with corrected website validation
+    public function updateHealthcareProfile(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->user_type !== 'healthcare') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $primaryClinic = $user->ownedClinics()->first();
+
+        // FIXED: Custom validation with proper website handling
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'registration_number' => 'required|string|max:255|unique:clinics,registration_number,' . ($primaryClinic->id ?? 'null'),
+            'license_number' => 'required|string|max:255|unique:clinics,license_number,' . ($primaryClinic->id ?? 'null'),
+            'organization_type' => 'required|in:hospital,clinic,diagnostic_center,pharmacy,nursing_home',
+            'description' => 'required|string|max:2000',
+            'address' => 'required|string|max:1000',
+            'phone' => 'required|string|max:20',
+            'email' => 'nullable|email|max:255',
+            // FIXED: More flexible website validation
+            'website' => [
+                'nullable',
+                'string',
+                'max:255',
+                function ($attribute, $value, $fail) {
+                    if (!empty($value)) {
+                        // Remove common prefixes for validation
+                        $cleanValue = str_replace(['http://', 'https://'], '', trim($value));
+
+                        // Check if it looks like a domain
+                        if (!preg_match('/^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$/', $cleanValue) &&
+                            !filter_var('http://' . $cleanValue, FILTER_VALIDATE_URL)) {
+                            $fail('The website field must be a valid domain or URL.');
+                        }
+                    }
+                }
+            ],
+            'facilities' => 'nullable|array',
+            'facilities.*' => 'string|max:100',
+            'specialties' => 'nullable|array',
+            'specialties.*' => 'string|max:100',
+            'opening_time' => 'required|date_format:H:i',
+            'closing_time' => 'required|date_format:H:i|after:opening_time',
+            'working_days' => 'required|array|min:1',
+            'working_days.*' => 'in:monday,tuesday,wednesday,thursday,friday,saturday,sunday',
+            'established_date' => 'nullable|date|before_or_equal:today',
+            'bed_count' => 'nullable|integer|min:0|max:10000',
+            'certifications' => 'nullable|array',
+            'certifications.*' => 'string|max:200',
+            'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            // Add latitude/longitude if provided
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'error' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $validatedData = $validator->validated();
+
+        // FIXED: Process website URL properly
+        if (!empty($validatedData['website'])) {
+            $website = trim($validatedData['website']);
+            // Add protocol if missing
+            if (!preg_match('/^https?:\/\//', $website)) {
+                $validatedData['website'] = 'https://' . $website;
+            }
+        } else {
+            $validatedData['website'] = null;
+        }
+
+        // Handle logo upload
+        if ($request->hasFile('logo')) {
+            // Delete old logo if exists
+            if ($primaryClinic && $primaryClinic->logo) {
+                $oldLogoPath = str_replace('/storage/', '', $primaryClinic->logo);
+                Storage::disk('public')->delete($oldLogoPath);
+            }
+
+            $logo = $request->file('logo');
+            $logoPath = $logo->store('clinic-logos', 'public');
+            $validatedData['logo'] = Storage::url($logoPath);
+        }
+
+        // Handle main image upload
+        if ($request->hasFile('image')) {
+            // Delete old image if exists
+            if ($primaryClinic && $primaryClinic->image) {
+                $oldImagePath = str_replace('/storage/', '', $primaryClinic->image);
+                Storage::disk('public')->delete($oldImagePath);
+            }
+
+            $image = $request->file('image');
+            $imagePath = $image->store('clinic-images', 'public');
+            $validatedData['image'] = Storage::url($imagePath);
+        }
+
+        // Handle multiple images upload
+        if ($request->hasFile('images')) {
+            $images = [];
+            foreach ($request->file('images') as $image) {
+                $imagePath = $image->store('clinic-images', 'public');
+                $images[] = Storage::url($imagePath);
+            }
+            $validatedData['images'] = $images;
+        }
+
+        // Add required fields with defaults
+        $validatedData['owner_id'] = $user->id;
+        $validatedData['latitude'] = $validatedData['latitude'] ?? 0;
+        $validatedData['longitude'] = $validatedData['longitude'] ?? 0;
+        $validatedData['is_active'] = true;
+        $validatedData['is_verified'] = $primaryClinic ? $primaryClinic->is_verified : false;
+
+        try {
+            // Create or update primary clinic
+            if ($primaryClinic) {
+                $primaryClinic->update($validatedData);
+                $clinic = $primaryClinic;
+            } else {
+                $clinic = $user->ownedClinics()->create($validatedData);
+            }
+
+            return response()->json([
+                'message' => 'Profile updated successfully',
+                'profile' => $clinic->fresh()
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Failed to save profile',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // NEW: Get healthcare dashboard statistics
+    public function getHealthcareDashboardStats(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->user_type !== 'healthcare') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $clinics = $user->ownedClinics;
+        $clinicIds = $clinics->pluck('id');
+
+        $today = now()->toDateString();
+        $thisMonth = now()->format('Y-m');
+
+        // Get connected doctors through clinic_doctor pivot table
+        $connectedDoctors = DB::table('clinic_doctor')
+            ->whereIn('clinic_id', $clinicIds)
+            ->distinct('doctor_id')
+            ->count();
+
+        $stats = [
+            'total_facilities' => $clinics->count(),
+            'connected_doctors' => $connectedDoctors,
+            'today_appointments' => Appointment::whereIn('clinic_id', $clinicIds)
+                ->whereDate('appointment_date', $today)
+                ->count(),
+            'monthly_appointments' => Appointment::whereIn('clinic_id', $clinicIds)
+                ->where('appointment_date', 'like', $thisMonth . '%')
+                ->count(),
+            'pending_requests' => ClinicConnectionRequest::whereIn('clinic_id', $clinicIds)
+                ->where('status', 'pending')
+                ->count(),
+            'total_patients' => Appointment::whereIn('clinic_id', $clinicIds)
+                ->distinct('patient_id')
+                ->count(),
+            'average_rating' => $clinics->avg('rating') ?? 0,
+            'total_reviews' => $clinics->sum('total_reviews') ?? 0
+        ];
+
+        return response()->json($stats);
+    }
+
+    // NEW: Get connection requests
+    public function getConnectionRequests(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->user_type !== 'healthcare') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $clinicIds = $user->ownedClinics()->pluck('id');
+
+        $requests = ClinicConnectionRequest::with(['doctor.user', 'clinic'])
+            ->whereIn('clinic_id', $clinicIds)
+            ->orderBy('created_at', 'desc')
+            ->paginate(10);
+
+        return response()->json($requests);
+    }
+
+    // NEW: Respond to connection request
+    public function respondToConnectionRequest(Request $request, $id)
+    {
+        $user = $request->user();
+
+        if ($user->user_type !== 'healthcare') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $validatedData = $request->validate([
+            'status' => 'required|in:approved,rejected',
+            'rejection_reason' => 'nullable|string|max:500',
+            'schedule_adjustments' => 'nullable|array'
+        ]);
+
+        $connectionRequest = ClinicConnectionRequest::with(['doctor', 'clinic'])->findOrFail($id);
+
+        // Check if this clinic belongs to the healthcare provider
+        $clinicIds = $user->ownedClinics()->pluck('id');
+        if (!$clinicIds->contains($connectionRequest->clinic_id)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        DB::transaction(function () use ($connectionRequest, $validatedData) {
+            $connectionRequest->update([
+                'status' => $validatedData['status'],
+                'rejection_reason' => $validatedData['rejection_reason'] ?? null
+            ]);
+
+            if ($validatedData['status'] === 'approved') {
+                // Create connection in clinic_doctor pivot table
+                $schedule = $connectionRequest->proposed_schedule;
+
+                // Apply any schedule adjustments
+                if (isset($validatedData['schedule_adjustments'])) {
+                    $schedule = array_merge($schedule, $validatedData['schedule_adjustments']);
+                }
+
+                $connectionRequest->doctor->clinics()->attach($connectionRequest->clinic_id, [
+                    'available_days' => json_encode($schedule['available_days']),
+                    'start_time' => $schedule['start_time'],
+                    'end_time' => $schedule['end_time'],
+                    'slot_duration' => $schedule['slot_duration'] ?? 30,
+                    'is_active' => true
+                ]);
+            }
+        });
+
+        return response()->json([
+            'message' => $validatedData['status'] === 'approved' ? 'Doctor connected successfully' : 'Connection request rejected',
+            'request' => $connectionRequest->fresh(['doctor.user', 'clinic'])
+        ]);
+    }
+
+    // NEW: Get connected doctors
+    public function getConnectedDoctors(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->user_type !== 'healthcare') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $clinics = $user->ownedClinics()->with(['doctors.user'])->get();
+
+        $doctors = collect();
+        foreach ($clinics as $clinic) {
+            foreach ($clinic->doctors as $doctor) {
+                $doctor->clinic_info = [
+                    'clinic_id' => $clinic->id,
+                    'clinic_name' => $clinic->name,
+                    'schedule' => $doctor->pivot
+                ];
+                $doctors->push($doctor);
+            }
+        }
+
+        return response()->json($doctors->unique('id')->values());
+    }
+
+    // NEW: Disconnect doctor
+    public function disconnectDoctor(Request $request, $doctorId)
+    {
+        $user = $request->user();
+
+        if ($user->user_type !== 'healthcare') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $clinicIds = $user->ownedClinics()->pluck('id');
+
+        // Remove doctor from all clinics belonging to this healthcare provider
+        DB::table('clinic_doctor')
+            ->where('doctor_id', $doctorId)
+            ->whereIn('clinic_id', $clinicIds)
+            ->delete();
+
+        return response()->json(['message' => 'Doctor disconnected successfully']);
+    }
+
+    // NEW: Get clinic appointments
+    public function getClinicAppointments(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->user_type !== 'healthcare') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $clinicIds = $user->ownedClinics()->pluck('id');
+
+        $query = Appointment::with(['patient', 'doctor.user', 'clinic'])
+            ->whereIn('clinic_id', $clinicIds)
+            ->orderBy('appointment_date', 'desc')
+            ->orderBy('appointment_time', 'desc');
+
+        // Filter by status
+        if ($request->has('status') && $request->status !== 'all') {
+            $query->where('status', $request->status);
+        }
+
+        // Filter by clinic
+        if ($request->has('clinic_id')) {
+            $query->where('clinic_id', $request->clinic_id);
+        }
+
+        // Filter by date range
+        if ($request->has('date_from')) {
+            $query->whereDate('appointment_date', '>=', $request->date_from);
+        }
+
+        if ($request->has('date_to')) {
+            $query->whereDate('appointment_date', '<=', $request->date_to);
+        }
+
+        $appointments = $query->paginate(15);
+
+        return response()->json($appointments);
+    }
+
+    // NEW: Update clinic appointment status
+    public function updateClinicAppointmentStatus(Request $request, $id)
+    {
+        $user = $request->user();
+
+        if ($user->user_type !== 'healthcare') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $validatedData = $request->validate([
+            'status' => 'required|in:confirmed,completed,cancelled',
+            'notes' => 'nullable|string|max:500'
+        ]);
+
+        $clinicIds = $user->ownedClinics()->pluck('id');
+        $appointment = Appointment::whereIn('clinic_id', $clinicIds)->findOrFail($id);
+
+        $appointment->update([
+            'status' => $validatedData['status'],
+            'notes' => $validatedData['notes'] ?? $appointment->notes
+        ]);
+
+        return response()->json([
+            'message' => 'Appointment status updated successfully',
+            'appointment' => $appointment->load(['patient', 'doctor.user', 'clinic'])
+        ]);
+    }
+
+    // NEW: Get healthcare provider's clinics list
+    public function getMyClinicsList(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->user_type !== 'healthcare') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $clinics = $user->ownedClinics()->with(['doctors'])->get();
+
+        return response()->json($clinics);
+    }
+
+    // NEW: Add new clinic
+    public function addNewClinic(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->user_type !== 'healthcare') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $validatedData = $request->validate([
+            'name' => 'required|string|max:255',
+            'address' => 'required|string|max:500',
+            'phone' => 'required|string|max:20',
+            'email' => 'nullable|email',
+            'description' => 'nullable|string|max:1000',
+            'opening_time' => 'required|date_format:H:i',
+            'closing_time' => 'required|date_format:H:i',
+            'working_days' => 'required|array|min:1',
+            'specialties' => 'nullable|array',
+            'facilities' => 'nullable|array'
+        ]);
+
+        $validatedData['owner_id'] = $user->id;
+        $validatedData['latitude'] = 0; // You might want to geocode the address
+        $validatedData['longitude'] = 0;
+        $validatedData['is_active'] = true;
+
+        $clinic = $user->ownedClinics()->create($validatedData);
+
+        return response()->json([
+            'message' => 'Clinic added successfully',
+            'clinic' => $clinic
+        ]);
     }
 }
 ```
@@ -1685,7 +2356,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Doctor;
+use App\Models\Clinic;
+use App\Models\ClinicConnectionRequest;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+
 
 class DoctorController extends Controller
 {
@@ -1723,9 +2398,9 @@ class DoctorController extends Controller
             $radius = $request->radius ?? 10;
 
             $query->whereHas('clinics', function($q) use ($lat, $lng, $radius) {
-                $q->selectRaw("*, 
-                    (6371 * acos(cos(radians(?)) * cos(radians(latitude)) * 
-                    cos(radians(longitude) - radians(?)) + sin(radians(?)) * 
+                $q->selectRaw("*,
+                    (6371 * acos(cos(radians(?)) * cos(radians(latitude)) *
+                    cos(radians(longitude) - radians(?)) + sin(radians(?)) *
                     sin(radians(latitude)))) AS distance", [$lat, $lng, $lat])
                   ->havingRaw('distance < ?', [$radius]);
             });
@@ -1755,29 +2430,29 @@ class DoctorController extends Controller
         }])->findOrFail($doctorId);
 
         $clinic = $doctor->clinics->first();
-        
+
         if (!$clinic) {
             return response()->json(['error' => 'Doctor not available at this clinic'], 404);
         }
 
         $schedule = $clinic->pivot;
         $availableDays = json_decode($schedule->available_days, true);
-        
+
         // Generate available slots for the next 7 days
         $availableSlots = [];
         $startDate = now();
-        
+
         for ($i = 0; $i < 7; $i++) {
             $date = $startDate->copy()->addDays($i);
             $dayName = strtolower($date->format('l'));
-            
+
             if (in_array($dayName, $availableDays)) {
                 $slots = $this->generateTimeSlots(
                     $schedule->start_time,
                     $schedule->end_time,
                     $schedule->slot_duration
                 );
-                
+
                 $availableSlots[] = [
                     'date' => $date->format('Y-m-d'),
                     'day' => $date->format('l'),
@@ -1816,6 +2491,472 @@ class DoctorController extends Controller
                                 ->pluck('specialization');
 
         return response()->json($specializations);
+    }
+
+    // NEW: Get doctor profile
+    public function getProfile(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->user_type !== 'doctor') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $doctor = $user->doctor()->with(['user', 'clinics'])->first();
+
+        return response()->json([
+            'doctor' => $doctor,
+            'is_complete' => $doctor ? $doctor->isProfileComplete() : false
+        ]);
+    }
+
+    // NEW: Update doctor profile
+    public function updateProfile(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->user_type !== 'doctor') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $validatedData = $request->validate([
+            'specialization' => 'required|string|max:255',
+            'license_number' => 'required|string|max:255|unique:doctors,license_number,' . ($user->doctor->id ?? 'null'),
+            'experience_years' => 'required|integer|min:0|max:50',
+            'bio' => 'required|string|max:1000',
+            'education' => 'nullable|string|max:500',
+            'consultation_fee' => 'required|numeric|min:0',
+            'qualification' => 'required|string|max:500',
+            'languages' => 'nullable|array',
+            'services' => 'nullable|array',
+            'profile_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
+        ]);
+
+        // Handle profile image upload
+        if ($request->hasFile('profile_image')) {
+            $image = $request->file('profile_image');
+            $imagePath = $image->store('doctor-profiles', 'public');
+            $validatedData['profile_image'] = Storage::url($imagePath);
+        }
+
+        // Create or update doctor profile
+        $doctor = $user->doctor()->updateOrCreate(
+            ['user_id' => $user->id],
+            $validatedData
+        );
+
+        return response()->json([
+            'message' => 'Profile updated successfully',
+            'doctor' => $doctor->load(['user', 'clinics'])
+        ]);
+    }
+
+    // NEW: Get dashboard statistics
+    public function getDashboardStats(Request $request)
+    {
+        $user = $request->user();
+        $doctor = $user->doctor;
+
+        if (!$doctor) {
+            return response()->json(['error' => 'Doctor profile not found'], 404);
+        }
+
+        $today = now()->toDateString();
+        $thisMonth = now()->format('Y-m');
+
+        $stats = [
+            'today_appointments' => $doctor->appointments()
+                ->whereDate('appointment_date', $today)
+                ->count(),
+            'total_patients' => $doctor->appointments()
+                ->distinct('patient_id')
+                ->count(),
+            'monthly_appointments' => $doctor->appointments()
+                ->where('appointment_date', 'like', $thisMonth . '%')
+                ->count(),
+            'active_clinics' => $doctor->clinics()->count(),
+            'pending_requests' => $doctor->connectionRequests()
+                ->where('status', 'pending')
+                ->count(),
+            'rating' => $doctor->rating ?? 0,
+            'total_reviews' => $doctor->total_reviews ?? 0
+        ];
+
+        return response()->json($stats);
+    }
+
+    // NEW: Get available clinics for connection
+    public function getAvailableClinics(Request $request)
+    {
+        $user = $request->user();
+        $doctor = $user->doctor;
+
+        if (!$doctor) {
+            return response()->json(['error' => 'Doctor profile not found'], 404);
+        }
+
+        // Get clinics that doctor is not connected to and hasn't sent pending requests to
+        $connectedClinicIds = $doctor->clinics()->pluck('clinics.id');
+        $pendingRequestClinicIds = $doctor->connectionRequests()
+            ->where('status', 'pending')
+            ->pluck('clinic_id');
+
+        $excludedIds = $connectedClinicIds->merge($pendingRequestClinicIds);
+
+        $query = Clinic::active()->whereNotIn('id', $excludedIds);
+
+        // Search functionality
+        if ($request->has('search') && !empty($request->search)) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', '%' . $search . '%')
+                  ->orWhere('address', 'like', '%' . $search . '%')
+                  ->orWhereJsonContains('specialties', $search);
+            });
+        }
+
+        $clinics = $query->orderBy('rating', 'desc')->paginate(12);
+
+        return response()->json($clinics);
+    }
+
+    // NEW: Get connection requests
+    public function getConnectionRequests(Request $request)
+    {
+        $user = $request->user();
+        $doctor = $user->doctor;
+
+        if (!$doctor) {
+            return response()->json(['error' => 'Doctor profile not found'], 404);
+        }
+
+        $requests = $doctor->connectionRequests()
+            ->with(['clinic'])
+            ->orderBy('created_at', 'desc')
+            ->paginate(10);
+
+        return response()->json($requests);
+    }
+
+    // NEW: Get doctor's connected clinics
+    public function getMyClinics(Request $request)
+    {
+        $user = $request->user();
+        $doctor = $user->doctor;
+
+        if (!$doctor) {
+            return response()->json(['error' => 'Doctor profile not found'], 404);
+        }
+
+        $clinics = $doctor->clinics()->get();
+
+        return response()->json($clinics);
+    }
+
+    // NEW: Disconnect from clinic
+    public function disconnectClinic(Request $request, $clinicId)
+    {
+        $user = $request->user();
+        $doctor = $user->doctor;
+
+        if (!$doctor) {
+            return response()->json(['error' => 'Doctor profile not found'], 404);
+        }
+
+        $doctor->clinics()->detach($clinicId);
+
+        return response()->json(['message' => 'Disconnected from clinic successfully']);
+    }
+
+    // NEW: Get schedule for specific clinic
+    public function getSchedule(Request $request, $clinicId)
+    {
+        $user = $request->user();
+        $doctor = $user->doctor;
+
+        if (!$doctor) {
+            return response()->json(['error' => 'Doctor profile not found'], 404);
+        }
+
+        $clinic = $doctor->clinics()->where('clinic_id', $clinicId)->first();
+
+        if (!$clinic) {
+            return response()->json(['error' => 'Not connected to this clinic'], 404);
+        }
+
+        return response()->json([
+            'clinic' => $clinic,
+            'schedule' => $clinic->pivot
+        ]);
+    }
+
+    // NEW: Update schedule for specific clinic
+    public function updateSchedule(Request $request, $clinicId)
+    {
+        $user = $request->user();
+        $doctor = $user->doctor;
+
+        if (!$doctor) {
+            return response()->json(['error' => 'Doctor profile not found'], 404);
+        }
+
+        $validatedData = $request->validate([
+            'available_days' => 'required|array|min:1',
+            'start_time' => 'required|date_format:H:i',
+            'end_time' => 'required|date_format:H:i|after:start_time',
+            'slot_duration' => 'required|integer|min:15|max:120'
+        ]);
+
+        $doctor->clinics()->updateExistingPivot($clinicId, $validatedData);
+
+        return response()->json(['message' => 'Schedule updated successfully']);
+    }
+
+    // NEW: Get doctor's appointments
+    public function getMyAppointments(Request $request)
+    {
+        $user = $request->user();
+        $doctor = $user->doctor;
+
+        if (!$doctor) {
+            return response()->json(['error' => 'Doctor profile not found'], 404);
+        }
+
+        $query = $doctor->appointments()
+            ->with(['patient', 'clinic'])
+            ->orderBy('appointment_date', 'desc')
+            ->orderBy('appointment_time', 'desc');
+
+        // Filter by status
+        if ($request->has('status') && $request->status !== 'all') {
+            $query->where('status', $request->status);
+        }
+
+        // Filter by date range
+        if ($request->has('date_from')) {
+            $query->whereDate('appointment_date', '>=', $request->date_from);
+        }
+
+        if ($request->has('date_to')) {
+            $query->whereDate('appointment_date', '<=', $request->date_to);
+        }
+
+        $appointments = $query->paginate(15);
+
+        return response()->json($appointments);
+    }
+
+    // NEW: Update appointment status
+    public function updateAppointmentStatus(Request $request, $id)
+    {
+        $user = $request->user();
+        $doctor = $user->doctor;
+
+        if (!$doctor) {
+            return response()->json(['error' => 'Doctor profile not found'], 404);
+        }
+
+        $validatedData = $request->validate([
+            'status' => 'required|in:confirmed,completed,cancelled',
+            'notes' => 'nullable|string|max:500'
+        ]);
+
+        $appointment = $doctor->appointments()->findOrFail($id);
+
+        $appointment->update([
+            'status' => $validatedData['status'],
+            'notes' => $validatedData['notes'] ?? $appointment->notes
+        ]);
+
+        return response()->json([
+            'message' => 'Appointment status updated successfully',
+            'appointment' => $appointment->load(['patient', 'clinic'])
+        ]);
+    }
+     // NEW: Search clinics by name, specialty, or location
+    public function searchClinics(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->user_type !== 'doctor') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $doctorProfile = $user->doctor;
+        if (!$doctorProfile) {
+            return response()->json(['error' => 'Doctor profile not found'], 404);
+        }
+
+        $query = Clinic::query()->where('is_active', true);
+
+        // Search by name
+        if ($request->has('name') && !empty($request->name)) {
+            $query->where('name', 'LIKE', '%' . $request->name . '%');
+        }
+
+        // Search by specialty
+        if ($request->has('specialty') && !empty($request->specialty)) {
+            $query->whereJsonContains('specialties', $request->specialty);
+        }
+
+        // Search by location
+        if ($request->has('location') && !empty($request->location)) {
+            $query->where('address', 'LIKE', '%' . $request->location . '%');
+        }
+
+        // Filter by organization type
+        if ($request->has('type') && !empty($request->type)) {
+            $query->where('organization_type', $request->type);
+        }
+
+        // Get already connected clinics
+        $connectedClinicIds = $doctorProfile->clinics()->pluck('clinic_id');
+
+        // Get pending requests
+        $pendingRequestClinicIds = ClinicConnectionRequest::where('doctor_id', $doctorProfile->id)
+            ->where('status', 'pending')
+            ->pluck('clinic_id');
+
+        $clinics = $query->with(['owner'])
+            ->orderBy('name')
+            ->paginate(10);
+
+        // Add connection status to each clinic
+        $clinics->getCollection()->transform(function ($clinic) use ($connectedClinicIds, $pendingRequestClinicIds) {
+            $clinic->connection_status = 'not_connected';
+
+            if ($connectedClinicIds->contains($clinic->id)) {
+                $clinic->connection_status = 'connected';
+            } elseif ($pendingRequestClinicIds->contains($clinic->id)) {
+                $clinic->connection_status = 'pending';
+            }
+
+            return $clinic;
+        });
+
+        return response()->json($clinics);
+    }
+
+    // NEW: Send connection request to clinic
+    public function sendConnectionRequest(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->user_type !== 'doctor') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $doctorProfile = $user->doctor;
+        if (!$doctorProfile) {
+            return response()->json(['error' => 'Doctor profile not found'], 404);
+        }
+
+        $validatedData = $request->validate([
+            'clinic_id' => 'required|exists:clinics,id',
+            'message' => 'nullable|string|max:500',
+            'proposed_schedule' => 'required|array',
+            'proposed_schedule.available_days' => 'required|array|min:1',
+            'proposed_schedule.available_days.*' => 'in:monday,tuesday,wednesday,thursday,friday,saturday,sunday',
+            'proposed_schedule.start_time' => 'required|date_format:H:i',
+            'proposed_schedule.end_time' => 'required|date_format:H:i|after:proposed_schedule.start_time',
+            'proposed_schedule.slot_duration' => 'required|integer|min:15|max:120'
+        ]);
+
+        // Check if already connected
+        if ($doctorProfile->clinics()->where('clinic_id', $validatedData['clinic_id'])->exists()) {
+            return response()->json(['error' => 'Already connected to this clinic'], 409);
+        }
+
+        // Check if request already exists
+        $existingRequest = ClinicConnectionRequest::where('doctor_id', $doctorProfile->id)
+            ->where('clinic_id', $validatedData['clinic_id'])
+            ->where('status', 'pending')
+            ->first();
+
+        if ($existingRequest) {
+            return response()->json(['error' => 'Connection request already sent'], 409);
+        }
+
+        $connectionRequest = ClinicConnectionRequest::create([
+            'doctor_id' => $doctorProfile->id,
+            'clinic_id' => $validatedData['clinic_id'],
+            'message' => $validatedData['message'],
+            'proposed_schedule' => $validatedData['proposed_schedule'],
+            'status' => 'pending'
+        ]);
+
+        $connectionRequest->load(['clinic', 'doctor.user']);
+
+        return response()->json([
+            'message' => 'Connection request sent successfully',
+            'request' => $connectionRequest
+        ]);
+    }
+
+    // NEW: Get doctor's connection requests
+    public function getMyConnectionRequests(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->user_type !== 'doctor') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $doctorProfile = $user->doctor;
+        if (!$doctorProfile) {
+            return response()->json(['error' => 'Doctor profile not found'], 404);
+        }
+
+        $requests = ClinicConnectionRequest::with(['clinic'])
+            ->where('doctor_id', $doctorProfile->id)
+            ->orderBy('created_at', 'desc')
+            ->paginate(10);
+
+        return response()->json($requests);
+    }
+
+    // NEW: Get doctor's connected clinics
+    public function getMyConnectedClinics(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->user_type !== 'doctor') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $doctorProfile = $user->doctor;
+        if (!$doctorProfile) {
+            return response()->json(['error' => 'Doctor profile not found'], 404);
+        }
+
+        $connectedClinics = $doctorProfile->clinics()
+            ->with(['owner'])
+            ->get()
+            ->map(function ($clinic) {
+                $clinic->schedule = $clinic->pivot;
+                return $clinic;
+            });
+
+        return response()->json($connectedClinics);
+    }
+
+    // NEW: Disconnect from clinic
+    public function disconnectFromClinic(Request $request, $clinicId)
+    {
+        $user = $request->user();
+
+        if ($user->user_type !== 'doctor') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $doctorProfile = $user->doctor;
+        if (!$doctorProfile) {
+            return response()->json(['error' => 'Doctor profile not found'], 404);
+        }
+
+        $doctorProfile->clinics()->detach($clinicId);
+
+        return response()->json(['message' => 'Successfully disconnected from clinic']);
     }
 }
 ```
@@ -1930,9 +3071,9 @@ class AppointmentController extends Controller
     {
         $appointment = Appointment::with(['doctor.user', 'clinic', 'patient'])
                                  ->findOrFail($id);
-        
+
         // Check if user has permission to view this appointment
-        if ($appointment->patient_id !== auth()->id() && 
+        if ($appointment->patient_id !== auth()->id() &&
             $appointment->doctor->user_id !== auth()->id()) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
@@ -1943,7 +3084,7 @@ class AppointmentController extends Controller
     public function cancel($id)
     {
         $appointment = Appointment::findOrFail($id);
-        
+
         // Check if user owns this appointment
         if ($appointment->patient_id !== auth()->id()) {
             return response()->json(['error' => 'Unauthorized'], 403);
@@ -2087,7 +3228,7 @@ class SocialAuthService
 
         // Try to get from request parameters
         $userType = request()->get('user_type') ?: request()->get('stored_user_type');
-        
+
         // Try to get from merged request data
         if (!$userType && request()->has('user_type')) {
             $userType = request()->input('user_type');
@@ -2104,7 +3245,7 @@ class SocialAuthService
             'from_input' => request()->input('user_type'),
             'final_user_type' => $userType
         ]);
-        
+
         // Validate user type
         $validTypes = ['patient', 'doctor', 'healthcare', 'admin'];
         if (!$userType || !in_array($userType, $validTypes)) {
@@ -2199,7 +3340,7 @@ class SocialAuthService
 }
 ```
 
-### Step 9:  Routes
+### Step 9: Routes
 
 **routes/web.php**
 
@@ -2264,7 +3405,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Auth routes
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
-    
+
     // Social auth management
     Route::prefix('auth/social')->group(function () {
         Route::get('/user/providers', [SocialAuthController::class, 'getUserProviders']);
@@ -2273,7 +3414,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/unlink/{provider}', [SocialAuthController::class, 'unlinkProvider'])
             ->where('provider', 'google|facebook|github|apple');
     });
-    
+
     // Appointments
     Route::prefix('appointments')->group(function () {
         Route::get('/', [AppointmentController::class, 'index']);
@@ -2282,10 +3423,84 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/{id}/cancel', [AppointmentController::class, 'cancel']);
     });
 });
+
+// Doctor-specific routes
+Route::middleware('auth:sanctum')->group(function () {
+    // ... existing routes ...
+
+    // Doctor Profile Management
+    Route::prefix('doctor')->group(function () {
+        Route::get('/profile', [DoctorController::class, 'getProfile']);
+        Route::post('/profile', [DoctorController::class, 'updateProfile']);
+        Route::get('/dashboard-stats', [DoctorController::class, 'getDashboardStats']);
+
+        // Clinic Connection Management
+        Route::get('/available-clinics', [DoctorController::class, 'getAvailableClinics']);
+        Route::post('/send-connection-request', [DoctorController::class, 'sendConnectionRequest']);
+        Route::get('/connection-requests', [DoctorController::class, 'getConnectionRequests']);
+        Route::post('/update-connection-status/{id}', [DoctorController::class, 'updateConnectionStatus']);
+        Route::get('/my-clinics', [DoctorController::class, 'getMyClinics']);
+        Route::delete('/disconnect-clinic/{clinicId}', [DoctorController::class, 'disconnectClinic']);
+
+        // Schedule Management
+        Route::get('/schedule/{clinicId}', [DoctorController::class, 'getSchedule']);
+        Route::post('/schedule/{clinicId}', [DoctorController::class, 'updateSchedule']);
+
+        // Appointment Management
+        Route::get('/appointments', [DoctorController::class, 'getMyAppointments']);
+        Route::post('/appointments/{id}/update-status', [DoctorController::class, 'updateAppointmentStatus']);
+    });
+});
+
+// Healthcare/Clinic-specific routes
+Route::middleware('auth:sanctum')->group(function () {
+    // ... existing routes ...
+
+    // Healthcare Profile Management
+    Route::prefix('healthcare')->group(function () {
+        Route::get('/profile', [ClinicController::class, 'getHealthcareProfile']);
+        Route::post('/profile', [ClinicController::class, 'updateHealthcareProfile']);
+        Route::get('/dashboard-stats', [ClinicController::class, 'getHealthcareDashboardStats']);
+
+        // Doctor Connection Management
+        Route::get('/connection-requests', [ClinicController::class, 'getConnectionRequests']);
+        Route::post('/connection-requests/{id}/respond', [ClinicController::class, 'respondToConnectionRequest']);
+        Route::get('/connected-doctors', [ClinicController::class, 'getConnectedDoctors']);
+        Route::delete('/disconnect-doctor/{doctorId}', [ClinicController::class, 'disconnectDoctor']);
+
+        // Schedule Management
+        Route::get('/doctor-schedule/{doctorId}', [ClinicController::class, 'getDoctorSchedule']);
+        Route::post('/doctor-schedule/{doctorId}', [ClinicController::class, 'updateDoctorSchedule']);
+
+        // Appointment Management
+        Route::get('/appointments', [ClinicController::class, 'getClinicAppointments']);
+        Route::post('/appointments/{id}/update-status', [ClinicController::class, 'updateClinicAppointmentStatus']);
+
+        // Clinic Management (for multiple clinics)
+        Route::get('/my-clinics', [ClinicController::class, 'getMyClinicsList']);
+        Route::post('/add-clinic', [ClinicController::class, 'addNewClinic']);
+    });
+});
+
+// Doctor-specific routes for clinic connections
+Route::middleware('auth:sanctum')->group(function () {
+    // ... existing routes ...
+
+    // Doctor routes for clinic connections
+    Route::prefix('doctor')->group(function () {
+        // ... existing doctor routes ...
+
+        // Clinic search and connection
+        Route::get('/search-clinics', [DoctorController::class, 'searchClinics']);
+        Route::post('/send-connection-request', [DoctorController::class, 'sendConnectionRequest']);
+        Route::get('/my-connection-requests', [DoctorController::class, 'getMyConnectionRequests']);
+        Route::get('/my-connected-clinics', [DoctorController::class, 'getMyConnectedClinics']);
+        Route::delete('/disconnect-clinic/{clinicId}', [DoctorController::class, 'disconnectFromClinic']);
+    });
+});
 ```
 
-
-***
+---
 
 ## 🎨 Frontend Implementation
 
@@ -2348,25 +3563,24 @@ Route::middleware('auth:sanctum')->group(function () {
 }
 ```
 
-
 ### Step 11: Vite Configuration
 
 **vite.config.js**
 
 ```javascript
-import { defineConfig } from 'vite';
-import laravel from 'laravel-vite-plugin';
-import react from '@vitejs/plugin-react';
+import { defineConfig } from "vite";
+import laravel from "laravel-vite-plugin";
+import react from "@vitejs/plugin-react";
 
 export default defineConfig({
     plugins: [
         react({
             babel: {
-                plugins: ['styled-jsx/babel']
-            }
+                plugins: ["styled-jsx/babel"],
+            },
         }),
         laravel({
-            input: ['resources/css/app.css', 'resources/js/app.jsx'],
+            input: ["resources/css/app.css", "resources/js/app.jsx"],
             refresh: true,
         }),
     ],
@@ -2375,12 +3589,12 @@ export default defineConfig({
         rollupOptions: {
             output: {
                 manualChunks: {
-                    vendor: ['react', 'react-dom'],
-                    mui: ['@mui/material', '@mui/icons-material'],
+                    vendor: ["react", "react-dom"],
+                    mui: ["@mui/material", "@mui/icons-material"],
                 },
             },
         },
-        minify: 'terser',
+        minify: "terser",
         terserOptions: {
             compress: {
                 drop_console: true,
@@ -2392,26 +3606,27 @@ export default defineConfig({
     },
     server: {
         hmr: {
-            host: 'localhost',
+            host: "localhost",
         },
     },
     esbuild: {
-        drop: process.env.NODE_ENV === 'production' ? ['console', 'debugger'] : [],
+        drop:
+            process.env.NODE_ENV === "production"
+                ? ["console", "debugger"]
+                : [],
     },
 });
 ```
-
 
 ### Step 12: Bootstrap Configuration
 
 **resources/js/bootstrap.js**
 
 ```javascript
-import axios from 'axios';
+import axios from "axios";
 window.axios = axios;
-window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
+window.axios.defaults.headers.common["X-Requested-With"] = "XMLHttpRequest";
 ```
-
 
 ### Step 13: Welcome Blade Template
 
@@ -2431,25 +3646,25 @@ window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    
+
     <!-- Favicon -->
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-    
+
     <!-- Open Graph Meta Tags -->
     <meta property="og:title" content="Visit Care - Healthcare Booking Platform">
     <meta property="og:description" content="Find and book appointments with verified doctors and clinics near you">
     <meta property="og:image" content="/og-image.jpg">
     <meta property="og:url" content="{{ url('/') }}">
     <meta property="og:type" content="website">
-    
+
     <!-- Twitter Meta Tags -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Visit Care - Healthcare Booking Platform">
     <meta name="twitter:description" content="Find and book appointments with verified doctors and clinics near you">
     <meta name="twitter:image" content="/twitter-image.jpg">
-    
+
     <!-- Preload critical resources -->
     <link rel="preload" href="{{ Vite::asset('resources/css/app.css') }}" as="style">
     <link rel="preload" href="{{ Vite::asset('resources/js/app.jsx') }}" as="script" crossorigin>
@@ -2470,28 +3685,27 @@ window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 </html>
 ```
 
-
 ### Step 14: Main App Component
 
 **resources/js/app.jsx**
 
 ```jsx
-import React from 'react';
-import { createRoot } from 'react-dom/client';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { ThemeProvider } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
-import theme from './theme/theme';
-import HomePage from './pages/HomePage';
-import ClinicDetailPage from './pages/ClinicDetailPage';
-import DoctorDetailPage from './pages/DoctorDetailPage';
-import BookAppointmentPage from './pages/BookAppointmentPage';
-import DoctorDashboard from './pages/doctor/DoctorDashboard';
-import HealthcareDashboard from './pages/healthcare/HealthcareDashboard';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AuthCallback from './components/auth/AuthCallback';
-import '../css/app.css';
-import './bootstrap';
+import React from "react";
+import { createRoot } from "react-dom/client";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { ThemeProvider } from "@mui/material/styles";
+import CssBaseline from "@mui/material/CssBaseline";
+import theme from "./theme/theme";
+import HomePage from "./pages/HomePage";
+import ClinicDetailPage from "./pages/ClinicDetailPage";
+import DoctorDetailPage from "./pages/DoctorDetailPage";
+import BookAppointmentPage from "./pages/BookAppointmentPage";
+import DoctorDashboard from "./pages/doctor/DoctorDashboard";
+import HealthcareDashboard from "./pages/healthcare/HealthcareDashboard";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AuthCallback from "./components/auth/AuthCallback";
+import "../css/app.css";
+import "./bootstrap";
 
 function App() {
     return (
@@ -2503,18 +3717,30 @@ function App() {
                     <Route path="/" element={<HomePage />} />
                     <Route path="/clinic/:id" element={<ClinicDetailPage />} />
                     <Route path="/doctor/:id" element={<DoctorDetailPage />} />
-                    
+
                     {/* Protected Routes */}
-                    <Route path="/book-appointment" element={<BookAppointmentPage />} />
-                    
+                    <Route
+                        path="/book-appointment"
+                        element={<BookAppointmentPage />}
+                    />
+
                     {/* Auth Callback Route */}
                     <Route path="/auth/callback" element={<AuthCallback />} />
-                    
+
                     {/* Role-based Dashboard Routes */}
-                    <Route path="/doctor/dashboard" element={<DoctorDashboard />} />
-                    <Route path="/healthcare/dashboard" element={<HealthcareDashboard />} />
-                    <Route path="/admin/dashboard" element={<AdminDashboard />} />
-                    
+                    <Route
+                        path="/doctor/dashboard"
+                        element={<DoctorDashboard />}
+                    />
+                    <Route
+                        path="/healthcare/dashboard"
+                        element={<HealthcareDashboard />}
+                    />
+                    <Route
+                        path="/admin/dashboard"
+                        element={<AdminDashboard />}
+                    />
+
                     {/* Fallback Route */}
                     <Route path="*" element={<HomePage />} />
                 </Routes>
@@ -2523,88 +3749,87 @@ function App() {
     );
 }
 
-const container = document.getElementById('app');
+const container = document.getElementById("app");
 const root = createRoot(container);
 root.render(<App />);
 ```
-
 
 ### Step 15: Material-UI Theme with Enhanced Icons
 
 **resources/js/theme/theme.js**
 
 ```javascript
-import { createTheme } from '@mui/material/styles';
+import { createTheme } from "@mui/material/styles";
 import "./theme.css";
 
 const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#10d915',    
-      light: '#4de352',   
-      dark: '#0cb010',    
-    },
-    secondary: {
-      main: '#dc004e',
-      light: '#ff5983',
-      dark: '#9a0036',
-    },
-    success: {
-      main: '#10d915',
-    },
-    error: {
-      main: '#f27474',
-    },
-    warning: {
-      main: '#f7e119',
-    },
-    info: {
-      main: '#2196f3',
-    },
-    background: {
-      default: '#f5f5f5',
-      paper: '#ffffff',
-    },
-  },
-  typography: {
-    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-    h1: {
-      fontSize: '2.5rem',
-      fontWeight: 700,
-    },
-    h2: {
-      fontSize: '2rem',
-      fontWeight: 600,
-    },
-    h3: {
-      fontSize: '1.5rem',
-      fontWeight: 600,
-    },
-  },
-  components: {
-    MuiButton: {
-      styleOverrides: {
-        root: {
-          borderRadius: 8,
-          textTransform: 'none',
-          fontWeight: 600,
+    palette: {
+        primary: {
+            main: "#10d915",
+            light: "#4de352",
+            dark: "#0cb010",
         },
-      },
-    },
-    MuiCard: {
-      styleOverrides: {
-        root: {
-          borderRadius: 12,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-          '&:hover': {
-            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-            transform: 'translateY(-2px)',
-          },
-          transition: 'all 0.3s ease-in-out',
+        secondary: {
+            main: "#dc004e",
+            light: "#ff5983",
+            dark: "#9a0036",
         },
-      },
+        success: {
+            main: "#10d915",
+        },
+        error: {
+            main: "#f27474",
+        },
+        warning: {
+            main: "#f7e119",
+        },
+        info: {
+            main: "#2196f3",
+        },
+        background: {
+            default: "#f5f5f5",
+            paper: "#ffffff",
+        },
     },
-  },
+    typography: {
+        fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+        h1: {
+            fontSize: "2.5rem",
+            fontWeight: 700,
+        },
+        h2: {
+            fontSize: "2rem",
+            fontWeight: 600,
+        },
+        h3: {
+            fontSize: "1.5rem",
+            fontWeight: 600,
+        },
+    },
+    components: {
+        MuiButton: {
+            styleOverrides: {
+                root: {
+                    borderRadius: 8,
+                    textTransform: "none",
+                    fontWeight: 600,
+                },
+            },
+        },
+        MuiCard: {
+            styleOverrides: {
+                root: {
+                    borderRadius: 12,
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                    "&:hover": {
+                        boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+                        transform: "translateY(-2px)",
+                    },
+                    transition: "all 0.3s ease-in-out",
+                },
+            },
+        },
+    },
 });
 
 export default theme;
@@ -2613,15 +3838,14 @@ export default theme;
 **resources/js/theme/theme.css**
 
 ```css
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@200;300;400;500;600&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@200;300;400;500;600&display=swap");
 
 * {
-  font-family: 'Poppins', sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+    font-family: "Poppins", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 ```
-
 
 ### Step 16: Enhanced Dummy Data with Icons
 
@@ -2629,287 +3853,319 @@ export default theme;
 
 ```javascript
 export const specialties = [
-    'General Medicine', 'Cardiology', 'Dermatology', 'Orthopedics',
-    'Pediatrics', 'Neurology', 'Dentistry', 'Gynecology', 'Psychiatry', 'Oncology'
+    "General Medicine",
+    "Cardiology",
+    "Dermatology",
+    "Orthopedics",
+    "Pediatrics",
+    "Neurology",
+    "Dentistry",
+    "Gynecology",
+    "Psychiatry",
+    "Oncology",
 ];
 
 export const clinics = [
     {
         id: 1,
-        name: 'City Medical Center',
-        address: '123 Health Street, Downtown, NY 10001',
-        distance: '0.5 km',
+        name: "City Medical Center",
+        address: "123 Health Street, Downtown, NY 10001",
+        distance: "0.5 km",
         rating: 4.8,
         reviewCount: 234,
-        facilities: ['🩻 X-Ray', '🔬 Lab', '💊 Pharmacy', '🚨 Emergency'],
-        image: 'https://images.unsplash.com/photo-1551190822-a9333d879b1f?w=400&h=300&fit=crop',
-        openTime: '08:00',
-        closeTime: '20:00',
-        isOpen: true
+        facilities: ["🩻 X-Ray", "🔬 Lab", "💊 Pharmacy", "🚨 Emergency"],
+        image: "https://images.unsplash.com/photo-1551190822-a9333d879b1f?w=400&h=300&fit=crop",
+        openTime: "08:00",
+        closeTime: "20:00",
+        isOpen: true,
     },
     {
         id: 2,
-        name: 'Green Valley Clinic',
-        address: '456 Wellness Ave, Midtown, NY 10002',
-        distance: '1.2 km',
+        name: "Green Valley Clinic",
+        address: "456 Wellness Ave, Midtown, NY 10002",
+        distance: "1.2 km",
         rating: 4.6,
         reviewCount: 187,
-        facilities: ['🔬 Lab', '💊 Pharmacy', '❤️ Cardiology', '🔍 Radiology'],
-        image: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=400&h=300&fit=crop',
-        openTime: '09:00',
-        closeTime: '18:00',
-        isOpen: true
+        facilities: ["🔬 Lab", "💊 Pharmacy", "❤️ Cardiology", "🔍 Radiology"],
+        image: "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=400&h=300&fit=crop",
+        openTime: "09:00",
+        closeTime: "18:00",
+        isOpen: true,
     },
     {
         id: 3,
-        name: 'Metro Health Hub',
-        address: '789 Care Road, Uptown, NY 10003',
-        distance: '2.1 km',
+        name: "Metro Health Hub",
+        address: "789 Care Road, Uptown, NY 10003",
+        distance: "2.1 km",
         rating: 4.7,
         reviewCount: 156,
-        facilities: ['🩻 X-Ray', '🧲 MRI', '🔬 Lab', '💊 Pharmacy', '⚕️ Surgery'],
-        image: 'https://images.unsplash.com/photo-1504813184591-01572f98c85f?w=400&h=300&fit=crop',
-        openTime: '24/7',
-        closeTime: '24/7',
-        isOpen: true
+        facilities: [
+            "🩻 X-Ray",
+            "🧲 MRI",
+            "🔬 Lab",
+            "💊 Pharmacy",
+            "⚕️ Surgery",
+        ],
+        image: "https://images.unsplash.com/photo-1504813184591-01572f98c85f?w=400&h=300&fit=crop",
+        openTime: "24/7",
+        closeTime: "24/7",
+        isOpen: true,
     },
     {
         id: 4,
-        name: 'Riverside Medical',
-        address: '321 River Lane, Brooklyn, NY 11201',
-        distance: '3.5 km',
+        name: "Riverside Medical",
+        address: "321 River Lane, Brooklyn, NY 11201",
+        distance: "3.5 km",
         rating: 4.5,
         reviewCount: 298,
-        facilities: ['🚨 Emergency', '🏥 ICU', '🔬 Lab', '💊 Pharmacy'],
-        image: 'https://images.unsplash.com/photo-1586773860418-d37222d8eeb4?w=400&h=300&fit=crop',
-        openTime: '06:00',
-        closeTime: '22:00',
-        isOpen: true
-    }
+        facilities: ["🚨 Emergency", "🏥 ICU", "🔬 Lab", "💊 Pharmacy"],
+        image: "https://images.unsplash.com/photo-1586773860418-d37222d8eeb4?w=400&h=300&fit=crop",
+        openTime: "06:00",
+        closeTime: "22:00",
+        isOpen: true,
+    },
 ];
 
 export const doctors = [
     {
         id: 1,
-        name: 'Dr. Sarah Johnson',
-        specialty: '❤️ Cardiology',
+        name: "Dr. Sarah Johnson",
+        specialty: "❤️ Cardiology",
         experience: 12,
         rating: 4.9,
         reviewCount: 145,
         fee: 150,
         isVerified: true,
-        nextAvailable: 'Today 2:30 PM',
-        languages: ['🇺🇸 English', '🇪🇸 Spanish'],
-        image: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150&h=150&fit=crop&crop=face',
-        clinicName: 'City Medical Center'
+        nextAvailable: "Today 2:30 PM",
+        languages: ["🇺🇸 English", "🇪🇸 Spanish"],
+        image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150&h=150&fit=crop&crop=face",
+        clinicName: "City Medical Center",
     },
     {
         id: 2,
-        name: 'Dr. Michael Chen',
-        specialty: '🩺 General Medicine',
+        name: "Dr. Michael Chen",
+        specialty: "🩺 General Medicine",
         experience: 8,
         rating: 4.7,
         reviewCount: 89,
         fee: 100,
         isVerified: true,
-        nextAvailable: 'Tomorrow 9:00 AM',
-        languages: ['🇺🇸 English', '🇨🇳 Mandarin'],
-        image: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=150&h=150&fit=crop&crop=face',
-        clinicName: 'Green Valley Clinic'
+        nextAvailable: "Tomorrow 9:00 AM",
+        languages: ["🇺🇸 English", "🇨🇳 Mandarin"],
+        image: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=150&h=150&fit=crop&crop=face",
+        clinicName: "Green Valley Clinic",
     },
     {
         id: 3,
-        name: 'Dr. Emily Rodriguez',
-        specialty: '🌟 Dermatology',
+        name: "Dr. Emily Rodriguez",
+        specialty: "🌟 Dermatology",
         experience: 10,
         rating: 4.8,
         reviewCount: 123,
         fee: 120,
         isVerified: true,
-        nextAvailable: 'Today 4:00 PM',
-        languages: ['🇺🇸 English', '🇪🇸 Spanish'],
-        image: 'https://images.unsplash.com/photo-1594824280438-29ed7265034c?w=150&h=150&fit=crop&crop=face',
-        clinicName: 'Metro Health Hub'
+        nextAvailable: "Today 4:00 PM",
+        languages: ["🇺🇸 English", "🇪🇸 Spanish"],
+        image: "https://images.unsplash.com/photo-1594824280438-29ed7265034c?w=150&h=150&fit=crop&crop=face",
+        clinicName: "Metro Health Hub",
     },
     {
         id: 4,
-        name: 'Dr. James Wilson',
-        specialty: '🦴 Orthopedics',
+        name: "Dr. James Wilson",
+        specialty: "🦴 Orthopedics",
         experience: 15,
         rating: 4.9,
         reviewCount: 167,
         fee: 180,
         isVerified: true,
-        nextAvailable: 'Tomorrow 11:30 AM',
-        languages: ['🇺🇸 English'],
-        image: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&h=150&fit=crop&crop=face',
-        clinicName: 'Riverside Medical'
+        nextAvailable: "Tomorrow 11:30 AM",
+        languages: ["🇺🇸 English"],
+        image: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&h=150&fit=crop&crop=face",
+        clinicName: "Riverside Medical",
     },
     {
         id: 5,
-        name: 'Dr. Lisa Anderson',
-        specialty: '👶 Pediatrics',
+        name: "Dr. Lisa Anderson",
+        specialty: "👶 Pediatrics",
         experience: 9,
         rating: 4.8,
         reviewCount: 201,
         fee: 110,
         isVerified: true,
-        nextAvailable: 'Today 3:15 PM',
-        languages: ['🇺🇸 English', '🇫🇷 French'],
-        image: 'https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=150&h=150&fit=crop&crop=face',
-        clinicName: 'City Medical Center'
+        nextAvailable: "Today 3:15 PM",
+        languages: ["🇺🇸 English", "🇫🇷 French"],
+        image: "https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=150&h=150&fit=crop&crop=face",
+        clinicName: "City Medical Center",
     },
     {
         id: 6,
-        name: 'Dr. Robert Kumar',
-        specialty: '🧠 Neurology',
+        name: "Dr. Robert Kumar",
+        specialty: "🧠 Neurology",
         experience: 14,
         rating: 4.7,
         reviewCount: 134,
         fee: 200,
         isVerified: true,
-        nextAvailable: 'Tomorrow 2:00 PM',
-        languages: ['🇺🇸 English', '🇮🇳 Hindi'],
-        image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=150&h=150&fit=crop&crop=face',
-        clinicName: 'Metro Health Hub'
-    }
+        nextAvailable: "Tomorrow 2:00 PM",
+        languages: ["🇺🇸 English", "🇮🇳 Hindi"],
+        image: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=150&h=150&fit=crop&crop=face",
+        clinicName: "Metro Health Hub",
+    },
 ];
 
 export const testimonials = [
     {
         id: 1,
-        name: 'Alice Thompson',
+        name: "Alice Thompson",
         rating: 5,
-        comment: 'Amazing experience! Found the perfect doctor near me within minutes. The booking process was seamless.',
-        avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b977?w=60&h=60&fit=crop&crop=face',
-        location: 'Manhattan, NY'
+        comment:
+            "Amazing experience! Found the perfect doctor near me within minutes. The booking process was seamless.",
+        avatar: "https://images.unsplash.com/photo-1494790108755-2616b612b977?w=60&h=60&fit=crop&crop=face",
+        location: "Manhattan, NY",
     },
     {
         id: 2,
-        name: 'David Kumar',
+        name: "David Kumar",
         rating: 5,
-        comment: 'The app made booking so easy. Great selection of verified doctors with real reviews from patients.',
-        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=60&h=60&fit=crop&crop=face',
-        location: 'Brooklyn, NY'
+        comment:
+            "The app made booking so easy. Great selection of verified doctors with real reviews from patients.",
+        avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=60&h=60&fit=crop&crop=face",
+        location: "Brooklyn, NY",
     },
     {
         id: 3,
-        name: 'Maria Garcia',
+        name: "Maria Garcia",
         rating: 4,
-        comment: 'Love the location-based search. Found excellent healthcare nearby and saved so much time.',
-        avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=60&h=60&fit=crop&crop=face',
-        location: 'Queens, NY'
+        comment:
+            "Love the location-based search. Found excellent healthcare nearby and saved so much time.",
+        avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=60&h=60&fit=crop&crop=face",
+        location: "Queens, NY",
     },
     {
         id: 4,
-        name: 'John Smith',
+        name: "John Smith",
         rating: 5,
-        comment: 'Professional service and verified doctors. The reminders feature is incredibly helpful.',
-        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=60&h=60&fit=crop&crop=face',
-        location: 'Bronx, NY'
-    }
+        comment:
+            "Professional service and verified doctors. The reminders feature is incredibly helpful.",
+        avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=60&h=60&fit=crop&crop=face",
+        location: "Bronx, NY",
+    },
 ];
 
 export const whyChooseFeatures = [
     {
-        icon: 'LocationOn',
-        title: '📍 Smart Location Search',
-        description: 'Find doctors and clinics near you with precise GPS-based location search and distance tracking.'
+        icon: "LocationOn",
+        title: "📍 Smart Location Search",
+        description:
+            "Find doctors and clinics near you with precise GPS-based location search and distance tracking.",
     },
     {
-        icon: 'Schedule',
-        title: '⏰ Real Time Booking',
-        description: 'Book appointments instantly with live availability updates and immediate confirmation.'
+        icon: "Schedule",
+        title: "⏰ Real Time Booking",
+        description:
+            "Book appointments instantly with live availability updates and immediate confirmation.",
     },
     {
-        icon: 'VerifiedUser',
-        title: '✅ Verified Doctors',
-        description: 'All our healthcare providers are thoroughly verified with proven credentials and licenses.'
+        icon: "VerifiedUser",
+        title: "✅ Verified Doctors",
+        description:
+            "All our healthcare providers are thoroughly verified with proven credentials and licenses.",
     },
     {
-        icon: 'PhoneIphone',
-        title: '📱 Mobile Optimized',
-        description: 'Perfect experience across all devices with our responsive and intuitive design.'
+        icon: "PhoneIphone",
+        title: "📱 Mobile Optimized",
+        description:
+            "Perfect experience across all devices with our responsive and intuitive design.",
     },
     {
-        icon: 'Security',
-        title: '🔒 Secure & Private',
-        description: 'Your health information is protected with bank-level encryption and privacy controls.'
+        icon: "Security",
+        title: "🔒 Secure & Private",
+        description:
+            "Your health information is protected with bank-level encryption and privacy controls.",
     },
     {
-        icon: 'NotificationImportant',
-        title: '🔔 Smart Reminders',
-        description: 'Never miss appointments with personalized reminders and health notifications.'
-    }
+        icon: "NotificationImportant",
+        title: "🔔 Smart Reminders",
+        description:
+            "Never miss appointments with personalized reminders and health notifications.",
+    },
 ];
 ```
-
 
 ### Step 17: Layout Components
 
 **resources/js/components/layout/MainLayout.jsx**
 
 ```jsx
-import React from 'react';
-import { Box, useTheme, useMediaQuery } from '@mui/material';
-import Header from '../common/Header';
-import Footer from '../common/Footer';
+import React from "react";
+import { Box, useTheme, useMediaQuery } from "@mui/material";
+import Header from "../common/Header";
+import Footer from "../common/Footer";
 
-const MainLayout = ({ children, disableGutters = false, maxWidth = "false", fullWidth = false, sx = {} }) => {
+const MainLayout = ({
+    children,
+    disableGutters = false,
+    maxWidth = "false",
+    fullWidth = false,
+    sx = {},
+}) => {
     const theme = useTheme();
-    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-    const isSmallMobile = useMediaQuery(theme.breakpoints.down('sm'));
-    const isTablet = useMediaQuery(theme.breakpoints.between('sm', 'md'));
+    const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+    const isSmallMobile = useMediaQuery(theme.breakpoints.down("sm"));
+    const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md"));
 
     // Calculate appropriate top padding based on device type
     const getTopPadding = () => {
-        if (isSmallMobile) return '65px';
-        if (isMobile) return '85px';
-        if (isTablet) return '70px';
-        return '0px';
+        if (isSmallMobile) return "65px";
+        if (isMobile) return "85px";
+        if (isTablet) return "70px";
+        return "0px";
     };
 
     return (
-        <Box 
+        <Box
             sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                minHeight: '100vh',
-                width: '100%',
-                overflowX: 'hidden',
-                ...sx
+                display: "flex",
+                flexDirection: "column",
+                minHeight: "100vh",
+                width: "100%",
+                overflowX: "hidden",
+                ...sx,
             }}
         >
             {/* Header - Fixed */}
             <Header />
-            
+
             {/* Main Content Area */}
             <Box
                 component="main"
                 sx={{
                     flexGrow: 1,
-                    width: fullWidth ? '100vw' : '100%',
+                    width: fullWidth ? "100vw" : "100%",
                     paddingTop: getTopPadding(),
-                    paddingX: disableGutters || fullWidth ? 0 : { xs: 0.5, sm: 1, md: 1.5 }, // Reduced padding
+                    paddingX:
+                        disableGutters || fullWidth
+                            ? 0
+                            : { xs: 0.5, sm: 1, md: 1.5 }, // Reduced padding
                     minHeight: `calc(100vh - ${getTopPadding()})`,
-                    position: 'relative',
+                    position: "relative",
                     zIndex: 1,
                     // Ensure content doesn't get cut off on mobile
-                    '@supports (padding: max(0px))': {
+                    "@supports (padding: max(0px))": {
                         paddingTop: `max(${getTopPadding()}, env(safe-area-inset-top))`,
                     },
                     // Full width override for specific sections
                     ...(fullWidth && {
-                        marginLeft: 'calc(-50vw + 50%)',
-                        marginRight: 'calc(-50vw + 50%)',
-                        maxWidth: '100vw',
-                        width: '100vw',
-                    })
+                        marginLeft: "calc(-50vw + 50%)",
+                        marginRight: "calc(-50vw + 50%)",
+                        maxWidth: "100vw",
+                        width: "100vw",
+                    }),
                 }}
             >
                 {children}
             </Box>
-            
+
             {/* Footer */}
             <Footer />
         </Box>
@@ -2918,7 +4174,6 @@ const MainLayout = ({ children, disableGutters = false, maxWidth = "false", full
 
 export default MainLayout;
 ```
-
 
 ### Step 18: Enhanced Header Component
 
@@ -3536,13 +4791,12 @@ const Header = () => {
 export default Header;
 ```
 
-
 ### Step 19: Enhanced Footer Component
 
 **resources/js/components/common/Footer.jsx**
 
 ```jsx
-import React from 'react';
+import React from "react";
 import {
     Box,
     Container,
@@ -3555,7 +4809,7 @@ import {
     ListItem,
     ListItemIcon,
     ListItemText,
-} from '@mui/material';
+} from "@mui/material";
 import {
     Phone,
     Email,
@@ -3566,101 +4820,113 @@ import {
     Instagram,
     LinkedIn,
     LocalHospital,
-} from '@mui/icons-material';
+} from "@mui/icons-material";
 
 const Footer = () => {
     const footerLinks = {
         services: [
-            '🔍 Find Doctors',
-            '📅 Book Appointments', 
-            '🏥 Find Clinics',
-            '📋 Health Records',
-            '💻 Telemedicine',
-            '🚨 Emergency Care'
+            "🔍 Find Doctors",
+            "📅 Book Appointments",
+            "🏥 Find Clinics",
+            "📋 Health Records",
+            "💻 Telemedicine",
+            "🚨 Emergency Care",
         ],
         support: [
-            '❓ Help Center',
-            '📞 Contact Us',
-            '💬 FAQ',
-            '🔐 Privacy Policy',
-            '📜 Terms of Service',
-            '♿ Accessibility'
+            "❓ Help Center",
+            "📞 Contact Us",
+            "💬 FAQ",
+            "🔐 Privacy Policy",
+            "📜 Terms of Service",
+            "♿ Accessibility",
         ],
         company: [
-            'ℹ️ About Us',
-            '💼 Careers',
-            '📰 Press',
-            '🤝 Partners',
-            '💰 Investors',
-            '📝 Blog'
-        ]
+            "ℹ️ About Us",
+            "💼 Careers",
+            "📰 Press",
+            "🤝 Partners",
+            "💰 Investors",
+            "📝 Blog",
+        ],
     };
 
     const contactInfo = [
-        { icon: <Phone />, text: '📞 +1 (555) 123-4567' },
-        { icon: <Email />, text: '📧 support@visitcare.com' },
-        { icon: <LocationOn />, text: '📍 123 Healthcare Ave, New York, NY 10001' },
-        { icon: <Schedule />, text: '🕐 24/7 Customer Support' }
+        { icon: <Phone />, text: "📞 +1 (555) 123-4567" },
+        { icon: <Email />, text: "📧 support@visitcare.com" },
+        {
+            icon: <LocationOn />,
+            text: "📍 123 Healthcare Ave, New York, NY 10001",
+        },
+        { icon: <Schedule />, text: "🕐 24/7 Customer Support" },
     ];
 
     const socialIcons = [
-        { icon: <Facebook />, link: '#', color: '#1877F2', name: 'Facebook' },
-        { icon: <Twitter />, link: '#', color: '#1DA1F2', name: 'Twitter' },
-        { icon: <Instagram />, link: '#', color: '#E4405F', name: 'Instagram' },
-        { icon: <LinkedIn />, link: '#', color: '#0A66C2', name: 'LinkedIn' }
+        { icon: <Facebook />, link: "#", color: "#1877F2", name: "Facebook" },
+        { icon: <Twitter />, link: "#", color: "#1DA1F2", name: "Twitter" },
+        { icon: <Instagram />, link: "#", color: "#E4405F", name: "Instagram" },
+        { icon: <LinkedIn />, link: "#", color: "#0A66C2", name: "LinkedIn" },
     ];
 
     return (
         <Box
             component="footer"
             sx={{
-                bgcolor: 'grey.900',
-                color: 'white',
+                bgcolor: "grey.900",
+                color: "white",
                 pt: 3,
                 pb: 2,
-                mt: 'auto',
-                width: '100%'
+                mt: "auto",
+                width: "100%",
             }}
         >
             <Container maxWidth="lg" sx={{ px: { xs: 1, sm: 2, md: 2 } }}>
                 <Grid container spacing={2}>
                     <Grid item xs={12} md={4}>
                         <Box sx={{ mb: 2 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                                <LocalHospital 
-                                    sx={{ 
-                                        color: 'primary.main', 
-                                        fontSize: '2rem',
-                                        mr: 1
-                                    }} 
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    mb: 3,
+                                }}
+                            >
+                                <LocalHospital
+                                    sx={{
+                                        color: "primary.main",
+                                        fontSize: "2rem",
+                                        mr: 1,
+                                    }}
                                 />
-                                <Typography 
-                                    variant="h5" 
-                                    sx={{ 
-                                        fontWeight: 'bold',
-                                        background: 'linear-gradient(45deg, #10d915 30%, #21CBF3 90%)',
-                                        backgroundClip: 'text',
-                                        WebkitBackgroundClip: 'text',
-                                        WebkitTextFillColor: 'transparent',
+                                <Typography
+                                    variant="h5"
+                                    sx={{
+                                        fontWeight: "bold",
+                                        background:
+                                            "linear-gradient(45deg, #10d915 30%, #21CBF3 90%)",
+                                        backgroundClip: "text",
+                                        WebkitBackgroundClip: "text",
+                                        WebkitTextFillColor: "transparent",
                                     }}
                                 >
                                     Visit Care
                                 </Typography>
                             </Box>
-                            
-                            <Typography 
-                                variant="body2" 
-                                sx={{ 
-                                    color: 'grey.400', 
-                                    mb: 2, 
+
+                            <Typography
+                                variant="body2"
+                                sx={{
+                                    color: "grey.400",
+                                    mb: 2,
                                     lineHeight: 1.7,
-                                    fontSize: '0.9rem'
+                                    fontSize: "0.9rem",
                                 }}
                             >
-                                🩺 Your trusted healthcare companion – easily find, book, and manage appointments with top providers near you.
+                                🩺 Your trusted healthcare companion – easily
+                                find, book, and manage appointments with top
+                                providers near you.
                             </Typography>
-                            
-                            <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+
+                            <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
                                 {socialIcons.map((social, index) => (
                                     <IconButton
                                         key={index}
@@ -3668,18 +4934,21 @@ const Footer = () => {
                                         href={social.link}
                                         title={social.name}
                                         sx={{
-                                            color: 'grey.400',
-                                            bgcolor: 'rgba(255, 255, 255, 0.05)',
-                                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                                            color: "grey.400",
+                                            bgcolor:
+                                                "rgba(255, 255, 255, 0.05)",
+                                            border: "1px solid rgba(255, 255, 255, 0.1)",
                                             width: 40,
                                             height: 40,
-                                            transition: 'all 0.3s ease',
-                                            '&:hover': {
+                                            transition: "all 0.3s ease",
+                                            "&:hover": {
                                                 color: social.color,
-                                                bgcolor: 'rgba(255, 255, 255, 0.1)',
-                                                transform: 'translateY(-2px)',
-                                                boxShadow: '0 4px 15px rgba(0, 0, 0, 0.3)'
-                                            }
+                                                bgcolor:
+                                                    "rgba(255, 255, 255, 0.1)",
+                                                transform: "translateY(-2px)",
+                                                boxShadow:
+                                                    "0 4px 15px rgba(0, 0, 0, 0.3)",
+                                            },
                                         }}
                                     >
                                         {social.icon}
@@ -3688,48 +4957,58 @@ const Footer = () => {
                             </Box>
 
                             <Box>
-                                <Typography 
-                                    variant="body2" 
-                                    sx={{ 
-                                        mb: 2, 
-                                        color: 'white',
+                                <Typography
+                                    variant="body2"
+                                    sx={{
+                                        mb: 2,
+                                        color: "white",
                                         fontWeight: 500,
-                                        fontSize: '1rem'
+                                        fontSize: "1rem",
                                     }}
                                 >
                                     📱 Download Our App
                                 </Typography>
-                                <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        gap: 1.5,
+                                        flexWrap: "wrap",
+                                    }}
+                                >
                                     <Box
                                         component="img"
                                         src="/images/common/apple_app_store.webp"
                                         alt="Download on App Store"
-                                        sx={{ 
-                                            height: 40, 
-                                            width: 'auto',
-                                            cursor: 'pointer',
-                                            transition: 'all 0.3s ease',
+                                        sx={{
+                                            height: 40,
+                                            width: "auto",
+                                            cursor: "pointer",
+                                            transition: "all 0.3s ease",
                                             borderRadius: 1,
-                                            '&:hover': {
-                                                transform: 'scale(1.05) translateY(-2px)',
-                                                boxShadow: '0 6px 20px rgba(0, 0, 0, 0.3)'
-                                            }
+                                            "&:hover": {
+                                                transform:
+                                                    "scale(1.05) translateY(-2px)",
+                                                boxShadow:
+                                                    "0 6px 20px rgba(0, 0, 0, 0.3)",
+                                            },
                                         }}
                                     />
                                     <Box
-                                        component="img" 
+                                        component="img"
                                         src="/images/common/google_play_store.webp"
                                         alt="Get it on Google Play"
-                                        sx={{ 
-                                            height: 40, 
-                                            width: 'auto',
-                                            cursor: 'pointer',
-                                            transition: 'all 0.3s ease',
+                                        sx={{
+                                            height: 40,
+                                            width: "auto",
+                                            cursor: "pointer",
+                                            transition: "all 0.3s ease",
                                             borderRadius: 1,
-                                            '&:hover': {
-                                                transform: 'scale(1.05) translateY(-2px)',
-                                                boxShadow: '0 6px 20px rgba(0, 0, 0, 0.3)'
-                                            }
+                                            "&:hover": {
+                                                transform:
+                                                    "scale(1.05) translateY(-2px)",
+                                                boxShadow:
+                                                    "0 6px 20px rgba(0, 0, 0, 0.3)",
+                                            },
                                         }}
                                     />
                                 </Box>
@@ -3738,13 +5017,13 @@ const Footer = () => {
                     </Grid>
 
                     <Grid item xs={12} sm={6} md={2}>
-                        <Typography 
-                            variant="h6" 
-                            sx={{ 
-                                mb: 2, 
-                                fontWeight: 'bold',
-                                color: 'white',
-                                fontSize: '1.1rem'
+                        <Typography
+                            variant="h6"
+                            sx={{
+                                mb: 2,
+                                fontWeight: "bold",
+                                color: "white",
+                                fontSize: "1.1rem",
                             }}
                         >
                             🛠️ Services
@@ -3755,17 +5034,17 @@ const Footer = () => {
                                     key={index}
                                     href="#"
                                     sx={{
-                                        display: 'block',
-                                        color: 'grey.400',
-                                        textDecoration: 'none',
+                                        display: "block",
+                                        color: "grey.400",
+                                        textDecoration: "none",
                                         mb: 1.2,
-                                        fontSize: '0.9rem',
-                                        transition: 'all 0.3s ease',
-                                        '&:hover': {
-                                            color: 'white',
-                                            textDecoration: 'none',
-                                            transform: 'translateX(5px)'
-                                        }
+                                        fontSize: "0.9rem",
+                                        transition: "all 0.3s ease",
+                                        "&:hover": {
+                                            color: "white",
+                                            textDecoration: "none",
+                                            transform: "translateX(5px)",
+                                        },
                                     }}
                                 >
                                     {service}
@@ -3775,13 +5054,13 @@ const Footer = () => {
                     </Grid>
 
                     <Grid item xs={12} sm={6} md={2}>
-                        <Typography 
-                            variant="h6" 
-                            sx={{ 
-                                mb: 2, 
-                                fontWeight: 'bold',
-                                color: 'white',
-                                fontSize: '1.1rem'
+                        <Typography
+                            variant="h6"
+                            sx={{
+                                mb: 2,
+                                fontWeight: "bold",
+                                color: "white",
+                                fontSize: "1.1rem",
                             }}
                         >
                             💬 Support
@@ -3792,17 +5071,17 @@ const Footer = () => {
                                     key={index}
                                     href="#"
                                     sx={{
-                                        display: 'block',
-                                        color: 'grey.400',
-                                        textDecoration: 'none',
+                                        display: "block",
+                                        color: "grey.400",
+                                        textDecoration: "none",
                                         mb: 1.2,
-                                        fontSize: '0.9rem',
-                                        transition: 'all 0.3s ease',
-                                        '&:hover': {
-                                            color: 'white',
-                                            textDecoration: 'none',
-                                            transform: 'translateX(5px)'
-                                        }
+                                        fontSize: "0.9rem",
+                                        transition: "all 0.3s ease",
+                                        "&:hover": {
+                                            color: "white",
+                                            textDecoration: "none",
+                                            transform: "translateX(5px)",
+                                        },
                                     }}
                                 >
                                     {support}
@@ -3812,13 +5091,13 @@ const Footer = () => {
                     </Grid>
 
                     <Grid item xs={12} sm={6} md={2}>
-                        <Typography 
-                            variant="h6" 
-                            sx={{ 
-                                mb: 2, 
-                                fontWeight: 'bold',
-                                color: 'white',
-                                fontSize: '1.1rem'
+                        <Typography
+                            variant="h6"
+                            sx={{
+                                mb: 2,
+                                fontWeight: "bold",
+                                color: "white",
+                                fontSize: "1.1rem",
                             }}
                         >
                             🏢 Company
@@ -3829,17 +5108,17 @@ const Footer = () => {
                                     key={index}
                                     href="#"
                                     sx={{
-                                        display: 'block',
-                                        color: 'grey.400',
-                                        textDecoration: 'none',
+                                        display: "block",
+                                        color: "grey.400",
+                                        textDecoration: "none",
                                         mb: 1.2,
-                                        fontSize: '0.9rem',
-                                        transition: 'all 0.3s ease',
-                                        '&:hover': {
-                                            color: 'white',
-                                            textDecoration: 'none',
-                                            transform: 'translateX(5px)'
-                                        }
+                                        fontSize: "0.9rem",
+                                        transition: "all 0.3s ease",
+                                        "&:hover": {
+                                            color: "white",
+                                            textDecoration: "none",
+                                            transform: "translateX(5px)",
+                                        },
                                     }}
                                 >
                                     {company}
@@ -3849,38 +5128,42 @@ const Footer = () => {
                     </Grid>
 
                     <Grid item xs={12} md={2}>
-                        <Typography 
-                            variant="h6" 
-                            sx={{ 
-                                mb: 2, 
-                                fontWeight: 'bold',
-                                color: 'white',
-                                fontSize: '1.1rem'
+                        <Typography
+                            variant="h6"
+                            sx={{
+                                mb: 2,
+                                fontWeight: "bold",
+                                color: "white",
+                                fontSize: "1.1rem",
                             }}
                         >
                             📞 Contact Info
                         </Typography>
                         <List dense>
                             {contactInfo.map((contact, index) => (
-                                <ListItem key={index} disableGutters sx={{ py: 0.5 }}>
-                                    <ListItemIcon 
-                                        sx={{ 
-                                            minWidth: 36, 
-                                            color: 'primary.main',
-                                            '& .MuiSvgIcon-root': {
-                                                fontSize: '1.1rem'
-                                            }
+                                <ListItem
+                                    key={index}
+                                    disableGutters
+                                    sx={{ py: 0.5 }}
+                                >
+                                    <ListItemIcon
+                                        sx={{
+                                            minWidth: 36,
+                                            color: "primary.main",
+                                            "& .MuiSvgIcon-root": {
+                                                fontSize: "1.1rem",
+                                            },
                                         }}
                                     >
                                         {contact.icon}
                                     </ListItemIcon>
-                                    <ListItemText 
+                                    <ListItemText
                                         primary={contact.text}
                                         primaryTypographyProps={{
-                                            variant: 'body2',
-                                            color: 'grey.400',
-                                            fontSize: '0.85rem',
-                                            lineHeight: 1.4
+                                            variant: "body2",
+                                            color: "grey.400",
+                                            fontSize: "0.85rem",
+                                            lineHeight: 1.4,
                                         }}
                                     />
                                 </ListItem>
@@ -3889,41 +5172,47 @@ const Footer = () => {
                     </Grid>
                 </Grid>
 
-                <Divider sx={{ my: 4, bgcolor: 'grey.700' }} />
+                <Divider sx={{ my: 4, bgcolor: "grey.700" }} />
 
                 <Box
                     sx={{
-                        display: 'flex',
-                        flexDirection: { xs: 'column', sm: 'row' },
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: 2
+                        display: "flex",
+                        flexDirection: { xs: "column", sm: "row" },
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: 2,
                     }}
                 >
-                    <Typography 
-                        variant="body2" 
-                        sx={{ 
-                            color: 'grey.400',
-                            fontSize: '0.9rem'
+                    <Typography
+                        variant="body2"
+                        sx={{
+                            color: "grey.400",
+                            fontSize: "0.9rem",
                         }}
                     >
-                        © 2025 Visit Care. All rights reserved. Made with ❤️ for better healthcare.
+                        © 2025 Visit Care. All rights reserved. Made with ❤️ for
+                        better healthcare.
                     </Typography>
-                    
-                    <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                        {['🔐 Privacy Policy', '📜 Terms of Service', '🍪 Cookie Policy', '♿ Accessibility'].map((link) => (
+
+                    <Box sx={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
+                        {[
+                            "🔐 Privacy Policy",
+                            "📜 Terms of Service",
+                            "🍪 Cookie Policy",
+                            "♿ Accessibility",
+                        ].map((link) => (
                             <Link
                                 key={link}
                                 href="#"
                                 sx={{
-                                    color: 'grey.400',
-                                    textDecoration: 'none',
-                                    fontSize: '0.875rem',
-                                    transition: 'all 0.3s ease',
-                                    '&:hover': {
-                                        color: 'white',
-                                        textDecoration: 'underline'
-                                    }
+                                    color: "grey.400",
+                                    textDecoration: "none",
+                                    fontSize: "0.875rem",
+                                    transition: "all 0.3s ease",
+                                    "&:hover": {
+                                        color: "white",
+                                        textDecoration: "underline",
+                                    },
                                 }}
                             >
                                 {link}
@@ -3939,19 +5228,18 @@ const Footer = () => {
 export default Footer;
 ```
 
-
 ### Step 20: Home Page Component
 
 **resources/js/pages/HomePage.jsx**
 
 ```jsx
-import React from 'react';
-import MainLayout from '../components/layout/MainLayout';
-import SearchSection from '../components/home/SearchSection';
-import NearbySection from '../components/home/NearbySection';
-import StatsSection from '../components/home/StatsSection';
-import WhyChooseSection from '../components/home/WhyChooseSection';
-import TestimonialsSection from '../components/home/TestimonialsSection';
+import React from "react";
+import MainLayout from "../components/layout/MainLayout";
+import SearchSection from "../components/home/SearchSection";
+import NearbySection from "../components/home/NearbySection";
+import StatsSection from "../components/home/StatsSection";
+import WhyChooseSection from "../components/home/WhyChooseSection";
+import TestimonialsSection from "../components/home/TestimonialsSection";
 
 const HomePage = () => {
     return (
@@ -4349,7 +5637,12 @@ const DoctorDetailPage = () => {
             {isMobile ? renderMobileSchedule() : renderDesktopSchedule()}
 
             {/* Additional Schedule Information */}
-            <Alert severity="info" elevation={3} sx={{ mt: 2, borderRadius: 2 }} icon={<MdInfo />}>
+            <Alert
+                severity="info"
+                elevation={3}
+                sx={{ mt: 2, borderRadius: 2 }}
+                icon={<MdInfo />}
+            >
                 <Typography variant="body2">
                     <strong>Note:</strong>
                     <ul
@@ -5100,7 +6393,11 @@ const DoctorDetailPage = () => {
             </Box>
 
             {doctor.clinics.map((clinic, index) => (
-                <Accordion key={clinic.id} elevation={5} sx={{ mb: 2, borderRadius: 3 }}>
+                <Accordion
+                    key={clinic.id}
+                    elevation={5}
+                    sx={{ mb: 2, borderRadius: 3 }}
+                >
                     <AccordionSummary
                         expandIcon={<ExpandMore />}
                         sx={{
@@ -5833,8 +7130,7 @@ const ClinicDetailPage = () => {
                                                 : "14px",
                                         }}
                                     />
-                                    {currentDoctor.experience_years || 0} years
-                                    experience
+                                    {currentDoctor.experience_years || 0} years experience
                                 </Typography>
                                 <Typography
                                     variant={isMobile ? "h6" : "h5"}
@@ -6433,8 +7729,7 @@ const ClinicDetailPage = () => {
                                     sx={{ mb: 2, display: "block" }}
                                 >
                                     <Work fontSize="small" sx={{ mr: 0.5 }} />
-                                    {doctor.experience_years || 0} years
-                                    experience
+                                    {doctor.experience_years || 0} years experience
                                 </Typography>
 
                                 <Box
@@ -6482,9 +7777,8 @@ const ClinicDetailPage = () => {
                                                 size={10}
                                                 style={{ marginRight: 4 }}
                                             />
-                                            Available:{" "}
-                                            {doctor.pivot.start_time || "N/A"} -{" "}
-                                            {doctor.pivot.end_time || "N/A"}
+                                            Available: {doctor.pivot
+                                                .start_time || "N/A"} - {doctor.pivot.end_time || "N/A"}
                                         </Typography>
                                     </Box>
                                 )}
@@ -6685,7 +7979,6 @@ const ClinicDetailPage = () => {
 
 export default ClinicDetailPage;
 ```
-
 
 **resources/js/pages/BookAppointmentPage.jsx**
 
@@ -8598,18 +9891,16 @@ const BookAppointmentPage = () => {
                                         !paymentMethod) && (
                                         <>
                                             <LocalHospital />
-                                            You can pay at the clinic during
-                                            your visit. Payment confirmation
-                                            will be updated after your
-                                            appointment.
+                                            You can pay at the clinic during your
+                                            visit. Payment confirmation will be updated
+                                            after your appointment.
                                         </>
                                     )}
                                     {paymentMethod === "online" && (
                                         <>
                                             <CreditCard />
-                                            Secure online payment. You will be
-                                            redirected to payment gateway after
-                                            confirmation.
+                                            Secure online payment. You will be redirected
+                                            to payment gateway after confirmation.
                                         </>
                                     )}
                                     {paymentMethod === "cash" && (
@@ -8939,7 +10230,7 @@ export default BookAppointmentPage;
 **resources/js/pages/admin/AdminDashboard.jsx**
 
 ```jsx
-import React from 'react';
+import React from "react";
 import {
     Box,
     Container,
@@ -8956,7 +10247,7 @@ import {
     ListItemIcon,
     Chip,
     Divider,
-} from '@mui/material';
+} from "@mui/material";
 import {
     AdminPanelSettings,
     People,
@@ -8968,21 +10259,56 @@ import {
     Notifications,
     SupervisorAccount,
     VerifiedUser,
-} from '@mui/icons-material';
-import MainLayout from '../../components/layout/MainLayout';
+} from "@mui/icons-material";
+import MainLayout from "../../components/layout/MainLayout";
 
 const AdminDashboard = () => {
     const adminStats = [
-        { title: '👥 Total Users', value: '2,456', icon: <People />, color: 'primary' },
-        { title: '🏥 Healthcare Providers', value: '156', icon: <LocalHospital />, color: 'success' },
-        { title: '🔐 System Security', value: '99.9%', icon: <Security />, color: 'warning' },
-        { title: '📈 Platform Growth', value: '+45%', icon: <TrendingUp />, color: 'info' },
+        {
+            title: "👥 Total Users",
+            value: "2,456",
+            icon: <People />,
+            color: "primary",
+        },
+        {
+            title: "🏥 Healthcare Providers",
+            value: "156",
+            icon: <LocalHospital />,
+            color: "success",
+        },
+        {
+            title: "🔐 System Security",
+            value: "99.9%",
+            icon: <Security />,
+            color: "warning",
+        },
+        {
+            title: "📈 Platform Growth",
+            value: "+45%",
+            icon: <TrendingUp />,
+            color: "info",
+        },
     ];
 
     const systemAlerts = [
-        { type: 'Security', message: 'System security scan completed', status: 'success', time: '1 hour ago' },
-        { type: 'Performance', message: 'High traffic detected - scaling resources', status: 'warning', time: '3 hours ago' },
-        { type: 'Maintenance', message: 'Scheduled backup completed successfully', status: 'success', time: '6 hours ago' },
+        {
+            type: "Security",
+            message: "System security scan completed",
+            status: "success",
+            time: "1 hour ago",
+        },
+        {
+            type: "Performance",
+            message: "High traffic detected - scaling resources",
+            status: "warning",
+            time: "3 hours ago",
+        },
+        {
+            type: "Maintenance",
+            message: "Scheduled backup completed successfully",
+            status: "success",
+            time: "6 hours ago",
+        },
     ];
 
     return (
@@ -8993,18 +10319,21 @@ const AdminDashboard = () => {
                     <Typography
                         variant="h4"
                         sx={{
-                            fontWeight: 'bold',
-                            display: 'flex',
-                            alignItems: 'center',
+                            fontWeight: "bold",
+                            display: "flex",
+                            alignItems: "center",
                             gap: 2,
                             mb: 1,
                         }}
                     >
-                        <AdminPanelSettings sx={{ fontSize: 40, color: 'primary.main' }} />
+                        <AdminPanelSettings
+                            sx={{ fontSize: 40, color: "primary.main" }}
+                        />
                         👑 Admin Dashboard
                     </Typography>
                     <Typography variant="h6" color="text.secondary">
-                        🎛️ Complete platform administration and system management
+                        🎛️ Complete platform administration and system
+                        management
                     </Typography>
                 </Box>
 
@@ -9012,9 +10341,15 @@ const AdminDashboard = () => {
                 <Grid container spacing={3} sx={{ mb: 4 }}>
                     {adminStats.map((stat, index) => (
                         <Grid item xs={12} sm={6} md={3} key={index}>
-                            <Card elevation={3} sx={{ height: '100%' }}>
+                            <Card elevation={3} sx={{ height: "100%" }}>
                                 <CardContent>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            mb: 2,
+                                        }}
+                                    >
                                         <Avatar
                                             sx={{
                                                 bgcolor: `${stat.color}.main`,
@@ -9024,10 +10359,16 @@ const AdminDashboard = () => {
                                             {stat.icon}
                                         </Avatar>
                                         <Box>
-                                            <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                                            <Typography
+                                                variant="h4"
+                                                sx={{ fontWeight: "bold" }}
+                                            >
                                                 {stat.value}
                                             </Typography>
-                                            <Typography variant="body2" color="text.secondary">
+                                            <Typography
+                                                variant="body2"
+                                                color="text.secondary"
+                                            >
                                                 {stat.title}
                                             </Typography>
                                         </Box>
@@ -9045,10 +10386,10 @@ const AdminDashboard = () => {
                             <Typography
                                 variant="h6"
                                 sx={{
-                                    fontWeight: 'bold',
+                                    fontWeight: "bold",
                                     mb: 3,
-                                    display: 'flex',
-                                    alignItems: 'center',
+                                    display: "flex",
+                                    alignItems: "center",
                                     gap: 1,
                                 }}
                             >
@@ -9062,11 +10403,13 @@ const AdminDashboard = () => {
                                             <ListItemIcon>
                                                 <Security
                                                     color={
-                                                        alert.status === 'success'
-                                                            ? 'success'
-                                                            : alert.status === 'warning'
-                                                            ? 'warning'
-                                                            : 'error'
+                                                        alert.status ===
+                                                        "success"
+                                                            ? "success"
+                                                            : alert.status ===
+                                                              "warning"
+                                                            ? "warning"
+                                                            : "error"
                                                     }
                                                 />
                                             </ListItemIcon>
@@ -9077,16 +10420,19 @@ const AdminDashboard = () => {
                                             <Chip
                                                 label={alert.status}
                                                 color={
-                                                    alert.status === 'success'
-                                                        ? 'success'
-                                                        : alert.status === 'warning'
-                                                        ? 'warning'
-                                                        : 'error'
+                                                    alert.status === "success"
+                                                        ? "success"
+                                                        : alert.status ===
+                                                          "warning"
+                                                        ? "warning"
+                                                        : "error"
                                                 }
                                                 size="small"
                                             />
                                         </ListItem>
-                                        {index < systemAlerts.length - 1 && <Divider />}
+                                        {index < systemAlerts.length - 1 && (
+                                            <Divider />
+                                        )}
                                     </React.Fragment>
                                 ))}
                             </List>
@@ -9099,22 +10445,28 @@ const AdminDashboard = () => {
                             <Typography
                                 variant="h6"
                                 sx={{
-                                    fontWeight: 'bold',
+                                    fontWeight: "bold",
                                     mb: 3,
-                                    display: 'flex',
-                                    alignItems: 'center',
+                                    display: "flex",
+                                    alignItems: "center",
                                     gap: 1,
                                 }}
                             >
                                 <Settings color="primary" />
                                 🔧 Admin Controls
                             </Typography>
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: 2,
+                                }}
+                            >
                                 <Button
                                     variant="outlined"
                                     startIcon={<SupervisorAccount />}
                                     fullWidth
-                                    sx={{ justifyContent: 'flex-start' }}
+                                    sx={{ justifyContent: "flex-start" }}
                                 >
                                     👥 User Management
                                 </Button>
@@ -9122,7 +10474,7 @@ const AdminDashboard = () => {
                                     variant="outlined"
                                     startIcon={<VerifiedUser />}
                                     fullWidth
-                                    sx={{ justifyContent: 'flex-start' }}
+                                    sx={{ justifyContent: "flex-start" }}
                                 >
                                     ✅ Verify Doctors
                                 </Button>
@@ -9130,7 +10482,7 @@ const AdminDashboard = () => {
                                     variant="outlined"
                                     startIcon={<LocalHospital />}
                                     fullWidth
-                                    sx={{ justifyContent: 'flex-start' }}
+                                    sx={{ justifyContent: "flex-start" }}
                                 >
                                     🏥 Platform Settings
                                 </Button>
@@ -9138,7 +10490,7 @@ const AdminDashboard = () => {
                                     variant="outlined"
                                     startIcon={<Assessment />}
                                     fullWidth
-                                    sx={{ justifyContent: 'flex-start' }}
+                                    sx={{ justifyContent: "flex-start" }}
                                 >
                                     📊 Analytics
                                 </Button>
@@ -9146,7 +10498,7 @@ const AdminDashboard = () => {
                                     variant="outlined"
                                     startIcon={<Security />}
                                     fullWidth
-                                    sx={{ justifyContent: 'flex-start' }}
+                                    sx={{ justifyContent: "flex-start" }}
                                 >
                                     🔐 Security Center
                                 </Button>
@@ -9165,7 +10517,7 @@ export default AdminDashboard;
 **resources/js/pages/doctor/DoctorDashboard.jsx**
 
 ```jsx
-import React from 'react';
+import React, { useState, useEffect } from "react";
 import {
     Box,
     Container,
@@ -9182,7 +10534,29 @@ import {
     ListItemText,
     ListItemIcon,
     Divider,
-} from '@mui/material';
+    Alert,
+    CircularProgress,
+    Tabs,
+    Tab,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    TextField,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    IconButton,
+    Tooltip,
+    Badge,
+} from "@mui/material";
 import {
     MedicalServices,
     Schedule,
@@ -9194,179 +10568,1524 @@ import {
     LocalHospital,
     Assignment,
     Assessment,
-} from '@mui/icons-material';
-import MainLayout from '../../components/layout/MainLayout';
+    Person,
+    Edit,
+    Visibility,
+    CheckCircle,
+    Cancel,
+    AccessTime,
+    Phone,
+    Email,
+    Business,
+    Search,
+    Send,
+    Star,
+    LocationOn,
+} from "@mui/icons-material";
+import { format, parseISO, isValid } from "date-fns";
+import MainLayout from "../../components/layout/MainLayout";
+import ProfileSetupModal from "../../components/doctor/ProfileSetupModal";
+import ClinicSearchModal from "../../components/doctor/ClinicSearchModal";
+import axios from "axios";
 
 const DoctorDashboard = () => {
-    const doctorStats = [
-        { title: '📅 Today\'s Appointments', value: '12', icon: <Schedule />, color: 'primary' },
-        { title: '👥 Total Patients', value: '248', icon: <People />, color: 'success' },
-        { title: '⭐ Average Rating', value: '4.8', icon: <TrendingUp />, color: 'warning' },
-        { title: '🏥 Active Clinics', value: '3', icon: <LocalHospital />, color: 'info' },
-    ];
+    const apiUrl = import.meta.env.VITE_API_URL;
+    const [doctor, setDoctor] = useState(null);
+    const [stats, setStats] = useState(null);
+    const [appointments, setAppointments] = useState([]);
+    const [clinics, setClinics] = useState([]);
+    const [connectionRequests, setConnectionRequests] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [showProfileModal, setShowProfileModal] = useState(false);
+    const [showClinicSearch, setShowClinicSearch] = useState(false);
+    const [tabValue, setTabValue] = useState(0);
+    const [appointmentFilter, setAppointmentFilter] = useState("all");
+    const [selectedAppointment, setSelectedAppointment] = useState(null);
+    const [showAppointmentDialog, setShowAppointmentDialog] = useState(false);
 
-    const todayAppointments = [
-        { time: '09:00 AM', patient: 'John Doe', type: 'Consultation', status: 'confirmed' },
-        { time: '10:30 AM', patient: 'Jane Smith', type: 'Follow-up', status: 'pending' },
-        { time: '02:00 PM', patient: 'Mike Johnson', type: 'Check-up', status: 'confirmed' },
-    ];
+    useEffect(() => {
+        loadDoctorData();
+        loadConnectedClinics();
+    }, []);
+
+    const loadDoctorData = async () => {
+        try {
+            const token = localStorage.getItem("auth_token");
+            const headers = { Authorization: `Bearer ${token}` };
+
+            // Load doctor profile
+            const profileResponse = await axios.get(
+                `${apiUrl}/doctor/profile`,
+                { headers }
+            );
+            const doctorData = profileResponse.data.doctor;
+
+            setDoctor(doctorData);
+
+            if (!doctorData || !profileResponse.data.is_complete) {
+                setShowProfileModal(true);
+                setLoading(false);
+                return;
+            }
+
+            // Load dashboard stats
+            const statsResponse = await axios.get(
+                `${apiUrl}/doctor/dashboard-stats`,
+                { headers }
+            );
+            setStats(statsResponse.data);
+
+            // Load appointments
+            const appointmentsResponse = await axios.get(
+                `${apiUrl}/doctor/appointments`,
+                {
+                    headers,
+                    params: { status: appointmentFilter, per_page: 10 },
+                }
+            );
+            setAppointments(appointmentsResponse.data.data || []);
+        } catch (error) {
+            console.error("Failed to load doctor data:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const loadConnectedClinics = async () => {
+        try {
+            const token = localStorage.getItem("auth_token");
+            const headers = { Authorization: `Bearer ${token}` };
+
+            // Load connected clinics (your existing API)
+            try {
+                const clinicsResponse = await axios.get(
+                    `${apiUrl}/doctor/my-clinics`,
+                    { headers }
+                );
+                setClinics(clinicsResponse.data || []);
+            } catch (error) {
+                console.log(
+                    "my-clinics endpoint not available, trying connected-clinics"
+                );
+                setClinics([]);
+            }
+
+            // Load new connected clinics from the connection system
+            try {
+                const connectedClinicsResponse = await axios.get(
+                    `${apiUrl}/doctor/my-connected-clinics`,
+                    { headers }
+                );
+                // Merge with existing clinics if needed
+                setClinics((prevClinics) => {
+                    const newClinics = connectedClinicsResponse.data || [];
+                    const allClinics = [...prevClinics, ...newClinics];
+                    // Remove duplicates based on ID
+                    const uniqueClinics = allClinics.filter(
+                        (clinic, index, arr) =>
+                            arr.findIndex((c) => c.id === clinic.id) === index
+                    );
+                    return uniqueClinics;
+                });
+            } catch (error) {
+                console.log("connected-clinics endpoint not available");
+            }
+
+            // Load connection requests
+            try {
+                const requestsResponse = await axios.get(
+                    `${apiUrl}/doctor/my-connection-requests`,
+                    { headers }
+                );
+                setConnectionRequests(requestsResponse.data.data || []);
+            } catch (error) {
+                console.log("connection-requests endpoint not available");
+                setConnectionRequests([]);
+            }
+        } catch (error) {
+            console.error("Failed to load clinic data:", error);
+        }
+    };
+
+    const handleProfileComplete = (doctorData) => {
+        setDoctor(doctorData);
+        setShowProfileModal(false);
+        loadDoctorData(); // Reload all data
+    };
+
+    const handleAppointmentStatusUpdate = async (appointmentId, status) => {
+        try {
+            const token = localStorage.getItem("auth_token");
+            await axios.post(
+                `${apiUrl}/doctor/appointments/${appointmentId}/update-status`,
+                { status },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            // Reload appointments
+            loadDoctorData();
+            setShowAppointmentDialog(false);
+        } catch (error) {
+            console.error("Failed to update appointment:", error);
+        }
+    };
+
+    const handleDisconnectClinic = async (clinicId) => {
+        try {
+            const token = localStorage.getItem("auth_token");
+            await axios.delete(
+                `${apiUrl}/doctor/disconnect-clinic/${clinicId}`,
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
+
+            // Reload clinic data
+            loadConnectedClinics();
+        } catch (error) {
+            console.error("Failed to disconnect from clinic:", error);
+        }
+    };
+
+    const getStatusColor = (status) => {
+        switch (status) {
+            case "confirmed":
+                return "success";
+            case "pending":
+                return "warning";
+            case "completed":
+                return "info";
+            case "cancelled":
+                return "error";
+            case "approved":
+                return "success";
+            case "rejected":
+                return "error";
+            default:
+                return "default";
+        }
+    };
+
+    // FIXED: Enhanced formatDateTime function with proper error handling
+    const formatDateTime = (date, time) => {
+        try {
+            // Check if date and time are valid
+            if (!date || !time) {
+                return {
+                    date: "Invalid Date",
+                    time: "Invalid Time",
+                };
+            }
+
+            // Handle different date formats
+            let dateObj;
+
+            // If date is already a Date object
+            if (date instanceof Date) {
+                dateObj = date;
+            }
+            // If date is a string, try to parse it
+            else if (typeof date === "string") {
+                // Try different parsing methods
+                if (date.includes("T")) {
+                    // ISO format: 2025-08-28T10:15:00Z
+                    dateObj = parseISO(date);
+                } else {
+                    // Date only format: 2025-08-28
+                    const timeStr = time.includes(":") ? time : `${time}:00`;
+                    const dateTimeStr = `${date}T${timeStr}`;
+                    dateObj = parseISO(dateTimeStr);
+                }
+            } else {
+                // Invalid date type
+                throw new Error("Invalid date format");
+            }
+
+            // Check if the parsed date is valid
+            if (!isValid(dateObj)) {
+                throw new Error("Invalid date");
+            }
+
+            return {
+                date: format(dateObj, "MMM dd, yyyy"),
+                time: format(dateObj, "hh:mm a"),
+            };
+        } catch (error) {
+            console.error("Error formatting date/time:", {
+                date,
+                time,
+                error: error.message,
+            });
+            return {
+                date: "Invalid Date",
+                time: "Invalid Time",
+            };
+        }
+    };
+
+    // FIXED: Safe date formatting for connection requests
+    const formatRequestDate = (dateString) => {
+        try {
+            if (!dateString) return "Unknown Date";
+
+            const dateObj = parseISO(dateString);
+            if (!isValid(dateObj)) return "Invalid Date";
+
+            return format(dateObj, "MMM dd, yyyy");
+        } catch (error) {
+            console.error("Error formatting request date:", error);
+            return "Invalid Date";
+        }
+    };
+
+    if (loading) {
+        return (
+            <MainLayout>
+                <Container
+                    maxWidth="lg"
+                    sx={{ mt: 12, mb: 4, textAlign: "center" }}
+                >
+                    <CircularProgress size={60} />
+                    <Typography variant="h6" sx={{ mt: 2 }}>
+                        Loading your dashboard...
+                    </Typography>
+                </Container>
+            </MainLayout>
+        );
+    }
+
+    if (!doctor) {
+        return (
+            <>
+                <MainLayout>
+                    <Container maxWidth="lg" sx={{ mt: 12, mb: 4 }}>
+                        <Alert severity="info">
+                            Please complete your profile setup to access the
+                            dashboard.
+                        </Alert>
+                    </Container>
+                </MainLayout>
+                <ProfileSetupModal
+                    open={showProfileModal}
+                    onClose={() => setShowProfileModal(false)}
+                    onComplete={handleProfileComplete}
+                />
+            </>
+        );
+    }
 
     return (
         <MainLayout>
             <Container maxWidth="lg" sx={{ mt: 12, mb: 4 }}>
                 {/* Header */}
                 <Box sx={{ mb: 4 }}>
-                    <Typography
-                        variant="h4"
-                        sx={{
-                            fontWeight: 'bold',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 2,
-                            mb: 1,
-                        }}
-                    >
-                        <MedicalServices sx={{ fontSize: 40, color: 'primary.main' }} />
-                        👨‍⚕️ Doctor Dashboard
-                    </Typography>
-                    <Typography variant="h6" color="text.secondary">
-                        🩺 Manage your practice, appointments, and patient care
-                    </Typography>
+                    <Grid container spacing={3} alignItems="center">
+                        <Grid item>
+                            <Avatar
+                                src={doctor.profile_image}
+                                sx={{
+                                    width: 80,
+                                    height: 80,
+                                    border: "3px solid",
+                                    borderColor: "primary.main",
+                                }}
+                            >
+                                <Person sx={{ fontSize: 40 }} />
+                            </Avatar>
+                        </Grid>
+                        <Grid item xs>
+                            <Typography
+                                variant="h4"
+                                sx={{ fontWeight: "bold", mb: 1 }}
+                            >
+                                Welcome, Dr. {doctor.user.name}
+                            </Typography>
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    gap: 1,
+                                    alignItems: "center",
+                                    mb: 1,
+                                }}
+                            >
+                                <Chip
+                                    label={doctor.specialization}
+                                    color="primary"
+                                />
+                                {doctor.is_verified && (
+                                    <Chip
+                                        label="Verified"
+                                        color="success"
+                                        icon={<CheckCircle />}
+                                    />
+                                )}
+                            </Box>
+                            <Typography variant="body1" color="text.secondary">
+                                {doctor.experience_years} years experience • ₹
+                                {doctor.consultation_fee} consultation fee
+                            </Typography>
+                        </Grid>
+                        <Grid item>
+                            <Button
+                                variant="outlined"
+                                startIcon={<Edit />}
+                                onClick={() => setShowProfileModal(true)}
+                            >
+                                Edit Profile
+                            </Button>
+                        </Grid>
+                    </Grid>
                 </Box>
 
+                {/* Quick Actions */}
+                <Paper elevation={2} sx={{ p: 3, mb: 4 }}>
+                    <Typography variant="h6" sx={{ fontWeight: "bold", mb: 2 }}>
+                        Quick Actions
+                    </Typography>
+                    <Grid container spacing={2}>
+                        <Grid item>
+                            <Button
+                                variant="contained"
+                                startIcon={<Search />}
+                                onClick={() => setShowClinicSearch(true)}
+                                sx={{ color: "white" }}
+                            >
+                                Find Clinics
+                            </Button>
+                        </Grid>
+                        <Grid item>
+                            <Button
+                                variant="outlined"
+                                startIcon={<Schedule />}
+                                onClick={() => setTabValue(0)}
+                            >
+                                View Appointments
+                            </Button>
+                        </Grid>
+                        <Grid item>
+                            <Button
+                                variant="outlined"
+                                startIcon={<LocalHospital />}
+                                onClick={() => setTabValue(1)}
+                            >
+                                My Clinics
+                            </Button>
+                        </Grid>
+                        <Grid item>
+                            <Button
+                                variant="outlined"
+                                startIcon={<Settings />}
+                                onClick={() => setShowProfileModal(true)}
+                            >
+                                Settings
+                            </Button>
+                        </Grid>
+                    </Grid>
+                </Paper>
+
                 {/* Stats Cards */}
-                <Grid container spacing={3} sx={{ mb: 4 }}>
-                    {doctorStats.map((stat, index) => (
-                        <Grid item xs={12} sm={6} md={3} key={index}>
-                            <Card elevation={3} sx={{ height: '100%' }}>
+                {stats && (
+                    <Grid container spacing={3} sx={{ mb: 4 }}>
+                        <Grid item xs={12} sm={6} md={3}>
+                            <Card elevation={3}>
                                 <CardContent>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            mb: 2,
+                                        }}
+                                    >
                                         <Avatar
                                             sx={{
-                                                bgcolor: `${stat.color}.main`,
+                                                bgcolor: "primary.main",
                                                 mr: 2,
                                             }}
                                         >
-                                            {stat.icon}
+                                            <Schedule />
                                         </Avatar>
                                         <Box>
-                                            <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-                                                {stat.value}
+                                            <Typography
+                                                variant="h4"
+                                                sx={{ fontWeight: "bold" }}
+                                            >
+                                                {stats.today_appointments || 0}
                                             </Typography>
-                                            <Typography variant="body2" color="text.secondary">
-                                                {stat.title}
+                                            <Typography
+                                                variant="body2"
+                                                color="text.secondary"
+                                            >
+                                                Today's Appointments
                                             </Typography>
                                         </Box>
                                     </Box>
                                 </CardContent>
                             </Card>
                         </Grid>
-                    ))}
-                </Grid>
 
-                <Grid container spacing={3}>
-                    {/* Today's Appointments */}
-                    <Grid item xs={12} md={8}>
-                        <Paper elevation={3} sx={{ p: 3 }}>
-                            <Typography
-                                variant="h6"
-                                sx={{
-                                    fontWeight: 'bold',
-                                    mb: 3,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 1,
-                                }}
-                            >
-                                <CalendarToday color="primary" />
-                                📅 Today's Appointments
-                            </Typography>
-                            <List>
-                                {todayAppointments.map((appointment, index) => (
-                                    <React.Fragment key={index}>
-                                        <ListItem>
-                                            <ListItemIcon>
-                                                <Schedule color="action" />
-                                            </ListItemIcon>
-                                            <ListItemText
-                                                primary={`${appointment.time} - ${appointment.patient}`}
-                                                secondary={`🩺 ${appointment.type}`}
-                                            />
-                                            <Chip
-                                                label={appointment.status}
-                                                color={appointment.status === 'confirmed' ? 'success' : 'warning'}
-                                                size="small"
-                                            />
-                                        </ListItem>
-                                        {index < todayAppointments.length - 1 && <Divider />}
-                                    </React.Fragment>
-                                ))}
-                            </List>
-                        </Paper>
+                        <Grid item xs={12} sm={6} md={3}>
+                            <Card elevation={3}>
+                                <CardContent>
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            mb: 2,
+                                        }}
+                                    >
+                                        <Avatar
+                                            sx={{
+                                                bgcolor: "success.main",
+                                                mr: 2,
+                                            }}
+                                        >
+                                            <People />
+                                        </Avatar>
+                                        <Box>
+                                            <Typography
+                                                variant="h4"
+                                                sx={{ fontWeight: "bold" }}
+                                            >
+                                                {stats.total_patients || 0}
+                                            </Typography>
+                                            <Typography
+                                                variant="body2"
+                                                color="text.secondary"
+                                            >
+                                                Total Patients
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+
+                        <Grid item xs={12} sm={6} md={3}>
+                            <Card elevation={3}>
+                                <CardContent>
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            mb: 2,
+                                        }}
+                                    >
+                                        <Avatar
+                                            sx={{
+                                                bgcolor: "warning.main",
+                                                mr: 2,
+                                            }}
+                                        >
+                                            <TrendingUp />
+                                        </Avatar>
+                                        <Box>
+                                            <Typography
+                                                variant="h4"
+                                                sx={{ fontWeight: "bold" }}
+                                            >
+                                                {stats.rating ||
+                                                    doctor.rating ||
+                                                    "0.0"}
+                                            </Typography>
+                                            <Typography
+                                                variant="body2"
+                                                color="text.secondary"
+                                            >
+                                                Average Rating
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+
+                        <Grid item xs={12} sm={6} md={3}>
+                            <Card elevation={3}>
+                                <CardContent>
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            mb: 2,
+                                        }}
+                                    >
+                                        <Avatar
+                                            sx={{ bgcolor: "info.main", mr: 2 }}
+                                        >
+                                            <LocalHospital />
+                                        </Avatar>
+                                        <Box>
+                                            <Typography
+                                                variant="h4"
+                                                sx={{ fontWeight: "bold" }}
+                                            >
+                                                {clinics.length}
+                                            </Typography>
+                                            <Typography
+                                                variant="body2"
+                                                color="text.secondary"
+                                            >
+                                                Connected Clinics
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        </Grid>
                     </Grid>
+                )}
 
-                    {/* Quick Actions */}
-                    <Grid item xs={12} md={4}>
-                        <Paper elevation={3} sx={{ p: 3 }}>
-                            <Typography
-                                variant="h6"
-                                sx={{
-                                    fontWeight: 'bold',
-                                    mb: 3,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 1,
-                                }}
-                            >
-                                <Settings color="primary" />
-                                ⚡ Quick Actions
-                            </Typography>
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                <Button
-                                    variant="outlined"
-                                    startIcon={<Assignment />}
-                                    fullWidth
-                                    sx={{ justifyContent: 'flex-start' }}
+                {/* Main Content Tabs */}
+                <Paper elevation={3} sx={{ borderRadius: 2 }}>
+                    <Tabs
+                        value={tabValue}
+                        onChange={(e, newValue) => setTabValue(newValue)}
+                        sx={{ borderBottom: 1, borderColor: "divider", px: 2 }}
+                    >
+                        <Tab label="Appointments" icon={<Assignment />} />
+                        <Tab
+                            label={
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 1,
+                                    }}
                                 >
-                                    📋 View All Appointments
-                                </Button>
-                                <Button
-                                    variant="outlined"
-                                    startIcon={<People />}
-                                    fullWidth
-                                    sx={{ justifyContent: 'flex-start' }}
+                                    My Clinics
+                                    {connectionRequests.filter(
+                                        (req) => req.status === "pending"
+                                    ).length > 0 && (
+                                        <Badge
+                                            badgeContent={
+                                                connectionRequests.filter(
+                                                    (req) =>
+                                                        req.status === "pending"
+                                                ).length
+                                            }
+                                            color="error"
+                                        />
+                                    )}
+                                </Box>
+                            }
+                            icon={<LocalHospital />}
+                        />
+                        <Tab label="Find Clinics" icon={<Search />} />
+                    </Tabs>
+
+                    <Box sx={{ p: 3 }}>
+                        {/* Appointments Tab */}
+                        {tabValue === 0 && (
+                            <Box>
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                        mb: 3,
+                                    }}
                                 >
-                                    👥 Manage Patients
-                                </Button>
-                                <Button
-                                    variant="outlined"
-                                    startIcon={<Schedule />}
-                                    fullWidth
-                                    sx={{ justifyContent: 'flex-start' }}
-                                >
-                                    ⏰ Update Schedule
-                                </Button>
-                                <Button
-                                    variant="outlined"
-                                    startIcon={<Assessment />}
-                                    fullWidth
-                                    sx={{ justifyContent: 'flex-start' }}
-                                >
-                                    📊 View Reports
-                                </Button>
-                                <Button
-                                    variant="outlined"
-                                    startIcon={<Notifications />}
-                                    fullWidth
-                                    sx={{ justifyContent: 'flex-start' }}
-                                >
-                                    🔔 Notifications
-                                </Button>
+                                    <Typography
+                                        variant="h6"
+                                        sx={{ fontWeight: "bold" }}
+                                    >
+                                        My Appointments
+                                    </Typography>
+                                    <FormControl
+                                        size="small"
+                                        sx={{ minWidth: 120 }}
+                                    >
+                                        <InputLabel>Filter</InputLabel>
+                                        <Select
+                                            value={appointmentFilter}
+                                            onChange={(e) =>
+                                                setAppointmentFilter(
+                                                    e.target.value
+                                                )
+                                            }
+                                        >
+                                            <MenuItem value="all">All</MenuItem>
+                                            <MenuItem value="pending">
+                                                Pending
+                                            </MenuItem>
+                                            <MenuItem value="confirmed">
+                                                Confirmed
+                                            </MenuItem>
+                                            <MenuItem value="completed">
+                                                Completed
+                                            </MenuItem>
+                                            <MenuItem value="cancelled">
+                                                Cancelled
+                                            </MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                </Box>
+
+                                <TableContainer>
+                                    <Table>
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell>Patient</TableCell>
+                                                <TableCell>
+                                                    Date & Time
+                                                </TableCell>
+                                                <TableCell>Clinic</TableCell>
+                                                <TableCell>Status</TableCell>
+                                                <TableCell>Fee</TableCell>
+                                                <TableCell>Actions</TableCell>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {appointments.map((appointment) => {
+                                                // FIXED: Safe date formatting
+                                                const dateTime = formatDateTime(
+                                                    appointment.appointment_date,
+                                                    appointment.appointment_time
+                                                );
+                                                return (
+                                                    <TableRow
+                                                        key={appointment.id}
+                                                    >
+                                                        <TableCell>
+                                                            <Box
+                                                                sx={{
+                                                                    display:
+                                                                        "flex",
+                                                                    alignItems:
+                                                                        "center",
+                                                                    gap: 1,
+                                                                }}
+                                                            >
+                                                                <Avatar
+                                                                    sx={{
+                                                                        width: 32,
+                                                                        height: 32,
+                                                                    }}
+                                                                >
+                                                                    {appointment
+                                                                        .patient
+                                                                        ?.name?.[0] ||
+                                                                        "P"}
+                                                                </Avatar>
+                                                                <Box>
+                                                                    <Typography
+                                                                        variant="body2"
+                                                                        sx={{
+                                                                            fontWeight: 600,
+                                                                        }}
+                                                                    >
+                                                                        {appointment
+                                                                            .patient
+                                                                            ?.name ||
+                                                                            "Unknown Patient"}
+                                                                    </Typography>
+                                                                    <Typography
+                                                                        variant="caption"
+                                                                        color="text.secondary"
+                                                                    >
+                                                                        {appointment
+                                                                            .patient
+                                                                            ?.email ||
+                                                                            "No email"}
+                                                                    </Typography>
+                                                                </Box>
+                                                            </Box>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Box>
+                                                                <Typography
+                                                                    variant="body2"
+                                                                    sx={{
+                                                                        fontWeight: 600,
+                                                                    }}
+                                                                >
+                                                                    {
+                                                                        dateTime.date
+                                                                    }
+                                                                </Typography>
+                                                                <Typography
+                                                                    variant="caption"
+                                                                    color="text.secondary"
+                                                                >
+                                                                    {
+                                                                        dateTime.time
+                                                                    }
+                                                                </Typography>
+                                                            </Box>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Typography variant="body2">
+                                                                {appointment
+                                                                    .clinic
+                                                                    ?.name ||
+                                                                    "Online"}
+                                                            </Typography>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Chip
+                                                                label={
+                                                                    appointment.status ||
+                                                                    "pending"
+                                                                }
+                                                                color={getStatusColor(
+                                                                    appointment.status
+                                                                )}
+                                                                size="small"
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Typography
+                                                                variant="body2"
+                                                                sx={{
+                                                                    fontWeight: 600,
+                                                                }}
+                                                            >
+                                                                ₹
+                                                                {appointment.amount ||
+                                                                    0}
+                                                            </Typography>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Tooltip title="View Details">
+                                                                <IconButton
+                                                                    size="small"
+                                                                    onClick={() => {
+                                                                        setSelectedAppointment(
+                                                                            appointment
+                                                                        );
+                                                                        setShowAppointmentDialog(
+                                                                            true
+                                                                        );
+                                                                    }}
+                                                                >
+                                                                    <Visibility />
+                                                                </IconButton>
+                                                            </Tooltip>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+
+                                {appointments.length === 0 && (
+                                    <Box sx={{ textAlign: "center", py: 4 }}>
+                                        <Typography
+                                            variant="h6"
+                                            color="text.secondary"
+                                        >
+                                            No appointments found
+                                        </Typography>
+                                        <Typography
+                                            variant="body2"
+                                            color="text.secondary"
+                                        >
+                                            Your appointments will appear here
+                                            once patients book with you.
+                                        </Typography>
+                                    </Box>
+                                )}
                             </Box>
-                        </Paper>
-                    </Grid>
-                </Grid>
+                        )}
+
+                        {/* My Clinics Tab */}
+                        {tabValue === 1 && (
+                            <Box>
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                        mb: 3,
+                                    }}
+                                >
+                                    <Typography
+                                        variant="h6"
+                                        sx={{ fontWeight: "bold" }}
+                                    >
+                                        Connected Clinics ({clinics.length})
+                                    </Typography>
+                                    <Button
+                                        variant="contained"
+                                        startIcon={<Search />}
+                                        onClick={() =>
+                                            setShowClinicSearch(true)
+                                        }
+                                        sx={{ color: "white" }}
+                                    >
+                                        Find More Clinics
+                                    </Button>
+                                </Box>
+
+                                <Grid container spacing={3}>
+                                    {clinics.map((clinic) => (
+                                        <Grid
+                                            item
+                                            xs={12}
+                                            md={6}
+                                            key={clinic.id}
+                                        >
+                                            <Card elevation={2}>
+                                                <CardContent>
+                                                    <Box
+                                                        sx={{
+                                                            display: "flex",
+                                                            alignItems:
+                                                                "center",
+                                                            gap: 2,
+                                                            mb: 2,
+                                                        }}
+                                                    >
+                                                        <Avatar
+                                                            src={clinic.logo}
+                                                            sx={{
+                                                                width: 60,
+                                                                height: 60,
+                                                            }}
+                                                        >
+                                                            <LocalHospital />
+                                                        </Avatar>
+                                                        <Box sx={{ flex: 1 }}>
+                                                            <Typography
+                                                                variant="h6"
+                                                                sx={{
+                                                                    fontWeight:
+                                                                        "bold",
+                                                                }}
+                                                            >
+                                                                {clinic.name}
+                                                            </Typography>
+                                                            <Typography
+                                                                variant="body2"
+                                                                color="text.secondary"
+                                                            >
+                                                                {clinic.organization_type
+                                                                    ?.replace(
+                                                                        "_",
+                                                                        " "
+                                                                    )
+                                                                    .toUpperCase() ||
+                                                                    "Clinic"}
+                                                            </Typography>
+                                                            <Box
+                                                                sx={{
+                                                                    display:
+                                                                        "flex",
+                                                                    alignItems:
+                                                                        "center",
+                                                                    gap: 1,
+                                                                    mt: 1,
+                                                                }}
+                                                            >
+                                                                <Chip
+                                                                    label="Connected"
+                                                                    color="success"
+                                                                    size="small"
+                                                                />
+                                                                {clinic.rating >
+                                                                    0 && (
+                                                                    <Box
+                                                                        sx={{
+                                                                            display:
+                                                                                "flex",
+                                                                            alignItems:
+                                                                                "center",
+                                                                            gap: 0.5,
+                                                                        }}
+                                                                    >
+                                                                        <Star
+                                                                            fontSize="small"
+                                                                            color="warning"
+                                                                        />
+                                                                        <Typography variant="caption">
+                                                                            {
+                                                                                clinic.rating
+                                                                            }
+                                                                        </Typography>
+                                                                    </Box>
+                                                                )}
+                                                            </Box>
+                                                        </Box>
+                                                    </Box>
+
+                                                    <Box sx={{ mb: 2 }}>
+                                                        <Typography
+                                                            variant="body2"
+                                                            color="text.secondary"
+                                                            sx={{ mb: 1 }}
+                                                        >
+                                                            <LocationOn
+                                                                fontSize="small"
+                                                                sx={{
+                                                                    mr: 1,
+                                                                    verticalAlign:
+                                                                        "middle",
+                                                                }}
+                                                            />
+                                                            {clinic.address?.substring(
+                                                                0,
+                                                                60
+                                                            )}...
+                                                        </Typography>
+                                                        <Typography
+                                                            variant="body2"
+                                                            color="text.secondary"
+                                                        >
+                                                            <Phone
+                                                                fontSize="small"
+                                                                sx={{
+                                                                    mr: 1,
+                                                                    verticalAlign:
+                                                                        "middle",
+                                                                }}
+                                                            />
+                                                            {clinic.phone}
+                                                        </Typography>
+                                                    </Box>
+
+                                                    {(clinic.pivot ||
+                                                        clinic.schedule) && (
+                                                        <Box sx={{ mb: 2 }}>
+                                                            <Typography
+                                                                variant="caption"
+                                                                color="text.secondary"
+                                                            >
+                                                                Your Schedule:
+                                                            </Typography>
+                                                            <Typography variant="body2">
+                                                                {clinic.pivot
+                                                                    ?.start_time ||
+                                                                    clinic
+                                                                        .schedule
+                                                                        ?.start_time ||
+                                                                    "N/A"}{" "}
+                                                                -{" "}
+                                                                {clinic.pivot
+                                                                    ?.end_time ||
+                                                                    clinic
+                                                                        .schedule
+                                                                        ?.end_time ||
+                                                                    "N/A"}
+                                                            </Typography>
+                                                            <Typography
+                                                                variant="body2"
+                                                                color="text.secondary"
+                                                            >
+                                                                Days:{" "}
+                                                                {JSON.parse(
+                                                                    clinic.pivot
+                                                                        ?.available_days ||
+                                                                        clinic
+                                                                            .schedule
+                                                                            ?.available_days ||
+                                                                        "[]"
+                                                                ).join(", ") ||
+                                                                    "N/A"}
+                                                            </Typography>
+                                                        </Box>
+                                                    )}
+
+                                                    <Box
+                                                        sx={{
+                                                            display: "flex",
+                                                            gap: 1,
+                                                        }}
+                                                    >
+                                                        <Button
+                                                            size="small"
+                                                            variant="outlined"
+                                                        >
+                                                            Edit Schedule
+                                                        </Button>
+                                                        <Button
+                                                            size="small"
+                                                            color="error"
+                                                            onClick={() =>
+                                                                handleDisconnectClinic(
+                                                                    clinic.id
+                                                                )
+                                                            }
+                                                        >
+                                                            Disconnect
+                                                        </Button>
+                                                    </Box>
+                                                </CardContent>
+                                            </Card>
+                                        </Grid>
+                                    ))}
+                                </Grid>
+
+                                {/* Connection Requests Section */}
+                                {connectionRequests.length > 0 && (
+                                    <>
+                                        <Typography
+                                            variant="h6"
+                                            sx={{
+                                                fontWeight: "bold",
+                                                mt: 4,
+                                                mb: 2,
+                                            }}
+                                        >
+                                            Connection Requests (
+                                            {connectionRequests.length})
+                                        </Typography>
+
+                                        <List>
+                                            {connectionRequests.map(
+                                                (request) => (
+                                                    <React.Fragment
+                                                        key={request.id}
+                                                    >
+                                                        <ListItem
+                                                            sx={{
+                                                                border: "1px solid",
+                                                                borderColor:
+                                                                    "divider",
+                                                                borderRadius: 2,
+                                                                mb: 1,
+                                                            }}
+                                                        >
+                                                            <ListItemIcon>
+                                                                <Avatar
+                                                                    src={
+                                                                        request
+                                                                            .clinic
+                                                                            ?.logo
+                                                                    }
+                                                                >
+                                                                    <LocalHospital />
+                                                                </Avatar>
+                                                            </ListItemIcon>
+                                                            <ListItemText
+                                                                primary={
+                                                                    request
+                                                                        .clinic
+                                                                        ?.name ||
+                                                                    "Unknown Clinic"
+                                                                }
+                                                                secondary={
+                                                                    <Box>
+                                                                        <Typography
+                                                                            variant="body2"
+                                                                            color="text.secondary"
+                                                                        >
+                                                                            Request
+                                                                            sent:{" "}
+                                                                            {formatRequestDate(
+                                                                                request.created_at
+                                                                            )}
+                                                                        </Typography>
+                                                                        {request.message && (
+                                                                            <Typography
+                                                                                variant="body2"
+                                                                                sx={{
+                                                                                    mt: 1,
+                                                                                }}
+                                                                            >
+                                                                                Message:{" "}
+                                                                                {
+                                                                                    request.message
+                                                                                }
+                                                                            </Typography>
+                                                                        )}
+                                                                        {request.rejection_reason && (
+                                                                            <Typography
+                                                                                variant="body2"
+                                                                                color="error"
+                                                                                sx={{
+                                                                                    mt: 1,
+                                                                                }}
+                                                                            >
+                                                                                Rejection
+                                                                                reason:{" "}
+                                                                                {
+                                                                                    request.rejection_reason
+                                                                                }
+                                                                            </Typography>
+                                                                        )}
+                                                                    </Box>
+                                                                }
+                                                            />
+                                                            <Chip
+                                                                label={
+                                                                    request.status ||
+                                                                    "pending"
+                                                                }
+                                                                color={getStatusColor(
+                                                                    request.status
+                                                                )}
+                                                                size="small"
+                                                            />
+                                                        </ListItem>
+                                                    </React.Fragment>
+                                                )
+                                            )}
+                                        </List>
+                                    </>
+                                )}
+
+                                {clinics.length === 0 && (
+                                    <Box sx={{ textAlign: "center", py: 4 }}>
+                                        <Typography
+                                            variant="h6"
+                                            color="text.secondary"
+                                        >
+                                            No clinics connected
+                                        </Typography>
+                                        <Typography
+                                            variant="body2"
+                                            color="text.secondary"
+                                            sx={{ mb: 2 }}
+                                        >
+                                            Connect with healthcare facilities
+                                            to start accepting appointments.
+                                        </Typography>
+                                        <Button
+                                            variant="contained"
+                                            startIcon={<Search />}
+                                            onClick={() =>
+                                                setShowClinicSearch(true)
+                                            }
+                                            sx={{ color: "white" }}
+                                        >
+                                            Find Clinics
+                                        </Button>
+                                    </Box>
+                                )}
+                            </Box>
+                        )}
+
+                        {/* Find Clinics Tab */}
+                        {tabValue === 2 && (
+                            <Box>
+                                <Typography
+                                    variant="h6"
+                                    sx={{ fontWeight: "bold", mb: 3 }}
+                                >
+                                    Find Healthcare Facilities
+                                </Typography>
+                                <Alert severity="info" sx={{ mb: 3 }}>
+                                    Search and connect with healthcare
+                                    facilities to expand your practice reach.
+                                </Alert>
+
+                                <Box sx={{ textAlign: "center", py: 4 }}>
+                                    <Typography
+                                        variant="h5"
+                                        color="text.secondary"
+                                        sx={{ mb: 2 }}
+                                    >
+                                        🏥 Ready to Expand Your Practice?
+                                    </Typography>
+                                    <Typography
+                                        variant="body1"
+                                        color="text.secondary"
+                                        sx={{ mb: 3 }}
+                                    >
+                                        Connect with hospitals, clinics, and
+                                        healthcare facilities in your area
+                                    </Typography>
+                                    <Button
+                                        variant="contained"
+                                        size="large"
+                                        startIcon={<Search />}
+                                        onClick={() =>
+                                            setShowClinicSearch(true)
+                                        }
+                                        sx={{ color: "white", px: 4, py: 1.5 }}
+                                    >
+                                        Search Healthcare Facilities
+                                    </Button>
+                                </Box>
+
+                                {/* Recent Search Results or Popular Clinics could go here */}
+                                <Box sx={{ mt: 4 }}>
+                                    <Typography variant="h6" sx={{ mb: 2 }}>
+                                        Why Connect with Healthcare Facilities?
+                                    </Typography>
+                                    <Grid container spacing={3}>
+                                        <Grid item xs={12} md={4}>
+                                            <Card elevation={1}>
+                                                <CardContent
+                                                    sx={{ textAlign: "center" }}
+                                                >
+                                                    <Avatar
+                                                        sx={{
+                                                            bgcolor:
+                                                                "primary.main",
+                                                            mx: "auto",
+                                                            mb: 2,
+                                                        }}
+                                                    >
+                                                        <People />
+                                                    </Avatar>
+                                                    <Typography
+                                                        variant="h6"
+                                                        gutterBottom
+                                                    >
+                                                        More Patients
+                                                    </Typography>
+                                                    <Typography
+                                                        variant="body2"
+                                                        color="text.secondary"
+                                                    >
+                                                        Reach more patients
+                                                        through established
+                                                        healthcare networks
+                                                    </Typography>
+                                                </CardContent>
+                                            </Card>
+                                        </Grid>
+                                        <Grid item xs={12} md={4}>
+                                            <Card elevation={1}>
+                                                <CardContent
+                                                    sx={{ textAlign: "center" }}
+                                                >
+                                                    <Avatar
+                                                        sx={{
+                                                            bgcolor:
+                                                                "success.main",
+                                                            mx: "auto",
+                                                            mb: 2,
+                                                        }}
+                                                    >
+                                                        <LocalHospital />
+                                                    </Avatar>
+                                                    <Typography
+                                                        variant="h6"
+                                                        gutterBottom
+                                                    >
+                                                        Better Resources
+                                                    </Typography>
+                                                    <Typography
+                                                        variant="body2"
+                                                        color="text.secondary"
+                                                    >
+                                                        Access to advanced
+                                                        medical equipment and
+                                                        facilities
+                                                    </Typography>
+                                                </CardContent>
+                                            </Card>
+                                        </Grid>
+                                        <Grid item xs={12} md={4}>
+                                            <Card elevation={1}>
+                                                <CardContent
+                                                    sx={{ textAlign: "center" }}
+                                                >
+                                                    <Avatar
+                                                        sx={{
+                                                            bgcolor:
+                                                                "info.main",
+                                                            mx: "auto",
+                                                            mb: 2,
+                                                        }}
+                                                    >
+                                                        <TrendingUp />
+                                                    </Avatar>
+                                                    <Typography
+                                                        variant="h6"
+                                                        gutterBottom
+                                                    >
+                                                        Grow Practice
+                                                    </Typography>
+                                                    <Typography
+                                                        variant="body2"
+                                                        color="text.secondary"
+                                                    >
+                                                        Expand your medical
+                                                        practice and increase
+                                                        earnings
+                                                    </Typography>
+                                                </CardContent>
+                                            </Card>
+                                        </Grid>
+                                    </Grid>
+                                </Box>
+                            </Box>
+                        )}
+                    </Box>
+                </Paper>
             </Container>
+
+            {/* Modals */}
+            <ProfileSetupModal
+                open={showProfileModal}
+                onClose={() => setShowProfileModal(false)}
+                onComplete={handleProfileComplete}
+            />
+
+            <ClinicSearchModal
+                open={showClinicSearch}
+                onClose={() => setShowClinicSearch(false)}
+            />
+
+            {/* Appointment Details Dialog */}
+            <Dialog
+                open={showAppointmentDialog}
+                onClose={() => setShowAppointmentDialog(false)}
+                maxWidth="sm"
+                fullWidth
+            >
+                {selectedAppointment && (
+                    <>
+                        <DialogTitle>Appointment Details</DialogTitle>
+                        <DialogContent>
+                            <Grid container spacing={2}>
+                                <Grid item xs={12}>
+                                    <Typography
+                                        variant="subtitle2"
+                                        color="text.secondary"
+                                    >
+                                        Patient
+                                    </Typography>
+                                    <Typography
+                                        variant="body1"
+                                        sx={{ fontWeight: 600 }}
+                                    >
+                                        {selectedAppointment.patient?.name ||
+                                            "Unknown Patient"}
+                                    </Typography>
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                    >
+                                        {selectedAppointment.patient?.email ||
+                                            "No email"}
+                                    </Typography>
+                                </Grid>
+
+                                <Grid item xs={6}>
+                                    <Typography
+                                        variant="subtitle2"
+                                        color="text.secondary"
+                                    >
+                                        Date
+                                    </Typography>
+                                    <Typography variant="body1">
+                                        {
+                                            formatDateTime(
+                                                selectedAppointment.appointment_date,
+                                                selectedAppointment.appointment_time
+                                            ).date
+                                        }
+                                    </Typography>
+                                </Grid>
+
+                                <Grid item xs={6}>
+                                    <Typography
+                                        variant="subtitle2"
+                                        color="text.secondary"
+                                    >
+                                        Time
+                                    </Typography>
+                                    <Typography variant="body1">
+                                        {
+                                            formatDateTime(
+                                                selectedAppointment.appointment_date,
+                                                selectedAppointment.appointment_time
+                                            ).time
+                                        }
+                                    </Typography>
+                                </Grid>
+
+                                <Grid item xs={12}>
+                                    <Typography
+                                        variant="subtitle2"
+                                        color="text.secondary"
+                                    >
+                                        Clinic
+                                    </Typography>
+                                    <Typography variant="body1">
+                                        {selectedAppointment.clinic?.name ||
+                                            "Online Consultation"}
+                                    </Typography>
+                                </Grid>
+
+                                {selectedAppointment.symptoms && (
+                                    <Grid item xs={12}>
+                                        <Typography
+                                            variant="subtitle2"
+                                            color="text.secondary"
+                                        >
+                                            Symptoms/Reason
+                                        </Typography>
+                                        <Typography variant="body1">
+                                            {selectedAppointment.symptoms}
+                                        </Typography>
+                                    </Grid>
+                                )}
+
+                                <Grid item xs={12}>
+                                    <Typography
+                                        variant="subtitle2"
+                                        color="text.secondary"
+                                    >
+                                        Status
+                                    </Typography>
+                                    <Chip
+                                        label={
+                                            selectedAppointment.status ||
+                                            "pending"
+                                        }
+                                        color={getStatusColor(
+                                            selectedAppointment.status
+                                        )}
+                                        size="small"
+                                    />
+                                </Grid>
+                            </Grid>
+                        </DialogContent>
+                        <DialogActions>
+                            <Button
+                                onClick={() => setShowAppointmentDialog(false)}
+                            >
+                                Close
+                            </Button>
+                            {selectedAppointment.status === "pending" && (
+                                <>
+                                    <Button
+                                        color="success"
+                                        onClick={() =>
+                                            handleAppointmentStatusUpdate(
+                                                selectedAppointment.id,
+                                                "confirmed"
+                                            )
+                                        }
+                                    >
+                                        Confirm
+                                    </Button>
+                                    <Button
+                                        color="error"
+                                        onClick={() =>
+                                            handleAppointmentStatusUpdate(
+                                                selectedAppointment.id,
+                                                "cancelled"
+                                            )
+                                        }
+                                    >
+                                        Cancel
+                                    </Button>
+                                </>
+                            )}
+                            {selectedAppointment.status === "confirmed" && (
+                                <Button
+                                    color="primary"
+                                    onClick={() =>
+                                        handleAppointmentStatusUpdate(
+                                            selectedAppointment.id,
+                                            "completed"
+                                        )
+                                    }
+                                >
+                                    Mark Complete
+                                </Button>
+                            )}
+                        </DialogActions>
+                    </>
+                )}
+            </Dialog>
         </MainLayout>
     );
 };
@@ -9377,7 +12096,7 @@ export default DoctorDashboard;
 **resources/js/pages/healthcare/HealthcareDashboard.jsx**
 
 ```jsx
-import React from 'react';
+import React, { useState, useEffect } from "react";
 import {
     Box,
     Container,
@@ -9387,14 +12106,36 @@ import {
     CardContent,
     Avatar,
     Button,
+    Chip,
     Paper,
     List,
     ListItem,
     ListItemText,
     ListItemIcon,
-    Chip,
     Divider,
-} from '@mui/material';
+    Alert,
+    CircularProgress,
+    Tabs,
+    Tab,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    TextField,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    IconButton,
+    Tooltip,
+    Badge,
+} from "@mui/material";
 import {
     LocalHospital,
     People,
@@ -9406,174 +12147,1559 @@ import {
     Assessment,
     Notifications,
     PersonAdd,
-} from '@mui/icons-material';
-import MainLayout from '../../components/layout/MainLayout';
+    Edit,
+    Visibility,
+    CheckCircle,
+    Cancel,
+    AccessTime,
+    Business,
+    Phone,
+    Email,
+    LocationOn,
+    Check,
+    Close,
+} from "@mui/icons-material";
+import { format, parseISO, isValid } from "date-fns";
+import MainLayout from "../../components/layout/MainLayout";
+import HealthcareProfileSetupModal from "../../components/healthcare/HealthcareProfileSetupModal";
+import axios from "axios";
 
 const HealthcareDashboard = () => {
-    const healthcareStats = [
-        { title: '🏥 Total Facilities', value: '5', icon: <LocalHospital />, color: 'primary' },
-        { title: '👨‍⚕️ Active Doctors', value: '45', icon: <MedicalServices />, color: 'success' },
-        { title: '📅 Monthly Appointments', value: '1,248', icon: <Schedule />, color: 'info' },
-        { title: '📈 Revenue Growth', value: '+23%', icon: <TrendingUp />, color: 'warning' },
-    ];
+    const apiUrl = import.meta.env.VITE_API_URL;
+    const [profile, setProfile] = useState(null);
+    const [stats, setStats] = useState(null);
+    const [appointments, setAppointments] = useState([]);
+    const [doctors, setDoctors] = useState([]);
+    const [connectionRequests, setConnectionRequests] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [showProfileModal, setShowProfileModal] = useState(false);
+    const [tabValue, setTabValue] = useState(0);
+    const [appointmentFilter, setAppointmentFilter] = useState("all");
+    const [selectedAppointment, setSelectedAppointment] = useState(null);
+    const [showAppointmentDialog, setShowAppointmentDialog] = useState(false);
+    const [selectedRequest, setSelectedRequest] = useState(null);
+    const [showRequestDialog, setShowRequestDialog] = useState(false);
 
-    const recentActivities = [
-        { action: 'New doctor registration', detail: 'Dr. Sarah Johnson - Cardiology', time: '2 hours ago' },
-        { action: 'Facility update', detail: 'City General Hospital - New equipment added', time: '4 hours ago' },
-        { action: 'Appointment surge', detail: 'Pediatric department - 15% increase', time: '1 day ago' },
-    ];
+    useEffect(() => {
+        loadHealthcareData();
+    }, []);
+
+    const loadHealthcareData = async () => {
+        try {
+            const token = localStorage.getItem("auth_token");
+            const headers = { Authorization: `Bearer ${token}` };
+
+            // Load healthcare profile
+            const profileResponse = await axios.get(
+                `${apiUrl}/healthcare/profile`,
+                { headers }
+            );
+            const profileData = profileResponse.data.profile;
+
+            setProfile(profileData);
+
+            if (!profileData || !profileResponse.data.is_complete) {
+                setShowProfileModal(true);
+                setLoading(false);
+                return;
+            }
+
+            // Load dashboard stats
+            const statsResponse = await axios.get(
+                `${apiUrl}/healthcare/dashboard-stats`,
+                { headers }
+            );
+            setStats(statsResponse.data);
+
+            // Load appointments
+            const appointmentsResponse = await axios.get(
+                `${apiUrl}/healthcare/appointments`,
+                {
+                    headers,
+                    params: { status: appointmentFilter, per_page: 10 },
+                }
+            );
+            setAppointments(appointmentsResponse.data.data || []);
+
+            // Load connected doctors
+            const doctorsResponse = await axios.get(
+                `${apiUrl}/healthcare/connected-doctors`,
+                { headers }
+            );
+            setDoctors(doctorsResponse.data || []);
+
+            // Load connection requests
+            const requestsResponse = await axios.get(
+                `${apiUrl}/healthcare/connection-requests`,
+                { headers }
+            );
+            setConnectionRequests(requestsResponse.data.data || []);
+        } catch (error) {
+            console.error("Failed to load healthcare data:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleProfileComplete = (profileData) => {
+        setProfile(profileData);
+        setShowProfileModal(false);
+        loadHealthcareData(); // Reload all data
+    };
+
+    const handleAppointmentStatusUpdate = async (appointmentId, status) => {
+        try {
+            const token = localStorage.getItem("auth_token");
+            await axios.post(
+                `${apiUrl}/healthcare/appointments/${appointmentId}/update-status`,
+                { status },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            // Reload appointments
+            loadHealthcareData();
+            setShowAppointmentDialog(false);
+        } catch (error) {
+            console.error("Failed to update appointment:", error);
+        }
+    };
+
+    const handleConnectionRequestResponse = async (
+        requestId,
+        status,
+        rejectionReason = ""
+    ) => {
+        try {
+            const token = localStorage.getItem("auth_token");
+            await axios.post(
+                `${apiUrl}/healthcare/connection-requests/${requestId}/respond`,
+                {
+                    status,
+                    rejection_reason: rejectionReason,
+                },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            // Reload data
+            loadHealthcareData();
+            setShowRequestDialog(false);
+        } catch (error) {
+            console.error("Failed to respond to request:", error);
+        }
+    };
+
+    const getStatusColor = (status) => {
+        switch (status) {
+            case "confirmed":
+                return "success";
+            case "pending":
+                return "warning";
+            case "completed":
+                return "info";
+            case "cancelled":
+                return "error";
+            case "approved":
+                return "success";
+            case "rejected":
+                return "error";
+            default:
+                return "default";
+        }
+    };
+
+    // FIXED: Enhanced formatDateTime function with proper error handling
+    const formatDateTime = (date, time) => {
+        try {
+            if (!date || !time) {
+                return { date: "Invalid Date", time: "Invalid Time" };
+            }
+
+            // Handle different date formats
+            let dateObj;
+
+            // If date is already a Date object
+            if (date instanceof Date) {
+                dateObj = date;
+            }
+            // If date is a string, try to parse it
+            else if (typeof date === "string") {
+                // Handle time format - ensure it has seconds
+                let timeStr = time;
+                if (typeof time === "string") {
+                    // If time is in hh:mm format, add seconds
+                    if (time.match(/^\d{2}:\d{2}$/)) {
+                        timeStr = time + ":00";
+                    }
+                    // If time has invalid format, default to 00:00:00
+                    else if (!time.match(/^\d{2}:\d{2}:\d{2}$/)) {
+                        timeStr = "00:00:00";
+                    }
+                } else {
+                    timeStr = "00:00:00";
+                }
+
+                // Try different parsing methods
+                if (date.includes("T")) {
+                    // ISO format: 2025-08-28T10:15:00Z
+                    dateObj = parseISO(date);
+                } else {
+                    // Date only format: 2025-08-28
+                    const dateTimeStr = `${date}T${timeStr}`;
+                    dateObj = parseISO(dateTimeStr);
+                }
+            } else {
+                // Invalid date type
+                throw new Error("Invalid date format");
+            }
+
+            // Check if the parsed date is valid
+            if (!isValid(dateObj)) {
+                throw new Error("Invalid date");
+            }
+
+            return {
+                date: format(dateObj, "MMM dd, yyyy"),
+                time: format(dateObj, "hh:mm a"),
+            };
+        } catch (error) {
+            console.error("Error formatting date/time:", {
+                date,
+                time,
+                error: error.message,
+            });
+            return {
+                date: "Invalid Date",
+                time: "Invalid Time",
+            };
+        }
+    };
+
+    if (loading) {
+        return (
+            <MainLayout>
+                <Container
+                    maxWidth="lg"
+                    sx={{ mt: 12, mb: 4, textAlign: "center" }}
+                >
+                    <CircularProgress size={60} />
+                    <Typography variant="h6" sx={{ mt: 2 }}>
+                        Loading your dashboard...
+                    </Typography>
+                </Container>
+            </MainLayout>
+        );
+    }
+
+    if (!profile) {
+        return (
+            <>
+                <MainLayout>
+                    <Container maxWidth="lg" sx={{ mt: 12, mb: 4 }}>
+                        <Alert severity="info">
+                            Please complete your organization profile setup to
+                            access the dashboard.
+                        </Alert>
+                    </Container>
+                </MainLayout>
+                <HealthcareProfileSetupModal
+                    open={showProfileModal}
+                    onClose={() => setShowProfileModal(false)}
+                    onComplete={handleProfileComplete}
+                />
+            </>
+        );
+    }
 
     return (
         <MainLayout>
             <Container maxWidth="lg" sx={{ mt: 12, mb: 4 }}>
                 {/* Header */}
                 <Box sx={{ mb: 4 }}>
-                    <Typography
-                        variant="h4"
-                        sx={{
-                            fontWeight: 'bold',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 2,
-                            mb: 1,
-                        }}
-                    >
-                        <LocalHospital sx={{ fontSize: 40, color: 'primary.main' }} />
-                        🏥 Healthcare Dashboard
-                    </Typography>
-                    <Typography variant="h6" color="text.secondary">
-                        🎯 Manage healthcare facilities, doctors, and operations
-                    </Typography>
+                    <Grid container spacing={3} alignItems="center">
+                        <Grid item>
+                            <Avatar
+                                src={profile.logo}
+                                sx={{
+                                    width: 80,
+                                    height: 80,
+                                    border: "3px solid",
+                                    borderColor: "primary.main",
+                                }}
+                            >
+                                <Business sx={{ fontSize: 40 }} />
+                            </Avatar>
+                        </Grid>
+                        <Grid item xs>
+                            <Typography
+                                variant="h4"
+                                sx={{ fontWeight: "bold", mb: 1 }}
+                            >
+                                {profile.name}
+                            </Typography>
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    gap: 1,
+                                    alignItems: "center",
+                                    mb: 1,
+                                }}
+                            >
+                                <Chip
+                                    label={
+                                        profile.organization_type
+                                            ?.replace("_", " ")
+                                            .toUpperCase() || "CLINIC"
+                                    }
+                                    color="primary"
+                                />
+                                {profile.is_verified && (
+                                    <Chip
+                                        label="Verified"
+                                        color="success"
+                                        icon={<CheckCircle />}
+                                    />
+                                )}
+                            </Box>
+                            <Typography variant="body1" color="text.secondary">
+                                {profile.description?.substring(0, 100)}...
+                            </Typography>
+                        </Grid>
+                        <Grid item>
+                            <Button
+                                variant="outlined"
+                                startIcon={<Edit />}
+                                onClick={() => setShowProfileModal(true)}
+                            >
+                                Edit Profile
+                            </Button>
+                        </Grid>
+                    </Grid>
                 </Box>
 
                 {/* Stats Cards */}
-                <Grid container spacing={3} sx={{ mb: 4 }}>
-                    {healthcareStats.map((stat, index) => (
-                        <Grid item xs={12} sm={6} md={3} key={index}>
-                            <Card elevation={3} sx={{ height: '100%' }}>
+                {stats && (
+                    <Grid container spacing={3} sx={{ mb: 4 }}>
+                        <Grid item xs={12} sm={6} md={3}>
+                            <Card elevation={3}>
                                 <CardContent>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            mb: 2,
+                                        }}
+                                    >
                                         <Avatar
                                             sx={{
-                                                bgcolor: `${stat.color}.main`,
+                                                bgcolor: "primary.main",
                                                 mr: 2,
                                             }}
                                         >
-                                            {stat.icon}
+                                            <LocalHospital />
                                         </Avatar>
                                         <Box>
-                                            <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-                                                {stat.value}
+                                            <Typography
+                                                variant="h4"
+                                                sx={{ fontWeight: "bold" }}
+                                            >
+                                                {stats.total_facilities || 0}
                                             </Typography>
-                                            <Typography variant="body2" color="text.secondary">
-                                                {stat.title}
+                                            <Typography
+                                                variant="body2"
+                                                color="text.secondary"
+                                            >
+                                                Total Facilities
                                             </Typography>
                                         </Box>
                                     </Box>
                                 </CardContent>
                             </Card>
                         </Grid>
-                    ))}
-                </Grid>
 
-                <Grid container spacing={3}>
-                    {/* Recent Activities */}
-                    <Grid item xs={12} md={8}>
-                        <Paper elevation={3} sx={{ p: 3 }}>
-                            <Typography
-                                variant="h6"
-                                sx={{
-                                    fontWeight: 'bold',
-                                    mb: 3,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 1,
-                                }}
-                            >
-                                <Assessment color="primary" />
-                                📊 Recent Activities
-                            </Typography>
-                            <List>
-                                {recentActivities.map((activity, index) => (
-                                    <React.Fragment key={index}>
-                                        <ListItem>
-                                            <ListItemIcon>
-                                                <Notifications color="action" />
-                                            </ListItemIcon>
-                                            <ListItemText
-                                                primary={`🔔 ${activity.action}`}
-                                                secondary={`${activity.detail} • ${activity.time}`}
-                                            />
-                                        </ListItem>
-                                        {index < recentActivities.length - 1 && <Divider />}
-                                    </React.Fragment>
-                                ))}
-                            </List>
-                        </Paper>
+                        <Grid item xs={12} sm={6} md={3}>
+                            <Card elevation={3}>
+                                <CardContent>
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            mb: 2,
+                                        }}
+                                    >
+                                        <Avatar
+                                            sx={{
+                                                bgcolor: "success.main",
+                                                mr: 2,
+                                            }}
+                                        >
+                                            <MedicalServices />
+                                        </Avatar>
+                                        <Box>
+                                            <Typography
+                                                variant="h4"
+                                                sx={{ fontWeight: "bold" }}
+                                            >
+                                                {stats.connected_doctors || 0}
+                                            </Typography>
+                                            <Typography
+                                                variant="body2"
+                                                color="text.secondary"
+                                            >
+                                                Connected Doctors
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+
+                        <Grid item xs={12} sm={6} md={3}>
+                            <Card elevation={3}>
+                                <CardContent>
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            mb: 2,
+                                        }}
+                                    >
+                                        <Avatar
+                                            sx={{ bgcolor: "info.main", mr: 2 }}
+                                        >
+                                            <Schedule />
+                                        </Avatar>
+                                        <Box>
+                                            <Typography
+                                                variant="h4"
+                                                sx={{ fontWeight: "bold" }}
+                                            >
+                                                {stats.today_appointments || 0}
+                                            </Typography>
+                                            <Typography
+                                                variant="body2"
+                                                color="text.secondary"
+                                            >
+                                                Today's Appointments
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+
+                        <Grid item xs={12} sm={6} md={3}>
+                            <Card elevation={3}>
+                                <CardContent>
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            mb: 2,
+                                        }}
+                                    >
+                                        <Badge
+                                            badgeContent={
+                                                stats.pending_requests || 0
+                                            }
+                                            color="error"
+                                        >
+                                            <Avatar
+                                                sx={{
+                                                    bgcolor: "warning.main",
+                                                    mr: 2,
+                                                }}
+                                            >
+                                                <Notifications />
+                                            </Avatar>
+                                        </Badge>
+                                        <Box>
+                                            <Typography
+                                                variant="h4"
+                                                sx={{ fontWeight: "bold" }}
+                                            >
+                                                {stats.pending_requests || 0}
+                                            </Typography>
+                                            <Typography
+                                                variant="body2"
+                                                color="text.secondary"
+                                            >
+                                                Pending Requests
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        </Grid>
                     </Grid>
+                )}
 
-                    {/* Management Actions */}
-                    <Grid item xs={12} md={4}>
-                        <Paper elevation={3} sx={{ p: 3 }}>
-                            <Typography
-                                variant="h6"
-                                sx={{
-                                    fontWeight: 'bold',
-                                    mb: 3,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 1,
-                                }}
-                            >
-                                <Settings color="primary" />
-                                ⚙️ Management
-                            </Typography>
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                <Button
-                                    variant="outlined"
-                                    startIcon={<LocalHospital />}
-                                    fullWidth
-                                    sx={{ justifyContent: 'flex-start' }}
+                {/* Main Content Tabs */}
+                <Paper elevation={3} sx={{ borderRadius: 2 }}>
+                    <Tabs
+                        value={tabValue}
+                        onChange={(e, newValue) => setTabValue(newValue)}
+                        sx={{ borderBottom: 1, borderColor: "divider", px: 2 }}
+                    >
+                        <Tab label="Appointments" icon={<Assignment />} />
+                        <Tab
+                            label={
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 1,
+                                    }}
                                 >
-                                    🏥 Manage Facilities
-                                </Button>
-                                <Button
-                                    variant="outlined"
-                                    startIcon={<PersonAdd />}
-                                    fullWidth
-                                    sx={{ justifyContent: 'flex-start' }}
+                                    Connection Requests
+                                    {connectionRequests.filter(
+                                        (req) => req.status === "pending"
+                                    ).length > 0 && (
+                                        <Badge
+                                            badgeContent={
+                                                connectionRequests.filter(
+                                                    (req) =>
+                                                        req.status === "pending"
+                                                ).length
+                                            }
+                                            color="error"
+                                        />
+                                    )}
+                                </Box>
+                            }
+                            icon={<Notifications />}
+                        />
+                        <Tab
+                            label="Connected Doctors"
+                            icon={<MedicalServices />}
+                        />
+                        <Tab label="Organization Info" icon={<Business />} />
+                    </Tabs>
+
+                    <Box sx={{ p: 3 }}>
+                        {/* Appointments Tab */}
+                        {tabValue === 0 && (
+                            <Box>
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                        mb: 3,
+                                    }}
                                 >
-                                    👨‍⚕️ Add New Doctor
-                                </Button>
-                                <Button
-                                    variant="outlined"
-                                    startIcon={<People />}
-                                    fullWidth
-                                    sx={{ justifyContent: 'flex-start' }}
+                                    <Typography
+                                        variant="h6"
+                                        sx={{ fontWeight: "bold" }}
+                                    >
+                                        Clinic Appointments
+                                    </Typography>
+                                    <FormControl
+                                        size="small"
+                                        sx={{ minWidth: 120 }}
+                                    >
+                                        <InputLabel>Filter</InputLabel>
+                                        <Select
+                                            value={appointmentFilter}
+                                            onChange={(e) =>
+                                                setAppointmentFilter(
+                                                    e.target.value
+                                                )
+                                            }
+                                        >
+                                            <MenuItem value="all">All</MenuItem>
+                                            <MenuItem value="pending">
+                                                Pending
+                                            </MenuItem>
+                                            <MenuItem value="confirmed">
+                                                Confirmed
+                                            </MenuItem>
+                                            <MenuItem value="completed">
+                                                Completed
+                                            </MenuItem>
+                                            <MenuItem value="cancelled">
+                                                Cancelled
+                                            </MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                </Box>
+
+                                <TableContainer>
+                                    <Table>
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell>Patient</TableCell>
+                                                <TableCell>Doctor</TableCell>
+                                                <TableCell>
+                                                    Date & Time
+                                                </TableCell>
+                                                <TableCell>Status</TableCell>
+                                                <TableCell>Fee</TableCell>
+                                                <TableCell>Actions</TableCell>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {appointments.map((appointment) => {
+                                                // FIXED: Safe date formatting with error handling
+                                                const dateTime = formatDateTime(
+                                                    appointment.appointment_date,
+                                                    appointment.appointment_time
+                                                );
+                                                return (
+                                                    <TableRow
+                                                        key={appointment.id}
+                                                    >
+                                                        <TableCell>
+                                                            <Box
+                                                                sx={{
+                                                                    display:
+                                                                        "flex",
+                                                                    alignItems:
+                                                                        "center",
+                                                                    gap: 1,
+                                                                }}
+                                                            >
+                                                                <Avatar
+                                                                    sx={{
+                                                                        width: 32,
+                                                                        height: 32,
+                                                                    }}
+                                                                >
+                                                                    {appointment
+                                                                        .patient
+                                                                        ?.name?.[0] ||
+                                                                        "P"}
+                                                                </Avatar>
+                                                                <Box>
+                                                                    <Typography
+                                                                        variant="body2"
+                                                                        sx={{
+                                                                            fontWeight: 600,
+                                                                        }}
+                                                                    >
+                                                                        {appointment
+                                                                            .patient
+                                                                            ?.name ||
+                                                                            "Unknown Patient"}
+                                                                    </Typography>
+                                                                    <Typography
+                                                                        variant="caption"
+                                                                        color="text.secondary"
+                                                                    >
+                                                                        {appointment
+                                                                            .patient
+                                                                            ?.email ||
+                                                                            "No email"}
+                                                                    </Typography>
+                                                                </Box>
+                                                            </Box>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Box>
+                                                                <Typography
+                                                                    variant="body2"
+                                                                    sx={{
+                                                                        fontWeight: 600,
+                                                                    }}
+                                                                >
+                                                                    Dr.{" "}
+                                                                    {appointment
+                                                                        .doctor
+                                                                        ?.user
+                                                                        ?.name ||
+                                                                        "Unknown Doctor"}
+                                                                </Typography>
+                                                                <Typography
+                                                                    variant="caption"
+                                                                    color="text.secondary"
+                                                                >
+                                                                    {appointment
+                                                                        .doctor
+                                                                        ?.specialization ||
+                                                                        "General"}
+                                                                </Typography>
+                                                            </Box>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Box>
+                                                                <Typography
+                                                                    variant="body2"
+                                                                    sx={{
+                                                                        fontWeight: 600,
+                                                                    }}
+                                                                >
+                                                                    {
+                                                                        dateTime.date
+                                                                    }
+                                                                </Typography>
+                                                                <Typography
+                                                                    variant="caption"
+                                                                    color="text.secondary"
+                                                                >
+                                                                    {
+                                                                        dateTime.time
+                                                                    }
+                                                                </Typography>
+                                                            </Box>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Chip
+                                                                label={
+                                                                    appointment.status ||
+                                                                    "pending"
+                                                                }
+                                                                color={getStatusColor(
+                                                                    appointment.status
+                                                                )}
+                                                                size="small"
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Typography
+                                                                variant="body2"
+                                                                sx={{
+                                                                    fontWeight: 600,
+                                                                }}
+                                                            >
+                                                                ₹
+                                                                {appointment.amount ||
+                                                                    0}
+                                                            </Typography>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Tooltip title="View Details">
+                                                                <IconButton
+                                                                    size="small"
+                                                                    onClick={() => {
+                                                                        setSelectedAppointment(
+                                                                            appointment
+                                                                        );
+                                                                        setShowAppointmentDialog(
+                                                                            true
+                                                                        );
+                                                                    }}
+                                                                >
+                                                                    <Visibility />
+                                                                </IconButton>
+                                                            </Tooltip>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+
+                                {appointments.length === 0 && (
+                                    <Box sx={{ textAlign: "center", py: 4 }}>
+                                        <Typography
+                                            variant="h6"
+                                            color="text.secondary"
+                                        >
+                                            No appointments found
+                                        </Typography>
+                                        <Typography
+                                            variant="body2"
+                                            color="text.secondary"
+                                        >
+                                            Appointments will appear here once
+                                            patients book with your doctors.
+                                        </Typography>
+                                    </Box>
+                                )}
+                            </Box>
+                        )}
+
+                        {/* Connection Requests Tab */}
+                        {tabValue === 1 && (
+                            <Box>
+                                <Typography
+                                    variant="h6"
+                                    sx={{ fontWeight: "bold", mb: 3 }}
                                 >
-                                    👥 Staff Management
-                                </Button>
-                                <Button
-                                    variant="outlined"
-                                    startIcon={<Assignment />}
-                                    fullWidth
-                                    sx={{ justifyContent: 'flex-start' }}
+                                    Doctor Connection Requests (
+                                    {connectionRequests.length})
+                                </Typography>
+
+                                <List>
+                                    {connectionRequests.map((request) => (
+                                        <React.Fragment key={request.id}>
+                                            <ListItem
+                                                sx={{
+                                                    border: "1px solid",
+                                                    borderColor: "divider",
+                                                    borderRadius: 2,
+                                                    mb: 2,
+                                                }}
+                                            >
+                                                <Box
+                                                    sx={{
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: 2,
+                                                        width: "100%",
+                                                    }}
+                                                >
+                                                    <Avatar
+                                                        src={
+                                                            request.doctor
+                                                                ?.profile_image
+                                                        }
+                                                        sx={{
+                                                            width: 50,
+                                                            height: 50,
+                                                        }}
+                                                    >
+                                                        <MedicalServices />
+                                                    </Avatar>
+
+                                                    <Box sx={{ flex: 1 }}>
+                                                        <Typography
+                                                            variant="h6"
+                                                            sx={{
+                                                                fontWeight:
+                                                                    "bold",
+                                                            }}
+                                                        >
+                                                            Dr.{" "}
+                                                            {request.doctor
+                                                                ?.user?.name ||
+                                                                "Unknown Doctor"}
+                                                        </Typography>
+                                                        <Typography
+                                                            variant="body2"
+                                                            color="text.secondary"
+                                                        >
+                                                            {request.doctor
+                                                                ?.specialization ||
+                                                                "General"}{" "}
+                                                            •{" "}
+                                                            {request.doctor
+                                                                ?.experience_years ||
+                                                                0}{" "}
+                                                            years exp.
+                                                        </Typography>
+                                                        <Typography
+                                                            variant="body2"
+                                                            sx={{ mt: 1 }}
+                                                        >
+                                                            Clinic:{" "}
+                                                            {request.clinic
+                                                                ?.name ||
+                                                                "Unknown Clinic"}
+                                                        </Typography>
+                                                        {request.message && (
+                                                            <Typography
+                                                                variant="body2"
+                                                                color="text.secondary"
+                                                                sx={{ mt: 1 }}
+                                                            >
+                                                                Message:{" "}
+                                                                {
+                                                                    request.message
+                                                                }
+                                                            </Typography>
+                                                        )}
+                                                    </Box>
+
+                                                    <Box
+                                                        sx={{
+                                                            display: "flex",
+                                                            flexDirection:
+                                                                "column",
+                                                            gap: 1,
+                                                            alignItems:
+                                                                "center",
+                                                        }}
+                                                    >
+                                                        <Chip
+                                                            label={
+                                                                request.status ||
+                                                                "pending"
+                                                            }
+                                                            color={getStatusColor(
+                                                                request.status
+                                                            )}
+                                                            size="small"
+                                                        />
+                                                        {request.status ===
+                                                            "pending" && (
+                                                            <Box
+                                                                sx={{
+                                                                    display:
+                                                                        "flex",
+                                                                    gap: 1,
+                                                                }}
+                                                            >
+                                                                <Button
+                                                                    size="small"
+                                                                    variant="contained"
+                                                                    color="success"
+                                                                    startIcon={
+                                                                        <Check />
+                                                                    }
+                                                                    onClick={() =>
+                                                                        handleConnectionRequestResponse(
+                                                                            request.id,
+                                                                            "approved"
+                                                                        )
+                                                                    }
+                                                                    sx={{
+                                                                        color: "white",
+                                                                    }}
+                                                                >
+                                                                    Accept
+                                                                </Button>
+                                                                <Button
+                                                                    size="small"
+                                                                    variant="outlined"
+                                                                    color="error"
+                                                                    startIcon={
+                                                                        <Close />
+                                                                    }
+                                                                    onClick={() => {
+                                                                        setSelectedRequest(
+                                                                            request
+                                                                        );
+                                                                        setShowRequestDialog(
+                                                                            true
+                                                                        );
+                                                                    }}
+                                                                >
+                                                                    Reject
+                                                                </Button>
+                                                            </Box>
+                                                        )}
+                                                        <Button
+                                                            size="small"
+                                                            variant="outlined"
+                                                            startIcon={
+                                                                <Visibility />
+                                                            }
+                                                            onClick={() => {
+                                                                setSelectedRequest(
+                                                                    request
+                                                                );
+                                                                setShowRequestDialog(
+                                                                    true
+                                                                );
+                                                            }}
+                                                        >
+                                                            View Details
+                                                        </Button>
+                                                    </Box>
+                                                </Box>
+                                            </ListItem>
+                                        </React.Fragment>
+                                    ))}
+                                </List>
+
+                                {connectionRequests.length === 0 && (
+                                    <Box sx={{ textAlign: "center", py: 4 }}>
+                                        <Typography
+                                            variant="h6"
+                                            color="text.secondary"
+                                        >
+                                            No connection requests
+                                        </Typography>
+                                        <Typography
+                                            variant="body2"
+                                            color="text.secondary"
+                                        >
+                                            Doctors can send connection requests
+                                            to join your healthcare facilities.
+                                        </Typography>
+                                    </Box>
+                                )}
+                            </Box>
+                        )}
+
+                        {/* Connected Doctors Tab */}
+                        {tabValue === 2 && (
+                            <Box>
+                                <Typography
+                                    variant="h6"
+                                    sx={{ fontWeight: "bold", mb: 3 }}
                                 >
-                                    📋 View Reports
-                                </Button>
-                                <Button
-                                    variant="outlined"
-                                    startIcon={<Schedule />}
-                                    fullWidth
-                                    sx={{ justifyContent: 'flex-start' }}
+                                    Connected Doctors ({doctors.length})
+                                </Typography>
+
+                                <Grid container spacing={3}>
+                                    {doctors.map((doctor) => (
+                                        <Grid
+                                            item
+                                            xs={12}
+                                            md={6}
+                                            key={doctor.id}
+                                        >
+                                            <Card elevation={2}>
+                                                <CardContent>
+                                                    <Box
+                                                        sx={{
+                                                            display: "flex",
+                                                            alignItems:
+                                                                "center",
+                                                            gap: 2,
+                                                            mb: 2,
+                                                        }}
+                                                    >
+                                                        <Avatar
+                                                            src={
+                                                                doctor.profile_image
+                                                            }
+                                                            sx={{
+                                                                width: 60,
+                                                                height: 60,
+                                                            }}
+                                                        >
+                                                            <MedicalServices />
+                                                        </Avatar>
+                                                        <Box sx={{ flex: 1 }}>
+                                                            <Typography
+                                                                variant="h6"
+                                                                sx={{
+                                                                    fontWeight:
+                                                                        "bold",
+                                                                }}
+                                                            >
+                                                                Dr.{" "}
+                                                                {doctor.user
+                                                                    ?.name ||
+                                                                    "Unknown Doctor"}
+                                                            </Typography>
+                                                            <Typography
+                                                                variant="body2"
+                                                                color="text.secondary"
+                                                            >
+                                                                {doctor.specialization ||
+                                                                    "General"}
+                                                            </Typography>
+                                                            <Box
+                                                                sx={{
+                                                                    display:
+                                                                        "flex",
+                                                                    gap: 1,
+                                                                    alignItems:
+                                                                        "center",
+                                                                    mt: 1,
+                                                                }}
+                                                            >
+                                                                <Chip
+                                                                    label={`${
+                                                                        doctor.experience_years ||
+                                                                        0
+                                                                    } years exp.`}
+                                                                    size="small"
+                                                                    variant="outlined"
+                                                                />
+                                                                <Chip
+                                                                    label={`₹${
+                                                                        doctor.consultation_fee ||
+                                                                        0
+                                                                    }`}
+                                                                    size="small"
+                                                                    color="primary"
+                                                                />
+                                                            </Box>
+                                                        </Box>
+                                                    </Box>
+
+                                                    {doctor.clinic_info && (
+                                                        <Box sx={{ mb: 2 }}>
+                                                            <Typography
+                                                                variant="caption"
+                                                                color="text.secondary"
+                                                            >
+                                                                Schedule at{" "}
+                                                                {
+                                                                    doctor
+                                                                        .clinic_info
+                                                                        .clinic_name
+                                                                }
+                                                                :
+                                                            </Typography>
+                                                            <Typography variant="body2">
+                                                                {doctor
+                                                                    .clinic_info
+                                                                    .schedule
+                                                                    ?.start_time ||
+                                                                    "N/A"}{" "}
+                                                                -{" "}
+                                                                {doctor
+                                                                    .clinic_info
+                                                                    .schedule
+                                                                    ?.end_time ||
+                                                                    "N/A"}
+                                                            </Typography>
+                                                        </Box>
+                                                    )}
+
+                                                    <Box
+                                                        sx={{
+                                                            display: "flex",
+                                                            gap: 1,
+                                                        }}
+                                                    >
+                                                        <Button
+                                                            size="small"
+                                                            variant="outlined"
+                                                        >
+                                                            View Profile
+                                                        </Button>
+                                                        <Button
+                                                            size="small"
+                                                            color="error"
+                                                        >
+                                                            Disconnect
+                                                        </Button>
+                                                    </Box>
+                                                </CardContent>
+                                            </Card>
+                                        </Grid>
+                                    ))}
+                                </Grid>
+
+                                {doctors.length === 0 && (
+                                    <Box sx={{ textAlign: "center", py: 4 }}>
+                                        <Typography
+                                            variant="h6"
+                                            color="text.secondary"
+                                        >
+                                            No doctors connected
+                                        </Typography>
+                                        <Typography
+                                            variant="body2"
+                                            color="text.secondary"
+                                        >
+                                            Accept connection requests from
+                                            doctors to start providing
+                                            healthcare services.
+                                        </Typography>
+                                    </Box>
+                                )}
+                            </Box>
+                        )}
+
+                        {/* Organization Info Tab */}
+                        {tabValue === 3 && (
+                            <Box>
+                                <Typography
+                                    variant="h6"
+                                    sx={{ fontWeight: "bold", mb: 3 }}
                                 >
-                                    ⏰ Schedule Management
+                                    Organization Information
+                                </Typography>
+
+                                <Grid container spacing={3}>
+                                    <Grid item xs={12} md={6}>
+                                        <Card elevation={2}>
+                                            <CardContent>
+                                                <Typography
+                                                    variant="h6"
+                                                    gutterBottom
+                                                >
+                                                    Basic Information
+                                                </Typography>
+                                                <Box
+                                                    sx={{
+                                                        display: "flex",
+                                                        flexDirection: "column",
+                                                        gap: 2,
+                                                    }}
+                                                >
+                                                    <Box>
+                                                        <Typography
+                                                            variant="caption"
+                                                            color="text.secondary"
+                                                        >
+                                                            Organization Name
+                                                        </Typography>
+                                                        <Typography
+                                                            variant="body1"
+                                                            sx={{
+                                                                fontWeight: 600,
+                                                            }}
+                                                        >
+                                                            {profile.name}
+                                                        </Typography>
+                                                    </Box>
+                                                    <Box>
+                                                        <Typography
+                                                            variant="caption"
+                                                            color="text.secondary"
+                                                        >
+                                                            Type
+                                                        </Typography>
+                                                        <Typography variant="body1">
+                                                            {profile.organization_type
+                                                                ?.replace(
+                                                                    "_",
+                                                                    " "
+                                                                )
+                                                                .toUpperCase()}
+                                                        </Typography>
+                                                    </Box>
+                                                    <Box>
+                                                        <Typography
+                                                            variant="caption"
+                                                            color="text.secondary"
+                                                        >
+                                                            Registration Number
+                                                        </Typography>
+                                                        <Typography variant="body1">
+                                                            {
+                                                                profile.registration_number
+                                                            }
+                                                        </Typography>
+                                                    </Box>
+                                                    <Box>
+                                                        <Typography
+                                                            variant="caption"
+                                                            color="text.secondary"
+                                                        >
+                                                            License Number
+                                                        </Typography>
+                                                        <Typography variant="body1">
+                                                            {
+                                                                profile.license_number
+                                                            }
+                                                        </Typography>
+                                                    </Box>
+                                                </Box>
+                                            </CardContent>
+                                        </Card>
+                                    </Grid>
+
+                                    <Grid item xs={12} md={6}>
+                                        <Card elevation={2}>
+                                            <CardContent>
+                                                <Typography
+                                                    variant="h6"
+                                                    gutterBottom
+                                                >
+                                                    Contact Information
+                                                </Typography>
+                                                <Box
+                                                    sx={{
+                                                        display: "flex",
+                                                        flexDirection: "column",
+                                                        gap: 2,
+                                                    }}
+                                                >
+                                                    <Box
+                                                        sx={{
+                                                            display: "flex",
+                                                            alignItems:
+                                                                "center",
+                                                            gap: 1,
+                                                        }}
+                                                    >
+                                                        <LocationOn
+                                                            fontSize="small"
+                                                            color="action"
+                                                        />
+                                                        <Typography variant="body2">
+                                                            {profile.address}
+                                                        </Typography>
+                                                    </Box>
+                                                    <Box
+                                                        sx={{
+                                                            display: "flex",
+                                                            alignItems:
+                                                                "center",
+                                                            gap: 1,
+                                                        }}
+                                                    >
+                                                        <Phone
+                                                            fontSize="small"
+                                                            color="action"
+                                                        />
+                                                        <Typography variant="body2">
+                                                            {profile.phone}
+                                                        </Typography>
+                                                    </Box>
+                                                    {profile.email && (
+                                                        <Box
+                                                            sx={{
+                                                                display: "flex",
+                                                                alignItems:
+                                                                    "center",
+                                                                gap: 1,
+                                                            }}
+                                                        >
+                                                            <Email
+                                                                fontSize="small"
+                                                                color="action"
+                                                            />
+                                                            <Typography variant="body2">
+                                                                {profile.email}
+                                                            </Typography>
+                                                        </Box>
+                                                    )}
+                                                    <Box
+                                                        sx={{
+                                                            display: "flex",
+                                                            alignItems:
+                                                                "center",
+                                                            gap: 1,
+                                                        }}
+                                                    >
+                                                        <AccessTime
+                                                            fontSize="small"
+                                                            color="action"
+                                                        />
+                                                        <Typography variant="body2">
+                                                            {
+                                                                profile.opening_time
+                                                            }{" "}
+                                                            -{" "}
+                                                            {
+                                                                profile.closing_time
+                                                            }
+                                                        </Typography>
+                                                    </Box>
+                                                </Box>
+                                            </CardContent>
+                                        </Card>
+                                    </Grid>
+                                </Grid>
+
+                                <Button
+                                    variant="contained"
+                                    startIcon={<Edit />}
+                                    onClick={() => setShowProfileModal(true)}
+                                    sx={{ mt: 3, color: "white" }}
+                                >
+                                    Edit Organization Profile
                                 </Button>
                             </Box>
-                        </Paper>
-                    </Grid>
-                </Grid>
+                        )}
+                    </Box>
+                </Paper>
             </Container>
+
+            {/* Profile Setup Modal */}
+            <HealthcareProfileSetupModal
+                open={showProfileModal}
+                onClose={() => setShowProfileModal(false)}
+                onComplete={handleProfileComplete}
+            />
+
+            {/* Appointment Details Dialog */}
+            <Dialog
+                open={showAppointmentDialog}
+                onClose={() => setShowAppointmentDialog(false)}
+                maxWidth="sm"
+                fullWidth
+            >
+                {selectedAppointment && (
+                    <>
+                        <DialogTitle>Appointment Details</DialogTitle>
+                        <DialogContent>
+                            <Grid container spacing={2}>
+                                <Grid item xs={12}>
+                                    <Typography
+                                        variant="subtitle2"
+                                        color="text.secondary"
+                                    >
+                                        Patient
+                                    </Typography>
+                                    <Typography
+                                        variant="body1"
+                                        sx={{ fontWeight: 600 }}
+                                    >
+                                        {selectedAppointment.patient?.name ||
+                                            "Unknown Patient"}
+                                    </Typography>
+                                </Grid>
+
+                                <Grid item xs={12}>
+                                    <Typography
+                                        variant="subtitle2"
+                                        color="text.secondary"
+                                    >
+                                        Doctor
+                                    </Typography>
+                                    <Typography variant="body1">
+                                        Dr.{" "}
+                                        {selectedAppointment.doctor?.user
+                                            ?.name || "Unknown Doctor"}{" "}
+                                        -{" "}
+                                        {selectedAppointment.doctor
+                                            ?.specialization || "General"}
+                                    </Typography>
+                                </Grid>
+
+                                {selectedAppointment.symptoms && (
+                                    <Grid item xs={12}>
+                                        <Typography
+                                            variant="subtitle2"
+                                            color="text.secondary"
+                                        >
+                                            Symptoms/Reason
+                                        </Typography>
+                                        <Typography variant="body1">
+                                            {selectedAppointment.symptoms}
+                                        </Typography>
+                                    </Grid>
+                                )}
+                            </Grid>
+                        </DialogContent>
+                        <DialogActions>
+                            <Button
+                                onClick={() => setShowAppointmentDialog(false)}
+                            >
+                                Close
+                            </Button>
+                            {selectedAppointment.status === "pending" && (
+                                <>
+                                    <Button
+                                        color="success"
+                                        onClick={() =>
+                                            handleAppointmentStatusUpdate(
+                                                selectedAppointment.id,
+                                                "confirmed"
+                                            )
+                                        }
+                                    >
+                                        Confirm
+                                    </Button>
+                                    <Button
+                                        color="error"
+                                        onClick={() =>
+                                            handleAppointmentStatusUpdate(
+                                                selectedAppointment.id,
+                                                "cancelled"
+                                            )
+                                        }
+                                    >
+                                        Cancel
+                                    </Button>
+                                </>
+                            )}
+                        </DialogActions>
+                    </>
+                )}
+            </Dialog>
+
+            {/* Connection Request Dialog */}
+            <Dialog
+                open={showRequestDialog}
+                onClose={() => setShowRequestDialog(false)}
+                maxWidth="sm"
+                fullWidth
+            >
+                {selectedRequest && (
+                    <>
+                        <DialogTitle>Connection Request Details</DialogTitle>
+                        <DialogContent>
+                            <Grid container spacing={2}>
+                                <Grid item xs={12}>
+                                    <Typography
+                                        variant="subtitle2"
+                                        color="text.secondary"
+                                    >
+                                        Doctor
+                                    </Typography>
+                                    <Typography
+                                        variant="body1"
+                                        sx={{ fontWeight: 600 }}
+                                    >
+                                        Dr.{" "}
+                                        {selectedRequest.doctor?.user?.name ||
+                                            "Unknown Doctor"}
+                                    </Typography>
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                    >
+                                        {selectedRequest.doctor
+                                            ?.specialization || "General"}{" "}
+                                        •{" "}
+                                        {selectedRequest.doctor
+                                            ?.experience_years || 0}{" "}
+                                        years experience
+                                    </Typography>
+                                </Grid>
+
+                                {selectedRequest.message && (
+                                    <Grid item xs={12}>
+                                        <Typography
+                                            variant="subtitle2"
+                                            color="text.secondary"
+                                        >
+                                            Message
+                                        </Typography>
+                                        <Typography variant="body1">
+                                            {selectedRequest.message}
+                                        </Typography>
+                                    </Grid>
+                                )}
+
+                                {selectedRequest.proposed_schedule && (
+                                    <Grid item xs={12}>
+                                        <Typography
+                                            variant="subtitle2"
+                                            color="text.secondary"
+                                        >
+                                            Proposed Schedule
+                                        </Typography>
+                                        <Typography variant="body2">
+                                            Time:{" "}
+                                            {
+                                                selectedRequest
+                                                    .proposed_schedule
+                                                    .start_time
+                                            }{" "}
+                                            -{" "}
+                                            {
+                                                selectedRequest
+                                                    .proposed_schedule.end_time
+                                            }
+                                        </Typography>
+                                        <Typography variant="body2">
+                                            Days:{" "}
+                                            {selectedRequest.proposed_schedule.available_days?.join(
+                                                ", "
+                                            ) || "Not specified"}
+                                        </Typography>
+                                    </Grid>
+                                )}
+                            </Grid>
+                        </DialogContent>
+                        <DialogActions>
+                            <Button onClick={() => setShowRequestDialog(false)}>
+                                Close
+                            </Button>
+                            {selectedRequest.status === "pending" && (
+                                <>
+                                    <Button
+                                        color="success"
+                                        onClick={() =>
+                                            handleConnectionRequestResponse(
+                                                selectedRequest.id,
+                                                "approved"
+                                            )
+                                        }
+                                    >
+                                        Accept
+                                    </Button>
+                                    <Button
+                                        color="error"
+                                        onClick={() =>
+                                            handleConnectionRequestResponse(
+                                                selectedRequest.id,
+                                                "rejected"
+                                            )
+                                        }
+                                    >
+                                        Reject
+                                    </Button>
+                                </>
+                            )}
+                        </DialogActions>
+                    </>
+                )}
+            </Dialog>
         </MainLayout>
     );
 };
@@ -9581,13 +13707,13 @@ const HealthcareDashboard = () => {
 export default HealthcareDashboard;
 ```
 
-### Step 21: Enhanced Search Section Component 
+### Step 21: Enhanced Search Section Component
 
 **resources/js/components/home/SearchSection.jsx**
 
 ```jsx
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
     Box,
     Container,
@@ -9610,43 +13736,43 @@ import {
     Divider,
     ButtonBase,
     CircularProgress,
-} from '@mui/material';
-import { 
-    Search, 
-    LocationOn, 
-    LocalHospital, 
+} from "@mui/material";
+import {
+    Search,
+    LocationOn,
+    LocalHospital,
     Person,
     Verified,
-    AccessTime
-} from '@mui/icons-material';
-import axios from 'axios';
+    AccessTime,
+} from "@mui/icons-material";
+import axios from "axios";
 
 const SearchSection = () => {
     const navigate = useNavigate();
     const apiUrl = import.meta.env.VITE_API_URL;
 
     // NEW: Search functionality states
-    const [searchType, setSearchType] = useState('both'); // 'doctors', 'clinics', 'both'
+    const [searchType, setSearchType] = useState("both"); // 'doctors', 'clinics', 'both'
     const [specializations, setSpecializations] = useState([]);
     const [loading, setLoading] = useState(false);
 
     // OLD: Original states
-    const [selectedSpecialty, setSelectedSpecialty] = useState('');
-    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedSpecialty, setSelectedSpecialty] = useState("");
+    const [searchQuery, setSearchQuery] = useState("");
     const [searchResults, setSearchResults] = useState([]);
     const [showResults, setShowResults] = useState(false);
     const [currentWordIndex, setCurrentWordIndex] = useState(0);
-    const [displayedText, setDisplayedText] = useState('');
+    const [displayedText, setDisplayedText] = useState("");
     const [isTyping, setIsTyping] = useState(true);
 
     // OLD: Words to cycle through
-    const words = ['Healthcare', 'Doctor'];
-    
+    const words = ["Healthcare", "Doctor"];
+
     // OLD: Static parts of the title and subtitle
-    const titleTemplate = 'Find _ Near You';
+    const titleTemplate = "Find _ Near You";
     const subtitles = [
         "Discover verified doctors and top-rated clinics in your area with smart location-based search",
-        "Connect with qualified medical professionals and book appointments at your convenience"
+        "Connect with qualified medical professionals and book appointments at your convenience",
     ];
 
     // NEW: Load specializations on component mount
@@ -9658,7 +13784,7 @@ const SearchSection = () => {
     useEffect(() => {
         const currentWord = words[currentWordIndex];
         let currentIndex = 0;
-        setDisplayedText('');
+        setDisplayedText("");
         setIsTyping(true);
 
         // Typing animation - slower speed
@@ -9669,10 +13795,12 @@ const SearchSection = () => {
             } else {
                 clearInterval(typingInterval);
                 setIsTyping(false);
-                
+
                 // Wait 6 seconds before starting next word
                 setTimeout(() => {
-                    setCurrentWordIndex((prevIndex) => (prevIndex + 1) % words.length);
+                    setCurrentWordIndex(
+                        (prevIndex) => (prevIndex + 1) % words.length
+                    );
                 }, 6000);
             }
         }, 300); // Changed from 150ms to 300ms for slower typing
@@ -9683,14 +13811,22 @@ const SearchSection = () => {
     // NEW: Load specializations function
     const loadSpecializations = async () => {
         try {
-            const response = await axios.get(`${apiUrl}/doctors/specializations`);
+            const response = await axios.get(
+                `${apiUrl}/doctors/specializations`
+            );
             setSpecializations(response.data);
         } catch (error) {
-            console.error('Failed to load specializations:', error);
+            console.error("Failed to load specializations:", error);
             // Fallback to old static data if API fails
             setSpecializations([
-                'Cardiology', 'Dermatology', 'Endocrinology', 'Gastroenterology',
-                'Neurology', 'Orthopedics', 'Pediatrics', 'Psychiatry'
+                "Cardiology",
+                "Dermatology",
+                "Endocrinology",
+                "Gastroenterology",
+                "Neurology",
+                "Orthopedics",
+                "Pediatrics",
+                "Psychiatry",
             ]);
         }
     };
@@ -9706,23 +13842,26 @@ const SearchSection = () => {
 
         try {
             const results = [];
-            
+
             // Search doctors if type is 'doctors' or 'both'
-            if (searchType === 'doctors' || searchType === 'both') {
+            if (searchType === "doctors" || searchType === "both") {
                 try {
                     const doctorParams = {
                         search: searchQuery,
                         specialization: selectedSpecialty,
-                        per_page: 5
+                        per_page: 5,
                     };
 
-                    const doctorResponse = await axios.get(`${apiUrl}/doctors`, {
-                        params: doctorParams
-                    });
+                    const doctorResponse = await axios.get(
+                        `${apiUrl}/doctors`,
+                        {
+                            params: doctorParams,
+                        }
+                    );
 
-                    const doctors = doctorResponse.data.data.map(doctor => ({
+                    const doctors = doctorResponse.data.data.map((doctor) => ({
                         ...doctor,
-                        type: 'doctor',
+                        type: "doctor",
                         // Map API fields to old UI expected fields for compatibility
                         name: doctor.user?.name || doctor.name,
                         specialty: doctor.specialization,
@@ -9730,48 +13869,53 @@ const SearchSection = () => {
                         rating: parseFloat(doctor.rating) || 0,
                         reviewCount: doctor.total_reviews || 0,
                         fee: doctor.consultation_fee,
-                        nextAvailable: 'Available for appointments',
+                        nextAvailable: "Available for appointments",
                         isVerified: doctor.is_verified,
-                        image: doctor.profile_image
+                        image: doctor.profile_image,
                     }));
 
                     results.push(...doctors);
                 } catch (doctorError) {
-                    console.error('Doctor search failed:', doctorError);
+                    console.error("Doctor search failed:", doctorError);
                 }
             }
 
             // Search clinics if type is 'clinics' or 'both'
-            if (searchType === 'clinics' || searchType === 'both') {
+            if (searchType === "clinics" || searchType === "both") {
                 try {
                     const clinicParams = {
                         search: searchQuery,
                         specialty: selectedSpecialty,
-                        per_page: 5
+                        per_page: 5,
                     };
 
-                    const clinicResponse = await axios.get(`${apiUrl}/clinics`, {
-                        params: clinicParams
-                    });
+                    const clinicResponse = await axios.get(
+                        `${apiUrl}/clinics`,
+                        {
+                            params: clinicParams,
+                        }
+                    );
 
-                    const clinics = clinicResponse.data.data.map(clinic => ({
+                    const clinics = clinicResponse.data.data.map((clinic) => ({
                         ...clinic,
-                        type: 'clinic',
+                        type: "clinic",
                         // Map API fields to old UI expected fields for compatibility
                         rating: parseFloat(clinic.rating) || 0,
                         reviewCount: clinic.total_reviews || 0,
-                        distance: clinic.distance_km ? `${clinic.distance_km} km` : 'Near you'
+                        distance: clinic.distance_km
+                            ? `${clinic.distance_km} km`
+                            : "Near you",
                     }));
 
                     results.push(...clinics);
                 } catch (clinicError) {
-                    console.error('Clinic search failed:', clinicError);
+                    console.error("Clinic search failed:", clinicError);
                 }
             }
 
             setSearchResults(results);
         } catch (error) {
-            console.error('Search failed:', error);
+            console.error("Search failed:", error);
             setSearchResults([]);
         } finally {
             setLoading(false);
@@ -9779,101 +13923,114 @@ const SearchSection = () => {
     };
 
     const handleKeyPress = (event) => {
-        if (event.key === 'Enter') {
+        if (event.key === "Enter") {
             handleSearch();
         }
     };
 
     // NEW: Updated result click handler with navigation
     const handleResultClick = (result) => {
-        if (result.type === 'doctor') {
+        if (result.type === "doctor") {
             navigate(`/doctor/${result.id}`);
-        } else if (result.type === 'clinic') {
+        } else if (result.type === "clinic") {
             navigate(`/clinic/${result.id}`);
         }
     };
 
     // OLD: Function to render the animated title
     const renderAnimatedTitle = () => {
-        const parts = titleTemplate.split('_');
+        const parts = titleTemplate.split("_");
         return (
             <>
-                {parts[0]}{' '} {/* "Find " with natural space */}
-                <span 
-                    style={{ 
-                        color: '#ff5983',
-                        position: 'relative',
-                        display: 'inline-block',
-                        textShadow: '2px 2px 4px rgba(255, 89, 131, 0.3)', // Pink shadow for animated word
+                {parts[0]} {/* "Find " with natural space */}
+                <span
+                    style={{
+                        color: "#ff5983",
+                        position: "relative",
+                        display: "inline-block",
+                        textShadow: "2px 2px 4px rgba(255, 89, 131, 0.3)", // Pink shadow for animated word
                     }}
                 >
                     {displayedText}
                     {isTyping && (
-                        <span 
+                        <span
                             className="blinking-cursor"
                             style={{
-                                borderRight: '3px solid #ff5983',
-                                marginLeft: '2px'
+                                borderRight: "3px solid #ff5983",
+                                marginLeft: "2px",
                             }}
                         />
                     )}
-                </span>
-                {' '}{parts[1]} {/* " Near You" with natural space before */}
+                </span> {parts[1]} {/* " Near You" with natural space before */}
             </>
         );
     };
 
     // NEW: Safe number conversion for ratings
     const safeRating = (rating) => {
-        const numRating = typeof rating === 'string' ? parseFloat(rating) : rating;
+        const numRating =
+            typeof rating === "string" ? parseFloat(rating) : rating;
         return isNaN(numRating) ? 0 : numRating;
     };
 
     return (
         <>
             <Box
-            sx={{
-                background: '#fff',
-                color: '#1a2a32',
-                boxShadow: '0 8px 32px 0 rgba(16,217,21,0.10), 0 1.5px 4px 0 rgba(60,60,60,0.10)',
-                borderRadius: 2,
-                py: { xs: 8, md: 12 },
-                position: 'relative',
-                overflow: 'hidden',
-                // Make this section full width
-                width: '100vw',
-                marginLeft: 'calc(-50vw + 50%)',
-                marginRight: 'calc(-50vw + 50%)',
-            }}
-        >
-                <Container maxWidth="xl" sx={{ position: 'relative', zIndex: 1 }}>
+                sx={{
+                    background: "#fff",
+                    color: "#1a2a32",
+                    boxShadow:
+                        "0 8px 32px 0 rgba(16,217,21,0.10), 0 1.5px 4px 0 rgba(60,60,60,0.10)",
+                    borderRadius: 2,
+                    py: { xs: 8, md: 12 },
+                    position: "relative",
+                    overflow: "hidden",
+                    // Make this section full width
+                    width: "100vw",
+                    marginLeft: "calc(-50vw + 50%)",
+                    marginRight: "calc(-50vw + 50%)",
+                }}
+            >
+                <Container
+                    maxWidth="xl"
+                    sx={{ position: "relative", zIndex: 1 }}
+                >
                     {/* OLD: Hero Content with Typewriter Animation */}
                     <Box textAlign="center" mb={6}>
-                        <Typography 
-                            variant="h2" 
-                            component="h1" 
+                        <Typography
+                            variant="h2"
+                            component="h1"
                             gutterBottom
-                            sx={{ 
-                                fontWeight: 'bold',
-                                fontSize: { xs: '2.5rem', md: '3.5rem', lg: '4rem' },
-                                color: '#10d915',
+                            sx={{
+                                fontWeight: "bold",
+                                fontSize: {
+                                    xs: "2.5rem",
+                                    md: "3.5rem",
+                                    lg: "4rem",
+                                },
+                                color: "#10d915",
                                 mb: 3,
-                                minHeight: { xs: '3rem', md: '4rem', lg: '5rem' }, // Prevent layout shift
-                                textShadow: '3px 3px 6px rgba(16, 217, 21, 0.3)', // Green shadow for main text
+                                minHeight: {
+                                    xs: "3rem",
+                                    md: "4rem",
+                                    lg: "5rem",
+                                }, // Prevent layout shift
+                                textShadow:
+                                    "3px 3px 6px rgba(16, 217, 21, 0.3)", // Green shadow for main text
                             }}
                         >
                             {renderAnimatedTitle()}
                         </Typography>
-                        <Typography 
-                            variant="h5" 
-                            sx={{ 
+                        <Typography
+                            variant="h5"
+                            sx={{
                                 opacity: 0.95,
-                                fontSize: { xs: '1.2rem', md: '1.5rem' },
-                                maxWidth: '600px',
-                                mx: 'auto',
+                                fontSize: { xs: "1.2rem", md: "1.5rem" },
+                                maxWidth: "600px",
+                                mx: "auto",
                                 lineHeight: 1.4,
-                                transition: 'opacity 0.5s ease-in-out',
-                                textShadow: '1px 1px 2px rgba(0, 0, 0, 0.1)', // Subtle shadow for subtitle
+                                transition: "opacity 0.5s ease-in-out",
+                                textShadow: "1px 1px 2px rgba(0, 0, 0, 0.1)", // Subtle shadow for subtitle
                             }}
                             key={`subtitle-${currentWordIndex}`}
                         >
@@ -9882,63 +14039,108 @@ const SearchSection = () => {
                     </Box>
 
                     {/* MIXED: Search Form - Old UI with New Functionality - Mobile Optimized */}
-                    <Paper 
-                        elevation={8} 
-                        sx={{ 
-                            p: { xs: 2, md: 4 }, 
+                    <Paper
+                        elevation={8}
+                        sx={{
+                            p: { xs: 2, md: 4 },
                             borderRadius: 3,
-                            background: 'rgba(255, 255, 255, 0.98)',
-                            backdropFilter: 'blur(10px)',
+                            background: "rgba(255, 255, 255, 0.98)",
+                            backdropFilter: "blur(10px)",
                             maxWidth: 900,
-                            mx: 'auto'
+                            mx: "auto",
                         }}
                     >
                         <Grid container spacing={2} alignItems="end">
                             {/* NEW: Search Type Dropdown - NOW VISIBLE ON MOBILE */}
                             <Grid item xs={6} sm={6} md={2}>
-                                <Typography variant="subtitle2" color="text.primary" gutterBottom sx={{ fontSize: { xs: '0.8rem', md: '0.875rem' } }}>
+                                <Typography
+                                    variant="subtitle2"
+                                    color="text.primary"
+                                    gutterBottom
+                                    sx={{
+                                        fontSize: {
+                                            xs: "0.8rem",
+                                            md: "0.875rem",
+                                        },
+                                    }}
+                                >
                                     Type
                                 </Typography>
                                 <FormControl fullWidth>
                                     <Select
                                         value={searchType}
-                                        onChange={(e) => setSearchType(e.target.value)}
-                                        sx={{ 
+                                        onChange={(e) =>
+                                            setSearchType(e.target.value)
+                                        }
+                                        sx={{
                                             borderRadius: 2,
-                                            fontSize: { xs: '0.85rem', md: '1rem' },
-                                            '& .MuiOutlinedInput-root': {
-                                                '& fieldset': { borderColor: 'rgba(0,0,0,0.07)' },
-                                            }
+                                            fontSize: {
+                                                xs: "0.85rem",
+                                                md: "1rem",
+                                            },
+                                            "& .MuiOutlinedInput-root": {
+                                                "& fieldset": {
+                                                    borderColor:
+                                                        "rgba(0,0,0,0.07)",
+                                                },
+                                            },
                                         }}
                                     >
                                         <MenuItem value="both">Both</MenuItem>
-                                        <MenuItem value="doctors">Doctors</MenuItem>
-                                        <MenuItem value="clinics">Clinics</MenuItem>
+                                        <MenuItem value="doctors">
+                                            Doctors
+                                        </MenuItem>
+                                        <MenuItem value="clinics">
+                                            Clinics
+                                        </MenuItem>
                                     </Select>
                                 </FormControl>
                             </Grid>
 
                             {/* MIXED: Specialty Dropdown - Mobile Optimized */}
                             <Grid item xs={6} sm={6} md={3}>
-                                <Typography variant="subtitle2" color="text.primary" gutterBottom sx={{ fontSize: { xs: '0.8rem', md: '0.875rem' } }}>
+                                <Typography
+                                    variant="subtitle2"
+                                    color="text.primary"
+                                    gutterBottom
+                                    sx={{
+                                        fontSize: {
+                                            xs: "0.8rem",
+                                            md: "0.875rem",
+                                        },
+                                    }}
+                                >
                                     Specialty
                                 </Typography>
                                 <FormControl fullWidth>
                                     <Select
                                         value={selectedSpecialty}
-                                        onChange={(e) => setSelectedSpecialty(e.target.value)}
+                                        onChange={(e) =>
+                                            setSelectedSpecialty(e.target.value)
+                                        }
                                         displayEmpty
-                                        sx={{ 
+                                        sx={{
                                             borderRadius: 2,
-                                            fontSize: { xs: '0.85rem', md: '1rem' },
-                                            '& .MuiOutlinedInput-root': {
-                                                '& fieldset': { borderColor: 'rgba(0,0,0,0.07)' },
-                                            }
+                                            fontSize: {
+                                                xs: "0.85rem",
+                                                md: "1rem",
+                                            },
+                                            "& .MuiOutlinedInput-root": {
+                                                "& fieldset": {
+                                                    borderColor:
+                                                        "rgba(0,0,0,0.07)",
+                                                },
+                                            },
                                         }}
                                     >
-                                        <MenuItem value="">All Specialties</MenuItem>
+                                        <MenuItem value="">
+                                            All Specialties
+                                        </MenuItem>
                                         {specializations.map((specialty) => (
-                                            <MenuItem key={specialty} value={specialty}>
+                                            <MenuItem
+                                                key={specialty}
+                                                value={specialty}
+                                            >
                                                 {specialty}
                                             </MenuItem>
                                         ))}
@@ -9948,24 +14150,52 @@ const SearchSection = () => {
 
                             {/* OLD: Search Field - Mobile Optimized */}
                             <Grid item xs={12} sm={8} md={5}>
-                                <Typography variant="subtitle2" color="text.primary" gutterBottom sx={{ fontSize: { xs: '0.8rem', md: '0.875rem' } }}>
+                                <Typography
+                                    variant="subtitle2"
+                                    color="text.primary"
+                                    gutterBottom
+                                    sx={{
+                                        fontSize: {
+                                            xs: "0.8rem",
+                                            md: "0.875rem",
+                                        },
+                                    }}
+                                >
                                     Search Doctor or Clinic
                                 </Typography>
                                 <TextField
                                     fullWidth
                                     placeholder="Enter doctor name, clinic name, or specialty..."
                                     value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    onChange={(e) =>
+                                        setSearchQuery(e.target.value)
+                                    }
                                     onKeyPress={handleKeyPress}
-                                    sx={{ 
-                                        '& .MuiOutlinedInput-root': { 
+                                    sx={{
+                                        "& .MuiOutlinedInput-root": {
                                             borderRadius: 2,
-                                            fontSize: { xs: '0.9rem', md: '1rem' },
-                                            '& fieldset': { borderColor: 'rgba(0,0,0,0.07)' },
-                                        }
+                                            fontSize: {
+                                                xs: "0.9rem",
+                                                md: "1rem",
+                                            },
+                                            "& fieldset": {
+                                                borderColor: "rgba(0,0,0,0.07)",
+                                            },
+                                        },
                                     }}
                                     InputProps={{
-                                        startAdornment: <Search sx={{ mr: 1, color: 'action.active', fontSize: { xs: '1.2rem', md: '1.5rem' } }} />
+                                        startAdornment: (
+                                            <Search
+                                                sx={{
+                                                    mr: 1,
+                                                    color: "action.active",
+                                                    fontSize: {
+                                                        xs: "1.2rem",
+                                                        md: "1.5rem",
+                                                    },
+                                                }}
+                                            />
+                                        ),
                                     }}
                                 />
                             </Grid>
@@ -9978,182 +14208,510 @@ const SearchSection = () => {
                                     size="large"
                                     onClick={handleSearch}
                                     disabled={loading}
-                                    startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
-                                    sx={{ 
+                                    startIcon={
+                                        loading ? (
+                                            <CircularProgress
+                                                size={20}
+                                                color="inherit"
+                                            />
+                                        ) : null
+                                    }
+                                    sx={{
                                         py: { xs: 1.5, md: 1.8 },
                                         borderRadius: 2,
                                         fontWeight: 600,
-                                        fontSize: { xs: '0.9rem', md: '1rem' },
+                                        fontSize: { xs: "0.9rem", md: "1rem" },
                                         boxShadow: 3,
                                         color: "white",
-                                        '&:hover': { boxShadow: 6 }
+                                        "&:hover": { boxShadow: 6 },
                                     }}
                                 >
-                                    {loading ? 'Searching...' : 'Search'}
+                                    {loading ? "Searching..." : "Search"}
                                 </Button>
                             </Grid>
                         </Grid>
 
                         {/* MIXED: Search Results - Mobile Optimized */}
                         <Collapse in={showResults}>
-                            <Box sx={{ mt: 4, pt: 3, borderTop: '1px solid rgba(0,0,0,0.08)' }}>
-                                <Typography variant="h6" gutterBottom color="text.primary" sx={{ fontSize: { xs: '1.1rem', md: '1.25rem' } }}>
+                            <Box
+                                sx={{
+                                    mt: 4,
+                                    pt: 3,
+                                    borderTop: "1px solid rgba(0,0,0,0.08)",
+                                }}
+                            >
+                                <Typography
+                                    variant="h6"
+                                    gutterBottom
+                                    color="text.primary"
+                                    sx={{
+                                        fontSize: {
+                                            xs: "1.1rem",
+                                            md: "1.25rem",
+                                        },
+                                    }}
+                                >
                                     Search Results ({searchResults.length})
                                 </Typography>
-                                
-                                <Paper 
-                                    sx={{ 
+
+                                <Paper
+                                    sx={{
                                         maxHeight: { xs: 350, md: 400 },
-                                        overflow: 'auto',
-                                        border: '1px solid rgba(0,0,0,0.07)',
-                                        borderRadius: 2
+                                        overflow: "auto",
+                                        border: "1px solid rgba(0,0,0,0.07)",
+                                        borderRadius: 2,
                                     }}
                                 >
                                     <List disablePadding>
                                         {searchResults.map((result, index) => (
-                                            <React.Fragment key={`${result.type}-${result.id}`}>
-                                                <ListItem 
-                                                    disablePadding
-                                                >
+                                            <React.Fragment
+                                                key={`${result.type}-${result.id}`}
+                                            >
+                                                <ListItem disablePadding>
                                                     <ButtonBase
                                                         component="div"
-                                                        onClick={() => handleResultClick(result)}
+                                                        onClick={() =>
+                                                            handleResultClick(
+                                                                result
+                                                            )
+                                                        }
                                                         sx={{
-                                                            width: '100%',
-                                                            py: { xs: 1.5, md: 2 },
-                                                            px: { xs: 1.5, md: 2 },
-                                                            display: 'flex',
-                                                            alignItems: 'flex-start',
-                                                            textAlign: 'left',
-                                                            '&:hover': { 
-                                                                backgroundColor: 'rgba(16,217,21,0.08)' 
-                                                            }
+                                                            width: "100%",
+                                                            py: {
+                                                                xs: 1.5,
+                                                                md: 2,
+                                                            },
+                                                            px: {
+                                                                xs: 1.5,
+                                                                md: 2,
+                                                            },
+                                                            display: "flex",
+                                                            alignItems:
+                                                                "flex-start",
+                                                            textAlign: "left",
+                                                            "&:hover": {
+                                                                backgroundColor:
+                                                                    "rgba(16,217,21,0.08)",
+                                                            },
                                                         }}
                                                     >
-                                                        <ListItemAvatar sx={{ mr: { xs: 1, md: 2 } }}>
-                                                            <Avatar 
-                                                                src={result.image || result.profile_image}
-                                                                sx={{ 
-                                                                    width: { xs: 50, md: 60 },
-                                                                    height: { xs: 50, md: 60 },
-                                                                    border: '2px solid',
-                                                                    borderColor: result.type === 'doctor' ? '#10d915' : 'secondary.main'
+                                                        <ListItemAvatar
+                                                            sx={{
+                                                                mr: {
+                                                                    xs: 1,
+                                                                    md: 2,
+                                                                },
+                                                            }}
+                                                        >
+                                                            <Avatar
+                                                                src={
+                                                                    result.image ||
+                                                                    result.profile_image
+                                                                }
+                                                                sx={{
+                                                                    width: {
+                                                                        xs: 50,
+                                                                        md: 60,
+                                                                    },
+                                                                    height: {
+                                                                        xs: 50,
+                                                                        md: 60,
+                                                                    },
+                                                                    border: "2px solid",
+                                                                    borderColor:
+                                                                        result.type ===
+                                                                        "doctor"
+                                                                            ? "#10d915"
+                                                                            : "secondary.main",
                                                                 }}
                                                             >
-                                                                {result.type === 'doctor' ? <Person /> : <LocalHospital />}
+                                                                {result.type ===
+                                                                "doctor" ? (
+                                                                    <Person />
+                                                                ) : (
+                                                                    <LocalHospital />
+                                                                )}
                                                             </Avatar>
                                                         </ListItemAvatar>
-                                                        
+
                                                         <ListItemText
                                                             primary={
-                                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, flexWrap: 'wrap' }}>
-                                                                    <Typography variant="h6" component="span" sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>
-                                                                        {result.name}
+                                                                <Box
+                                                                    sx={{
+                                                                        display:
+                                                                            "flex",
+                                                                        alignItems:
+                                                                            "center",
+                                                                        gap: 1,
+                                                                        mb: 0.5,
+                                                                        flexWrap:
+                                                                            "wrap",
+                                                                    }}
+                                                                >
+                                                                    <Typography
+                                                                        variant="h6"
+                                                                        component="span"
+                                                                        sx={{
+                                                                            fontSize:
+                                                                                {
+                                                                                    xs: "1rem",
+                                                                                    md: "1.25rem",
+                                                                                },
+                                                                        }}
+                                                                    >
+                                                                        {
+                                                                            result.name
+                                                                        }
                                                                     </Typography>
-                                                                    {result.type === 'doctor' && result.isVerified && (
-                                                                        <Chip 
-                                                                            label="Verified" 
-                                                                            size="small" 
-                                                                            color="success" 
-                                                                            icon={<Verified sx={{ fontSize: '0.7rem' }} />}
-                                                                            sx={{ 
-                                                                                fontSize: { xs: '0.6rem', md: '0.7rem' },
-                                                                                height: { xs: '18px', md: '24px' },
-                                                                                color: 'white' 
-                                                                            }}
-                                                                        />
-                                                                    )}
+                                                                    {result.type ===
+                                                                        "doctor" &&
+                                                                        result.isVerified && (
+                                                                            <Chip
+                                                                                label="Verified"
+                                                                                size="small"
+                                                                                color="success"
+                                                                                icon={
+                                                                                    <Verified
+                                                                                        sx={{
+                                                                                            fontSize:
+                                                                                                "0.7rem",
+                                                                                        }}
+                                                                                    />
+                                                                                }
+                                                                                sx={{
+                                                                                    fontSize:
+                                                                                        {
+                                                                                            xs: "0.6rem",
+                                                                                            md: "0.7rem",
+                                                                                        },
+                                                                                    height: {
+                                                                                        xs: "18px",
+                                                                                        md: "24px",
+                                                                                    },
+                                                                                    color: "white",
+                                                                                }}
+                                                                            />
+                                                                        )}
                                                                 </Box>
                                                             }
                                                             secondary={
                                                                 <Box>
-                                                                    {result.type === 'doctor' ? (
+                                                                    {result.type ===
+                                                                    "doctor" ? (
                                                                         <>
-                                                                            <Typography variant="body2" color="primary" sx={{ fontSize: { xs: '0.85rem', md: '0.875rem' } }}>
-                                                                                {result.specialty || result.specialization} • {result.experience || result.experience_years} years exp.
+                                                                            <Typography
+                                                                                variant="body2"
+                                                                                color="primary"
+                                                                                sx={{
+                                                                                    fontSize:
+                                                                                        {
+                                                                                            xs: "0.85rem",
+                                                                                            md: "0.875rem",
+                                                                                        },
+                                                                                }}
+                                                                            >
+                                                                                {result.specialty ||
+                                                                                    result.specialization}{" "}
+                                                                                •{" "}
+                                                                                {result.experience ||
+                                                                                    result.experience_years}{" "}
+                                                                                years
+                                                                                exp.
                                                                             </Typography>
-                                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1, flexWrap: 'wrap' }}>
-                                                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                                                    <Rating value={safeRating(result.rating)} precision={0.1} size="small" readOnly />
-                                                                                    <Typography variant="body2" sx={{ fontSize: { xs: '0.8rem', md: '0.875rem' } }}>
-                                                                                        {safeRating(result.rating)} ({result.reviewCount || result.total_reviews || 0} reviews)
+                                                                            <Box
+                                                                                sx={{
+                                                                                    display:
+                                                                                        "flex",
+                                                                                    alignItems:
+                                                                                        "center",
+                                                                                    gap: 2,
+                                                                                    mt: 1,
+                                                                                    flexWrap:
+                                                                                        "wrap",
+                                                                                }}
+                                                                            >
+                                                                                <Box
+                                                                                    sx={{
+                                                                                        display:
+                                                                                            "flex",
+                                                                                        alignItems:
+                                                                                            "center",
+                                                                                        gap: 0.5,
+                                                                                    }}
+                                                                                >
+                                                                                    <Rating
+                                                                                        value={safeRating(
+                                                                                            result.rating
+                                                                                        )}
+                                                                                        precision={
+                                                                                            0.1
+                                                                                        }
+                                                                                        size="small"
+                                                                                        readOnly
+                                                                                    />
+                                                                                    <Typography
+                                                                                        variant="body2"
+                                                                                        sx={{
+                                                                                            fontSize:
+                                                                                                {
+                                                                                                    xs: "0.8rem",
+                                                                                                    md: "0.875rem",
+                                                                                                },
+                                                                                        }}
+                                                                                    >
+                                                                                        {safeRating(
+                                                                                            result.rating
+                                                                                        )}{" "}
+                                                                                        (
+                                                                                        {result.reviewCount ||
+                                                                                            result.total_reviews ||
+                                                                                            0}{" "}
+                                                                                        reviews)
                                                                                     </Typography>
                                                                                 </Box>
                                                                                 {result.fee && (
-                                                                                    <Chip 
+                                                                                    <Chip
                                                                                         label={`₹${result.fee}`}
                                                                                         size="small"
                                                                                         color="secondary"
                                                                                         variant="outlined"
-                                                                                        sx={{ 
-                                                                                            fontSize: { xs: '0.7rem', md: '0.75rem' },
-                                                                                            height: { xs: '20px', md: '24px' }
+                                                                                        sx={{
+                                                                                            fontSize:
+                                                                                                {
+                                                                                                    xs: "0.7rem",
+                                                                                                    md: "0.75rem",
+                                                                                                },
+                                                                                            height: {
+                                                                                                xs: "20px",
+                                                                                                md: "24px",
+                                                                                            },
                                                                                         }}
                                                                                     />
                                                                                 )}
                                                                             </Box>
-                                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                                                                                <AccessTime fontSize="small" color="action" sx={{ fontSize: { xs: '1rem', md: '1.2rem' } }} />
-                                                                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', md: '0.75rem' } }}>
-                                                                                    {result.nextAvailable || 'Available for appointments'}
+                                                                            <Box
+                                                                                sx={{
+                                                                                    display:
+                                                                                        "flex",
+                                                                                    alignItems:
+                                                                                        "center",
+                                                                                    gap: 1,
+                                                                                    mt: 0.5,
+                                                                                }}
+                                                                            >
+                                                                                <AccessTime
+                                                                                    fontSize="small"
+                                                                                    color="action"
+                                                                                    sx={{
+                                                                                        fontSize:
+                                                                                            {
+                                                                                                xs: "1rem",
+                                                                                                md: "1.2rem",
+                                                                                            },
+                                                                                    }}
+                                                                                />
+                                                                                <Typography
+                                                                                    variant="caption"
+                                                                                    color="text.secondary"
+                                                                                    sx={{
+                                                                                        fontSize:
+                                                                                            {
+                                                                                                xs: "0.75rem",
+                                                                                                md: "0.75rem",
+                                                                                            },
+                                                                                    }}
+                                                                                >
+                                                                                    {result.nextAvailable ||
+                                                                                        "Available for appointments"}
                                                                                 </Typography>
                                                                             </Box>
                                                                         </>
                                                                     ) : (
                                                                         <>
-                                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                                                                                <LocationOn fontSize="small" color="primary" sx={{ fontSize: { xs: '1rem', md: '1.2rem' } }} />
-                                                                                <Typography variant="body2" sx={{ fontSize: { xs: '0.8rem', md: '0.875rem' } }}>
-                                                                                    {result.address}
+                                                                            <Box
+                                                                                sx={{
+                                                                                    display:
+                                                                                        "flex",
+                                                                                    alignItems:
+                                                                                        "center",
+                                                                                    gap: 1,
+                                                                                    mb: 1,
+                                                                                }}
+                                                                            >
+                                                                                <LocationOn
+                                                                                    fontSize="small"
+                                                                                    color="primary"
+                                                                                    sx={{
+                                                                                        fontSize:
+                                                                                            {
+                                                                                                xs: "1rem",
+                                                                                                md: "1.2rem",
+                                                                                            },
+                                                                                    }}
+                                                                                />
+                                                                                <Typography
+                                                                                    variant="body2"
+                                                                                    sx={{
+                                                                                        fontSize:
+                                                                                            {
+                                                                                                xs: "0.8rem",
+                                                                                                md: "0.875rem",
+                                                                                            },
+                                                                                    }}
+                                                                                >
+                                                                                    {
+                                                                                        result.address
+                                                                                    }
                                                                                 </Typography>
                                                                             </Box>
-                                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-                                                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                                                    <Rating value={safeRating(result.rating)} precision={0.1} size="small" readOnly />
-                                                                                    <Typography variant="body2" sx={{ fontSize: { xs: '0.8rem', md: '0.875rem' } }}>
-                                                                                        {safeRating(result.rating)} ({result.reviewCount || result.total_reviews || 0} reviews)
+                                                                            <Box
+                                                                                sx={{
+                                                                                    display:
+                                                                                        "flex",
+                                                                                    alignItems:
+                                                                                        "center",
+                                                                                    gap: 2,
+                                                                                    flexWrap:
+                                                                                        "wrap",
+                                                                                }}
+                                                                            >
+                                                                                <Box
+                                                                                    sx={{
+                                                                                        display:
+                                                                                            "flex",
+                                                                                        alignItems:
+                                                                                            "center",
+                                                                                        gap: 0.5,
+                                                                                    }}
+                                                                                >
+                                                                                    <Rating
+                                                                                        value={safeRating(
+                                                                                            result.rating
+                                                                                        )}
+                                                                                        precision={
+                                                                                            0.1
+                                                                                        }
+                                                                                        size="small"
+                                                                                        readOnly
+                                                                                    />
+                                                                                    <Typography
+                                                                                        variant="body2"
+                                                                                        sx={{
+                                                                                            fontSize:
+                                                                                                {
+                                                                                                    xs: "0.8rem",
+                                                                                                    md: "0.875rem",
+                                                                                                },
+                                                                                        }}
+                                                                                    >
+                                                                                        {safeRating(
+                                                                                            result.rating
+                                                                                        )}{" "}
+                                                                                        (
+                                                                                        {result.reviewCount ||
+                                                                                            result.total_reviews ||
+                                                                                            0}{" "}
+                                                                                        reviews)
                                                                                     </Typography>
                                                                                 </Box>
                                                                                 {result.distance && (
-                                                                                    <Chip 
-                                                                                        label={result.distance}
+                                                                                    <Chip
+                                                                                        label={
+                                                                                            result.distance
+                                                                                        }
                                                                                         size="small"
                                                                                         color="info"
                                                                                         variant="outlined"
-                                                                                        sx={{ 
-                                                                                            fontSize: { xs: '0.7rem', md: '0.75rem' },
-                                                                                            height: { xs: '20px', md: '24px' }
+                                                                                        sx={{
+                                                                                            fontSize:
+                                                                                                {
+                                                                                                    xs: "0.7rem",
+                                                                                                    md: "0.75rem",
+                                                                                                },
+                                                                                            height: {
+                                                                                                xs: "20px",
+                                                                                                md: "24px",
+                                                                                            },
                                                                                         }}
                                                                                     />
                                                                                 )}
                                                                             </Box>
                                                                             {/* Show specialties for clinics */}
-                                                                            {result.specialties && result.specialties.length > 0 && (
-                                                                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
-                                                                                    {result.specialties.slice(0, 3).map((specialty, idx) => (
-                                                                                        <Chip 
-                                                                                            key={idx} 
-                                                                                            label={specialty} 
-                                                                                            size="small" 
-                                                                                            variant="outlined"
-                                                                                            sx={{ 
-                                                                                                fontSize: { xs: '0.6rem', md: '0.7rem' },
-                                                                                                height: { xs: '18px', md: '22px' }
-                                                                                            }}
-                                                                                        />
-                                                                                    ))}
-                                                                                    {result.specialties.length > 3 && (
-                                                                                        <Chip 
-                                                                                            label={`+${result.specialties.length - 3} more`} 
-                                                                                            size="small"
-                                                                                            sx={{ 
-                                                                                                fontSize: { xs: '0.6rem', md: '0.7rem' },
-                                                                                                height: { xs: '18px', md: '22px' }
-                                                                                            }}
-                                                                                        />
-                                                                                    )}
-                                                                                </Box>
-                                                                            )}
+                                                                            {result.specialties &&
+                                                                                result
+                                                                                    .specialties
+                                                                                    .length >
+                                                                                    0 && (
+                                                                                    <Box
+                                                                                        sx={{
+                                                                                            display:
+                                                                                                "flex",
+                                                                                            flexWrap:
+                                                                                                "wrap",
+                                                                                            gap: 0.5,
+                                                                                            mt: 1,
+                                                                                        }}
+                                                                                    >
+                                                                                        {result.specialties
+                                                                                            .slice(
+                                                                                                0,
+                                                                                                3
+                                                                                            )
+                                                                                            .map(
+                                                                                                (
+                                                                                                    specialty,
+                                                                                                    idx
+                                                                                                ) => (
+                                                                                                    <Chip
+                                                                                                        key={
+                                                                                                            idx
+                                                                                                        }
+                                                                                                        label={
+                                                                                                            specialty
+                                                                                                        }
+                                                                                                        size="small"
+                                                                                                        variant="outlined"
+                                                                                                        sx={{
+                                                                                                            fontSize:
+                                                                                                                {
+                                                                                                                    xs: "0.6rem",
+                                                                                                                    md: "0.7rem",
+                                                                                                                },
+                                                                                                            height: {
+                                                                                                                xs: "18px",
+                                                                                                                md: "22px",
+                                                                                                            },
+                                                                                                        }}
+                                                                                                    />
+                                                                                                )
+                                                                                            )}
+                                                                                        {result
+                                                                                            .specialties
+                                                                                            .length >
+                                                                                            3 && (
+                                                                                            <Chip
+                                                                                                label={`+${
+                                                                                                    result
+                                                                                                        .specialties
+                                                                                                        .length -
+                                                                                                    3
+                                                                                                } more`}
+                                                                                                size="small"
+                                                                                                sx={{
+                                                                                                    fontSize:
+                                                                                                        {
+                                                                                                            xs: "0.6rem",
+                                                                                                            md: "0.7rem",
+                                                                                                        },
+                                                                                                    height: {
+                                                                                                        xs: "18px",
+                                                                                                        md: "22px",
+                                                                                                    },
+                                                                                                }}
+                                                                                            />
+                                                                                        )}
+                                                                                    </Box>
+                                                                                )}
                                                                         </>
                                                                     )}
                                                                 </Box>
@@ -10161,32 +14719,69 @@ const SearchSection = () => {
                                                         />
                                                     </ButtonBase>
                                                 </ListItem>
-                                                {index < searchResults.length - 1 && <Divider />}
+                                                {index <
+                                                    searchResults.length -
+                                                        1 && <Divider />}
                                             </React.Fragment>
                                         ))}
 
                                         {/* NEW: No results message */}
-                                        {searchResults.length === 0 && showResults && !loading && (
-                                            <ListItem>
-                                                <ListItemText
-                                                    primary={
-                                                        <Typography variant="h6" color="text.secondary" textAlign="center" sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>
-                                                            No results found
-                                                        </Typography>
-                                                    }
-                                                    secondary={
-                                                        <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ fontSize: { xs: '0.8rem', md: '0.875rem' } }}>
-                                                            Try adjusting your search criteria or browse our featured doctors and clinics.
-                                                        </Typography>
-                                                    }
-                                                />
-                                            </ListItem>
-                                        )}
+                                        {searchResults.length === 0 &&
+                                            showResults &&
+                                            !loading && (
+                                                <ListItem>
+                                                    <ListItemText
+                                                        primary={
+                                                            <Typography
+                                                                variant="h6"
+                                                                color="text.secondary"
+                                                                textAlign="center"
+                                                                sx={{
+                                                                    fontSize: {
+                                                                        xs: "1rem",
+                                                                        md: "1.25rem",
+                                                                    },
+                                                                }}
+                                                            >
+                                                                No results found
+                                                            </Typography>
+                                                        }
+                                                        secondary={
+                                                            <Typography
+                                                                variant="body2"
+                                                                color="text.secondary"
+                                                                textAlign="center"
+                                                                sx={{
+                                                                    fontSize: {
+                                                                        xs: "0.8rem",
+                                                                        md: "0.875rem",
+                                                                    },
+                                                                }}
+                                                            >
+                                                                Try adjusting
+                                                                your search
+                                                                criteria or
+                                                                browse our
+                                                                featured doctors
+                                                                and clinics.
+                                                            </Typography>
+                                                        }
+                                                    />
+                                                </ListItem>
+                                            )}
 
                                         {/* NEW: Loading state */}
                                         {loading && (
                                             <ListItem>
-                                                <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%', py: 2 }}>
+                                                <Box
+                                                    sx={{
+                                                        display: "flex",
+                                                        justifyContent:
+                                                            "center",
+                                                        width: "100%",
+                                                        py: 2,
+                                                    }}
+                                                >
                                                     <CircularProgress />
                                                 </Box>
                                             </ListItem>
@@ -10220,7 +14815,6 @@ const SearchSection = () => {
 
 export default SearchSection;
 ```
-
 
 ### Step 22: Enhanced Nearby Section Component
 
@@ -10834,7 +15428,6 @@ const NearbySection = () => {
 export default NearbySection;
 ```
 
-
 ### Step 23: Enhanced Stats Section Component
 
 **resources/js/components/home/StatsSection.jsx**
@@ -11129,7 +15722,6 @@ const StatsSection = () => {
 export default StatsSection;
 ```
 
-
 ### Step 24: Enhanced Why Choose Section Component
 
 **resources/js/components/home/WhyChooseSection.jsx**
@@ -11282,7 +15874,6 @@ const WhyChooseSection = () => {
 
 export default WhyChooseSection;
 ```
-
 
 ### Step 25: Enhanced Testimonials Section Component
 
@@ -11538,7 +16129,6 @@ const TestimonialsSection = () => {
 export default TestimonialsSection;
 ```
 
-
 ### Step 26: Complete Location Map Component
 
 **resources/js/components/home/LocationMap.jsx**
@@ -11567,11 +16157,11 @@ import {
   useTheme,
 } from "@mui/material";
 import { ListItemButton } from "@mui/material";
-import { 
-  Close, 
-  LocationOn, 
-  MyLocation, 
-  Search, 
+import {
+  Close,
+  LocationOn,
+  MyLocation,
+  Search,
   Navigation,
   Map,
   Place
@@ -11601,7 +16191,7 @@ const LocationMap = ({
   const [searchResults, setSearchResults] = useState([]);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
-  
+
   const mapRef = useRef(null);
   const googleMapRef = useRef(null);
   const markersRef = useRef([]);
@@ -11627,7 +16217,7 @@ const LocationMap = ({
 
   const cleanup = useCallback(() => {
     isUnmountingRef.current = true;
-    
+
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
       searchTimeoutRef.current = null;
@@ -11670,7 +16260,7 @@ const LocationMap = ({
         if (document.querySelector('script[src*="maps.googleapis.com"]')) {
           const checkGoogleMaps = () => {
             if (isUnmountingRef.current) return;
-            
+
             if (window.google && window.google.maps) {
               setGoogleMapsLoaded(true);
             } else {
@@ -11735,7 +16325,7 @@ const LocationMap = ({
     if (!open) {
       cleanup();
     }
-    
+
     return () => {
       cleanup();
     };
@@ -11747,8 +16337,8 @@ const LocationMap = ({
     }
 
     try {
-      const coords = Array.isArray(selectedCoords) && selectedCoords.length >= 2 
-        ? selectedCoords 
+      const coords = Array.isArray(selectedCoords) && selectedCoords.length >= 2
+        ? selectedCoords
         : [40.7128, -74.006];
 
       googleMapRef.current = new window.google.maps.Map(mapRef.current, {
@@ -11792,7 +16382,7 @@ const LocationMap = ({
     }
 
     const position = { lat: coords[^0], lng: coords[^1] };
-    
+
     try {
       const marker = new window.google.maps.Marker({
         position: position,
@@ -11852,7 +16442,7 @@ const LocationMap = ({
 
   const handleMapClick = async (e) => {
     if (isUnmountingRef.current) return;
-    
+
     const lat = e.latLng.lat();
     const lng = e.latLng.lng();
     setLoading(true);
@@ -11889,7 +16479,7 @@ const LocationMap = ({
               resolve("Location not found");
               return;
             }
-            
+
             if (status === "OK" && results[^0]) {
               const address = results.formatted_address;
               const parts = address.split(",").slice(0, 3);
@@ -11925,7 +16515,7 @@ const LocationMap = ({
 
       placesServiceRef.current.textSearch(request, (results, status) => {
         if (isUnmountingRef.current) return;
-        
+
         if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
           const searchData = results.slice(0, 5).map(place => ({
             display_name: place.formatted_address,
@@ -11966,7 +16556,7 @@ const LocationMap = ({
 
   const selectSearchResult = (result) => {
     if (isUnmountingRef.current) return;
-    
+
     const coords = [parseFloat(result.lat), parseFloat(result.lon)];
     const locationName = result.display_name.split(",").slice(0, 3).join(",").trim();
 
@@ -11985,7 +16575,7 @@ const LocationMap = ({
 
   const selectRecentLocation = (location) => {
     if (isUnmountingRef.current) return;
-    
+
     setSelectedLocation(location.name);
     setSelectedCoords(location.coords);
 
@@ -12007,7 +16597,7 @@ const LocationMap = ({
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         if (isUnmountingRef.current) return;
-        
+
         const { latitude, longitude } = position.coords;
         const coords = [latitude, longitude];
 
@@ -12492,7 +17082,8 @@ const LocationMap = ({
 
 export default LocationMap;
 ```
-### Step 27: Enhanced Auth Component (Complete)
+
+### Step 27: Enhanced Auth Component
 
 **resources/js/components/auth/LoginModal.jsx**
 
@@ -12540,9 +17131,16 @@ import {
 import axios from "axios";
 
 // Reusable Components
-const UserTypeSelect = ({ value, onChange, error, disabled, required = false, sx = {} }) => {
+const UserTypeSelect = ({
+    value,
+    onChange,
+    error,
+    disabled,
+    required = false,
+    sx = {},
+}) => {
     const theme = useTheme();
-    
+
     const userTypeOptions = [
         { value: "patient", label: "Patient" },
         { value: "doctor", label: "Doctor" },
@@ -12584,7 +17182,11 @@ const UserTypeSelect = ({ value, onChange, error, disabled, required = false, sx
                 ))}
             </Select>
             {error && (
-                <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.5 }}>
+                <Typography
+                    variant="caption"
+                    color="error"
+                    sx={{ mt: 0.5, ml: 1.5 }}
+                >
                     {Array.isArray(error) ? error[0] : error}
                 </Typography>
             )}
@@ -12615,7 +17217,8 @@ const AuthToggle = ({ authType, setAuthType, disabled }) => (
                 fontWeight: 500,
                 transition: "all 0.2s ease-in-out",
                 ...(authType === "mobile" && {
-                    background: "linear-gradient(135deg, #ff5983 0%, #dc004e 100%)",
+                    background:
+                        "linear-gradient(135deg, #ff5983 0%, #dc004e 100%)",
                     color: "white",
                     boxShadow: "0 4px 8px rgba(196, 9, 25, 0.3)",
                 }),
@@ -12635,7 +17238,8 @@ const AuthToggle = ({ authType, setAuthType, disabled }) => (
                 fontWeight: 500,
                 transition: "all 0.2s ease-in-out",
                 ...(authType === "email" && {
-                    background: "linear-gradient(135deg, #ff5983 0%, #dc004e 100%)",
+                    background:
+                        "linear-gradient(135deg, #ff5983 0%, #dc004e 100%)",
                     color: "white",
                     boxShadow: "0 4px 8px rgba(196, 9, 25, 0.3)",
                 }),
@@ -12655,7 +17259,8 @@ const AuthToggle = ({ authType, setAuthType, disabled }) => (
                 fontWeight: 500,
                 transition: "all 0.2s ease-in-out",
                 ...(authType === "social" && {
-                    background: "linear-gradient(135deg, #ff5983 0%, #dc004e 100%)",
+                    background:
+                        "linear-gradient(135deg, #ff5983 0%, #dc004e 100%)",
                     color: "white",
                     boxShadow: "0 4px 8px rgba(196, 9, 25, 0.3)",
                 }),
@@ -12666,7 +17271,13 @@ const AuthToggle = ({ authType, setAuthType, disabled }) => (
     </Box>
 );
 
-const SubmitButton = ({ loading, disabled, onClick, children, type = "button" }) => (
+const SubmitButton = ({
+    loading,
+    disabled,
+    onClick,
+    children,
+    type = "button",
+}) => (
     <Button
         type={type}
         fullWidth
@@ -12712,7 +17323,14 @@ const SubmitButton = ({ loading, disabled, onClick, children, type = "button" })
     </Button>
 );
 
-const SocialButton = ({ provider, icon, onClick, disabled, fullWidth = false, color }) => (
+const SocialButton = ({
+    provider,
+    icon,
+    onClick,
+    disabled,
+    fullWidth = false,
+    color,
+}) => (
     <Button
         fullWidth={fullWidth}
         variant="outlined"
@@ -12759,14 +17377,14 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
     const [authType, setAuthType] = useState("mobile");
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-    
+
     // Mobile auth data
     const [mobileData, setMobileData] = useState({
         fullName: "",
         mobileNumber: "",
         userType: "",
     });
-    
+
     // Email auth data
     const [emailData, setEmailData] = useState({
         name: "",
@@ -12775,7 +17393,7 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
         password_confirmation: "",
         user_type: "",
     });
-    
+
     // Social auth data
     const [socialData, setSocialData] = useState({
         user_type: "",
@@ -12798,7 +17416,11 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
             const timer = setTimeout(() => {
                 setMobileData({ fullName: "", mobileNumber: "", userType: "" });
                 setEmailData({
-                    name: "", email: "", password: "", password_confirmation: "", user_type: "",
+                    name: "",
+                    email: "",
+                    password: "",
+                    password_confirmation: "",
+                    user_type: "",
                 });
                 setSocialData({ user_type: "" });
                 setMobileErrors({ name: "", number: "" });
@@ -12831,14 +17453,16 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
             const response = await axios.get(`${apiUrl}/auth/social/providers`);
             setSocialProviders(response.data.providers || []);
         } catch (error) {
-            console.error('Failed to load social providers:', error);
+            console.error("Failed to load social providers:", error);
             // Set default providers if API fails
-            setSocialProviders(['google', 'facebook', 'github', 'apple']);
+            setSocialProviders(["google", "facebook", "github", "apple"]);
         }
     };
 
     const checkAlreadyLoggedIn = () => {
-        const token = localStorage.getItem("auth_token") || localStorage.getItem("portal_token");
+        const token =
+            localStorage.getItem("auth_token") ||
+            localStorage.getItem("portal_token");
         const userId = localStorage.getItem("user_id");
         return token && userId;
     };
@@ -12852,19 +17476,28 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
         setMobileErrors({ name: "", number: "" });
 
         if (!trimmedName) {
-            setMobileErrors(prev => ({ ...prev, name: "Name is required" }));
+            setMobileErrors((prev) => ({ ...prev, name: "Name is required" }));
             valid = false;
         } else if (trimmedName.length < 2) {
-            setMobileErrors(prev => ({ ...prev, name: "Name must be at least 2 characters" }));
+            setMobileErrors((prev) => ({
+                ...prev,
+                name: "Name must be at least 2 characters",
+            }));
             valid = false;
         }
 
         const mobileRegex = /^[6-9]\d{9}$/;
         if (!trimmedNumber) {
-            setMobileErrors(prev => ({ ...prev, number: "Mobile number is required" }));
+            setMobileErrors((prev) => ({
+                ...prev,
+                number: "Mobile number is required",
+            }));
             valid = false;
         } else if (!mobileRegex.test(trimmedNumber)) {
-            setMobileErrors(prev => ({ ...prev, number: "Enter a valid 10-digit Indian mobile number" }));
+            setMobileErrors((prev) => ({
+                ...prev,
+                number: "Enter a valid 10-digit Indian mobile number",
+            }));
             valid = false;
         }
 
@@ -12906,7 +17539,10 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
             valid = false;
         }
 
-        if (!isLogin && emailData.password !== emailData.password_confirmation) {
+        if (
+            !isLogin &&
+            emailData.password !== emailData.password_confirmation
+        ) {
             newErrors.password_confirmation = "Passwords do not match";
             valid = false;
         }
@@ -12925,12 +17561,12 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
         setMobileData({ ...mobileData, [field]: event.target.value });
 
         if (field === "fullName" && event.target.value.trim().length >= 2) {
-            setMobileErrors(prev => ({ ...prev, name: "" }));
+            setMobileErrors((prev) => ({ ...prev, name: "" }));
         }
         if (field === "mobileNumber") {
             const mobileRegex = /^[6-9]\d{9}$/;
             if (mobileRegex.test(event.target.value.trim())) {
-                setMobileErrors(prev => ({ ...prev, number: "" }));
+                setMobileErrors((prev) => ({ ...prev, number: "" }));
             }
         }
         if (generalError) setGeneralError("");
@@ -12949,15 +17585,15 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
     const handleSocialInputChange = (field) => (event) => {
         const newValue = event.target.value;
         console.log(`Social ${field} changed to:`, newValue);
-        
+
         setSocialData({ ...socialData, [field]: newValue });
-        
+
         // CRITICAL FIX: Store the selected user type immediately when changed
         if (field === "user_type" && newValue) {
             localStorage.setItem("selected_user_type", newValue);
             console.log("Stored user_type in localStorage:", newValue);
         }
-        
+
         if (generalError) setGeneralError("");
     };
 
@@ -13001,10 +17637,21 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
         } catch (error) {
             if (error.response?.data?.errors) {
                 const errs = error.response.data.errors;
-                if (errs.name) setMobileErrors(prev => ({ ...prev, name: errs.name[0] }));
-                if (errs.number) setMobileErrors(prev => ({ ...prev, number: errs.number[0] }));
+                if (errs.name)
+                    setMobileErrors((prev) => ({
+                        ...prev,
+                        name: errs.name[0],
+                    }));
+                if (errs.number)
+                    setMobileErrors((prev) => ({
+                        ...prev,
+                        number: errs.number[0],
+                    }));
             } else {
-                setGeneralError(error.response?.data?.message || "An error occurred during mobile authentication");
+                setGeneralError(
+                    error.response?.data?.message ||
+                        "An error occurred during mobile authentication"
+                );
             }
         } finally {
             setLoading(false);
@@ -13026,24 +17673,27 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
 
         try {
             const endpoint = isLogin ? "/auth/login" : "/auth/register";
-            const payload = isLogin 
+            const payload = isLogin
                 ? {
-                    email: emailData.email.trim(),
-                    password: emailData.password,
-                }
+                      email: emailData.email.trim(),
+                      password: emailData.password,
+                  }
                 : {
-                    name: emailData.name.trim(),
-                    email: emailData.email.trim(),
-                    password: emailData.password,
-                    password_confirmation: emailData.password_confirmation,
-                    user_type: emailData.user_type,
-                };
+                      name: emailData.name.trim(),
+                      email: emailData.email.trim(),
+                      password: emailData.password,
+                      password_confirmation: emailData.password_confirmation,
+                      user_type: emailData.user_type,
+                  };
 
             const response = await axios.post(`${apiUrl}${endpoint}`, payload);
 
             localStorage.setItem("auth_token", response.data.token);
             localStorage.setItem("user_id", response.data.user.id);
-            localStorage.setItem("user_data", JSON.stringify(response.data.user));
+            localStorage.setItem(
+                "user_data",
+                JSON.stringify(response.data.user)
+            );
 
             onLoginSuccess({
                 user: response.data.user,
@@ -13056,7 +17706,10 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
             if (error.response?.data?.errors) {
                 setEmailErrors(error.response.data.errors);
             } else {
-                setGeneralError(error.response?.data?.message || "An error occurred during email authentication");
+                setGeneralError(
+                    error.response?.data?.message ||
+                        "An error occurred during email authentication"
+                );
             }
         } finally {
             setLoading(false);
@@ -13068,7 +17721,7 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
         console.log("Social login initiated for provider:", provider);
         console.log("Current socialData:", socialData);
         console.log("IsLogin:", isLogin);
-        
+
         // CRITICAL FIX: Always require user type selection for social auth
         if (!socialData.user_type) {
             setGeneralError("Please select your role first");
@@ -13081,61 +17734,76 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
         }
 
         try {
-            setSocialLoading(prev => ({ ...prev, [provider]: true }));
+            setSocialLoading((prev) => ({ ...prev, [provider]: true }));
 
             // CRITICAL FIX: Always store user type in localStorage before redirect
             const userTypeToStore = socialData.user_type;
-            
+
             // Clear previous stored data
             localStorage.removeItem("selected_user_type");
             localStorage.removeItem("social_auth_mode");
             localStorage.removeItem("social_redirect_provider");
             localStorage.removeItem("social_redirect_timestamp");
-            
+
             // Store the selected user type and auth mode
             localStorage.setItem("selected_user_type", userTypeToStore);
-            localStorage.setItem("social_auth_mode", isLogin ? "login" : "register");
+            localStorage.setItem(
+                "social_auth_mode",
+                isLogin ? "login" : "register"
+            );
             localStorage.setItem("social_redirect_provider", provider);
-            localStorage.setItem("social_redirect_timestamp", Date.now().toString());
-            
+            localStorage.setItem(
+                "social_redirect_timestamp",
+                Date.now().toString()
+            );
+
             console.log("Stored data before redirect:", {
                 selected_user_type: userTypeToStore,
                 social_auth_mode: isLogin ? "login" : "register",
-                provider: provider
+                provider: provider,
             });
-            
+
             // CRITICAL FIX: Always pass user_type in URL regardless of login/register mode
-            const requestUrl = `${apiUrl}/auth/social/${provider}?user_type=${encodeURIComponent(userTypeToStore)}&mode=${isLogin ? 'login' : 'register'}`;
-                
+            const requestUrl = `${apiUrl}/auth/social/${provider}?user_type=${encodeURIComponent(
+                userTypeToStore
+            )}&mode=${isLogin ? "login" : "register"}`;
+
             console.log("Making request to:", requestUrl);
-            
+
             const response = await axios.get(requestUrl);
-            
+
             if (response.data.redirect_url) {
                 // CRITICAL FIX: Ensure user_type is always in redirect URL
                 let redirectUrl = response.data.redirect_url;
-                
+
                 // Parse the existing URL to add user_type parameter
                 const url = new URL(redirectUrl);
-                url.searchParams.set('user_type', userTypeToStore);
+                url.searchParams.set("user_type", userTypeToStore);
                 redirectUrl = url.toString();
-                
+
                 console.log("Final redirect URL:", redirectUrl);
-                
+
                 // Redirect to the OAuth provider
                 window.location.href = redirectUrl;
             } else {
                 throw new Error("No redirect URL received");
             }
         } catch (error) {
-            setSocialLoading(prev => ({ ...prev, [provider]: false }));
+            setSocialLoading((prev) => ({ ...prev, [provider]: false }));
             console.error(`${provider} authentication failed:`, error);
-            setGeneralError(`${provider} authentication failed: ${error.response?.data?.message || error.message}`);
+            setGeneralError(
+                `${provider} authentication failed: ${
+                    error.response?.data?.message || error.message
+                }`
+            );
         }
     };
 
     const handleClose = () => {
-        if (!loading && !Object.values(socialLoading).some(loading => loading)) {
+        if (
+            !loading &&
+            !Object.values(socialLoading).some((loading) => loading)
+        ) {
             onClose();
         }
     };
@@ -13146,7 +17814,11 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
         setMobileErrors({ name: "", number: "" });
         setGeneralError("");
         setEmailData({
-            name: "", email: "", password: "", password_confirmation: "", user_type: "",
+            name: "",
+            email: "",
+            password: "",
+            password_confirmation: "",
+            user_type: "",
         });
         setMobileData({ fullName: "", mobileNumber: "", userType: "" });
         setSocialData({ user_type: "" });
@@ -13240,14 +17912,20 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                             >
                                 <IconButton
                                     onClick={handleClose}
-                                    disabled={loading || Object.values(socialLoading).some(loading => loading)}
+                                    disabled={
+                                        loading ||
+                                        Object.values(socialLoading).some(
+                                            (loading) => loading
+                                        )
+                                    }
                                     sx={{
                                         position: "absolute",
                                         right: 8,
                                         top: 8,
                                         color: "text.secondary",
                                         "&:hover": {
-                                            backgroundColor: "rgba(0, 0, 0, 0.04)",
+                                            backgroundColor:
+                                                "rgba(0, 0, 0, 0.04)",
                                         },
                                         "&:disabled": {
                                             color: "text.disabled",
@@ -13290,12 +17968,11 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                     variant="body2"
                                     sx={{ color: "text.secondary" }}
                                 >
-                                    {authType === "mobile" 
-                                        ? "Log in or Sign up" 
-                                        : isLogin 
-                                        ? "Log in to your account" 
-                                        : "Create your account"
-                                    }
+                                    {authType === "mobile"
+                                        ? "Log in or Sign up"
+                                        : isLogin
+                                        ? "Log in to your account"
+                                        : "Create your account"}
                                 </Typography>
                             </Box>
 
@@ -13316,27 +17993,46 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                 )}
 
                                 {/* Debug Info - Remove in production */}
-                                {process.env.NODE_ENV === 'development' && authType === "social" && (
-                                    <Box sx={{ mb: 2, p: 1, bgcolor: "#f0f0f0", borderRadius: 1, fontSize: "0.8rem" }}>
-                                        <Typography variant="caption">
-                                            Debug - Social Data: {JSON.stringify(socialData)}
-                                        </Typography>
-                                        <br />
-                                        <Typography variant="caption">
-                                            Debug - IsLogin: {isLogin ? 'true' : 'false'}
-                                        </Typography>
-                                        <br />
-                                        <Typography variant="caption">
-                                            Debug - LocalStorage user_type: {localStorage.getItem("selected_user_type")}
-                                        </Typography>
-                                    </Box>
-                                )}
+                                {process.env.NODE_ENV === "development" &&
+                                    authType === "social" && (
+                                        <Box
+                                            sx={{
+                                                mb: 2,
+                                                p: 1,
+                                                bgcolor: "#f0f0f0",
+                                                borderRadius: 1,
+                                                fontSize: "0.8rem",
+                                            }}
+                                        >
+                                            <Typography variant="caption">
+                                                Debug - Social Data:{" "}
+                                                {JSON.stringify(socialData)}
+                                            </Typography>
+                                            <br />
+                                            <Typography variant="caption">
+                                                Debug - IsLogin:{" "}
+                                                {isLogin ? "true" : "false"}
+                                            </Typography>
+                                            <br />
+                                            <Typography variant="caption">
+                                                Debug - LocalStorage user_type:{" "}
+                                                {localStorage.getItem(
+                                                    "selected_user_type"
+                                                )}
+                                            </Typography>
+                                        </Box>
+                                    )}
 
                                 {/* Auth Type Toggle */}
                                 <AuthToggle
                                     authType={authType}
                                     setAuthType={setAuthType}
-                                    disabled={loading || Object.values(socialLoading).some(loading => loading)}
+                                    disabled={
+                                        loading ||
+                                        Object.values(socialLoading).some(
+                                            (loading) => loading
+                                        )
+                                    }
                                 />
 
                                 {/* Mobile Authentication */}
@@ -13346,7 +18042,9 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                             fullWidth
                                             label="Enter your name"
                                             value={mobileData.fullName}
-                                            onChange={handleMobileInputChange("fullName")}
+                                            onChange={handleMobileInputChange(
+                                                "fullName"
+                                            )}
                                             margin="dense"
                                             required
                                             disabled={loading}
@@ -13365,9 +18063,14 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                                 "& .MuiOutlinedInput-root": {
                                                     borderRadius: 2,
                                                     "&:hover": {
-                                                        "& .MuiOutlinedInput-notchedOutline": {
-                                                            borderColor: theme.palette.primary.main,
-                                                        },
+                                                        "& .MuiOutlinedInput-notchedOutline":
+                                                            {
+                                                                borderColor:
+                                                                    theme
+                                                                        .palette
+                                                                        .primary
+                                                                        .main,
+                                                            },
                                                     },
                                                 },
                                             }}
@@ -13378,7 +18081,9 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                             label="Enter mobile number"
                                             type="tel"
                                             value={mobileData.mobileNumber}
-                                            onChange={handleMobileInputChange("mobileNumber")}
+                                            onChange={handleMobileInputChange(
+                                                "mobileNumber"
+                                            )}
                                             margin="dense"
                                             required
                                             disabled={loading}
@@ -13405,9 +18110,14 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                                 "& .MuiOutlinedInput-root": {
                                                     borderRadius: 2,
                                                     "&:hover": {
-                                                        "& .MuiOutlinedInput-notchedOutline": {
-                                                            borderColor: theme.palette.primary.main,
-                                                        },
+                                                        "& .MuiOutlinedInput-notchedOutline":
+                                                            {
+                                                                borderColor:
+                                                                    theme
+                                                                        .palette
+                                                                        .primary
+                                                                        .main,
+                                                            },
                                                     },
                                                 },
                                             }}
@@ -13415,7 +18125,9 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
 
                                         <UserTypeSelect
                                             value={mobileData.userType}
-                                            onChange={handleMobileInputChange("userType")}
+                                            onChange={handleMobileInputChange(
+                                                "userType"
+                                            )}
                                             disabled={loading}
                                             required
                                         />
@@ -13442,13 +18154,24 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                                 fullWidth
                                                 label="Full Name"
                                                 value={emailData.name}
-                                                onChange={handleEmailInputChange("name")}
+                                                onChange={handleEmailInputChange(
+                                                    "name"
+                                                )}
                                                 margin="dense"
                                                 required
                                                 disabled={loading}
                                                 placeholder="Enter your full name"
                                                 error={!!emailErrors.name}
-                                                helperText={emailErrors.name ? (Array.isArray(emailErrors.name) ? emailErrors.name[0] : emailErrors.name) : ""}
+                                                helperText={
+                                                    emailErrors.name
+                                                        ? Array.isArray(
+                                                              emailErrors.name
+                                                          )
+                                                            ? emailErrors
+                                                                  .name[0]
+                                                            : emailErrors.name
+                                                        : ""
+                                                }
                                                 InputProps={{
                                                     startAdornment: (
                                                         <InputAdornment position="start">
@@ -13458,14 +18181,20 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                                 }}
                                                 sx={{
                                                     mb: 1,
-                                                    "& .MuiOutlinedInput-root": {
-                                                        borderRadius: 2,
-                                                        "&:hover": {
-                                                            "& .MuiOutlinedInput-notchedOutline": {
-                                                                borderColor: theme.palette.primary.main,
+                                                    "& .MuiOutlinedInput-root":
+                                                        {
+                                                            borderRadius: 2,
+                                                            "&:hover": {
+                                                                "& .MuiOutlinedInput-notchedOutline":
+                                                                    {
+                                                                        borderColor:
+                                                                            theme
+                                                                                .palette
+                                                                                .primary
+                                                                                .main,
+                                                                    },
                                                             },
                                                         },
-                                                    },
                                                 }}
                                             />
                                         )}
@@ -13475,13 +18204,23 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                             label="Email Address"
                                             type="email"
                                             value={emailData.email}
-                                            onChange={handleEmailInputChange("email")}
+                                            onChange={handleEmailInputChange(
+                                                "email"
+                                            )}
                                             margin="dense"
                                             required
                                             disabled={loading}
                                             placeholder="Enter your email"
                                             error={!!emailErrors.email}
-                                            helperText={emailErrors.email ? (Array.isArray(emailErrors.email) ? emailErrors.email[0] : emailErrors.email) : ""}
+                                            helperText={
+                                                emailErrors.email
+                                                    ? Array.isArray(
+                                                          emailErrors.email
+                                                      )
+                                                        ? emailErrors.email[0]
+                                                        : emailErrors.email
+                                                    : ""
+                                            }
                                             InputProps={{
                                                 startAdornment: (
                                                     <InputAdornment position="start">
@@ -13494,9 +18233,14 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                                 "& .MuiOutlinedInput-root": {
                                                     borderRadius: 2,
                                                     "&:hover": {
-                                                        "& .MuiOutlinedInput-notchedOutline": {
-                                                            borderColor: theme.palette.primary.main,
-                                                        },
+                                                        "& .MuiOutlinedInput-notchedOutline":
+                                                            {
+                                                                borderColor:
+                                                                    theme
+                                                                        .palette
+                                                                        .primary
+                                                                        .main,
+                                                            },
                                                     },
                                                 },
                                             }}
@@ -13505,15 +18249,30 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                         <TextField
                                             fullWidth
                                             label="Password"
-                                            type={showPassword ? "text" : "password"}
+                                            type={
+                                                showPassword
+                                                    ? "text"
+                                                    : "password"
+                                            }
                                             value={emailData.password}
-                                            onChange={handleEmailInputChange("password")}
+                                            onChange={handleEmailInputChange(
+                                                "password"
+                                            )}
                                             margin="dense"
                                             required
                                             disabled={loading}
                                             placeholder="Enter your password"
                                             error={!!emailErrors.password}
-                                            helperText={emailErrors.password ? (Array.isArray(emailErrors.password) ? emailErrors.password[0] : emailErrors.password) : ""}
+                                            helperText={
+                                                emailErrors.password
+                                                    ? Array.isArray(
+                                                          emailErrors.password
+                                                      )
+                                                        ? emailErrors
+                                                              .password[0]
+                                                        : emailErrors.password
+                                                    : ""
+                                            }
                                             InputProps={{
                                                 startAdornment: (
                                                     <InputAdornment position="start">
@@ -13523,11 +18282,19 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                                 endAdornment: (
                                                     <InputAdornment position="end">
                                                         <IconButton
-                                                            onClick={() => setShowPassword(!showPassword)}
+                                                            onClick={() =>
+                                                                setShowPassword(
+                                                                    !showPassword
+                                                                )
+                                                            }
                                                             disabled={loading}
                                                             edge="end"
                                                         >
-                                                            {showPassword ? <VisibilityOff /> : <Visibility />}
+                                                            {showPassword ? (
+                                                                <VisibilityOff />
+                                                            ) : (
+                                                                <Visibility />
+                                                            )}
                                                         </IconButton>
                                                     </InputAdornment>
                                                 ),
@@ -13537,9 +18304,14 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                                 "& .MuiOutlinedInput-root": {
                                                     borderRadius: 2,
                                                     "&:hover": {
-                                                        "& .MuiOutlinedInput-notchedOutline": {
-                                                            borderColor: theme.palette.primary.main,
-                                                        },
+                                                        "& .MuiOutlinedInput-notchedOutline":
+                                                            {
+                                                                borderColor:
+                                                                    theme
+                                                                        .palette
+                                                                        .primary
+                                                                        .main,
+                                                            },
                                                     },
                                                 },
                                             }}
@@ -13549,15 +18321,34 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                             <TextField
                                                 fullWidth
                                                 label="Confirm Password"
-                                                type={showConfirmPassword ? "text" : "password"}
-                                                value={emailData.password_confirmation}
-                                                onChange={handleEmailInputChange("password_confirmation")}
+                                                type={
+                                                    showConfirmPassword
+                                                        ? "text"
+                                                        : "password"
+                                                }
+                                                value={
+                                                    emailData.password_confirmation
+                                                }
+                                                onChange={handleEmailInputChange(
+                                                    "password_confirmation"
+                                                )}
                                                 margin="dense"
                                                 required
                                                 disabled={loading}
                                                 placeholder="Confirm your password"
-                                                error={!!emailErrors.password_confirmation}
-                                                helperText={emailErrors.password_confirmation ? (Array.isArray(emailErrors.password_confirmation) ? emailErrors.password_confirmation[0] : emailErrors.password_confirmation) : ""}
+                                                error={
+                                                    !!emailErrors.password_confirmation
+                                                }
+                                                helperText={
+                                                    emailErrors.password_confirmation
+                                                        ? Array.isArray(
+                                                              emailErrors.password_confirmation
+                                                          )
+                                                            ? emailErrors
+                                                                  .password_confirmation[0]
+                                                            : emailErrors.password_confirmation
+                                                        : ""
+                                                }
                                                 InputProps={{
                                                     startAdornment: (
                                                         <InputAdornment position="start">
@@ -13567,25 +18358,41 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                                     endAdornment: (
                                                         <InputAdornment position="end">
                                                             <IconButton
-                                                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                                                disabled={loading}
+                                                                onClick={() =>
+                                                                    setShowConfirmPassword(
+                                                                        !showConfirmPassword
+                                                                    )
+                                                                }
+                                                                disabled={
+                                                                    loading
+                                                                }
                                                                 edge="end"
                                                             >
-                                                                {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                                                                {showConfirmPassword ? (
+                                                                    <VisibilityOff />
+                                                                ) : (
+                                                                    <Visibility />
+                                                                )}
                                                             </IconButton>
                                                         </InputAdornment>
                                                     ),
                                                 }}
                                                 sx={{
                                                     mb: 1,
-                                                    "& .MuiOutlinedInput-root": {
-                                                        borderRadius: 2,
-                                                        "&:hover": {
-                                                            "& .MuiOutlinedInput-notchedOutline": {
-                                                                borderColor: theme.palette.primary.main,
+                                                    "& .MuiOutlinedInput-root":
+                                                        {
+                                                            borderRadius: 2,
+                                                            "&:hover": {
+                                                                "& .MuiOutlinedInput-notchedOutline":
+                                                                    {
+                                                                        borderColor:
+                                                                            theme
+                                                                                .palette
+                                                                                .primary
+                                                                                .main,
+                                                                    },
                                                             },
                                                         },
-                                                    },
                                                 }}
                                             />
                                         )}
@@ -13593,7 +18400,9 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                         {!isLogin && (
                                             <UserTypeSelect
                                                 value={emailData.user_type}
-                                                onChange={handleEmailInputChange("user_type")}
+                                                onChange={handleEmailInputChange(
+                                                    "user_type"
+                                                )}
                                                 error={emailErrors.user_type}
                                                 disabled={loading}
                                                 required
@@ -13604,19 +18413,29 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                             type="submit"
                                             loading={loading}
                                         >
-                                            {isLogin ? "LOGIN" : "CREATE ACCOUNT"}
+                                            {isLogin
+                                                ? "LOGIN"
+                                                : "CREATE ACCOUNT"}
                                         </SubmitButton>
 
                                         {/* Forgot Password Link for Login */}
                                         {isLogin && (
-                                            <Box sx={{ textAlign: "center", mt: 1, mb: 2 }}>
+                                            <Box
+                                                sx={{
+                                                    textAlign: "center",
+                                                    mt: 1,
+                                                    mb: 2,
+                                                }}
+                                            >
                                                 <Link
                                                     component="button"
                                                     type="button"
                                                     variant="body2"
                                                     onClick={() => {
                                                         // Handle forgot password
-                                                        console.log("Forgot password clicked");
+                                                        console.log(
+                                                            "Forgot password clicked"
+                                                        );
                                                     }}
                                                     disabled={loading}
                                                     sx={{
@@ -13624,7 +18443,8 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                                         color: "primary.main",
                                                         cursor: "pointer",
                                                         "&:hover": {
-                                                            textDecoration: "underline",
+                                                            textDecoration:
+                                                                "underline",
                                                         },
                                                         "&:disabled": {
                                                             color: "text.disabled",
@@ -13637,16 +18457,24 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                         )}
 
                                         {/* Toggle Auth Mode */}
-                                        <Box sx={{ textAlign: "center", mt: 1 }}>
-                                            <Typography variant="body2" color="text.secondary">
-                                                {isLogin ? "Don't have an account? " : "Already have an account? "}
+                                        <Box
+                                            sx={{ textAlign: "center", mt: 1 }}
+                                        >
+                                            <Typography
+                                                variant="body2"
+                                                color="text.secondary"
+                                            >
+                                                {isLogin
+                                                    ? "Don't have an account? "
+                                                    : "Already have an account? "}
                                                 <Link
                                                     component="button"
                                                     type="button"
                                                     onClick={toggleAuthMode}
                                                     disabled={loading}
                                                     sx={{
-                                                        textDecoration: "underline",
+                                                        textDecoration:
+                                                            "underline",
                                                         color: "primary.main",
                                                         cursor: "pointer",
                                                         "&:disabled": {
@@ -13654,7 +18482,9 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                                         },
                                                     }}
                                                 >
-                                                    {isLogin ? "Sign up" : "Log in"}
+                                                    {isLogin
+                                                        ? "Sign up"
+                                                        : "Log in"}
                                                 </Link>
                                             </Typography>
                                         </Box>
@@ -13667,8 +18497,15 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                         {/* ALWAYS SHOW USER TYPE SELECT FOR SOCIAL AUTH */}
                                         <UserTypeSelect
                                             value={socialData.user_type}
-                                            onChange={handleSocialInputChange("user_type")}
-                                            disabled={loading || Object.values(socialLoading).some(loading => loading)}
+                                            onChange={handleSocialInputChange(
+                                                "user_type"
+                                            )}
+                                            disabled={
+                                                loading ||
+                                                Object.values(
+                                                    socialLoading
+                                                ).some((loading) => loading)
+                                            }
                                             required={true} // Always required for social auth
                                             sx={{ mb: 2 }}
                                         />
@@ -13683,39 +18520,117 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                             }}
                                         >
                                             <SocialButton
-                                                provider={socialLoading.google ? "Connecting..." : "Continue with Google"}
-                                                icon={socialLoading.google ? <CircularProgress size={20} /> : <Google />}
-                                                onClick={() => handleSocialLogin("google")}
-                                                disabled={loading || socialLoading.google || !socialData.user_type}
+                                                provider={
+                                                    socialLoading.google
+                                                        ? "Connecting..."
+                                                        : "Continue with Google"
+                                                }
+                                                icon={
+                                                    socialLoading.google ? (
+                                                        <CircularProgress
+                                                            size={20}
+                                                        />
+                                                    ) : (
+                                                        <Google />
+                                                    )
+                                                }
+                                                onClick={() =>
+                                                    handleSocialLogin("google")
+                                                }
+                                                disabled={
+                                                    loading ||
+                                                    socialLoading.google ||
+                                                    !socialData.user_type
+                                                }
                                                 fullWidth
                                                 color="#db4437"
                                             />
 
-                                            <Box sx={{ display: "flex", gap: 1 }}>
+                                            <Box
+                                                sx={{ display: "flex", gap: 1 }}
+                                            >
                                                 <SocialButton
-                                                    provider={socialLoading.facebook ? "Connecting..." : "Facebook"}
-                                                    icon={socialLoading.facebook ? <CircularProgress size={20} /> : <Facebook />}
-                                                    onClick={() => handleSocialLogin("facebook")}
-                                                    disabled={loading || socialLoading.facebook || !socialData.user_type}
+                                                    provider={
+                                                        socialLoading.facebook
+                                                            ? "Connecting..."
+                                                            : "Facebook"
+                                                    }
+                                                    icon={
+                                                        socialLoading.facebook ? (
+                                                            <CircularProgress
+                                                                size={20}
+                                                            />
+                                                        ) : (
+                                                            <Facebook />
+                                                        )
+                                                    }
+                                                    onClick={() =>
+                                                        handleSocialLogin(
+                                                            "facebook"
+                                                        )
+                                                    }
+                                                    disabled={
+                                                        loading ||
+                                                        socialLoading.facebook ||
+                                                        !socialData.user_type
+                                                    }
                                                     fullWidth
                                                     color="#4267B2"
                                                 />
 
                                                 <SocialButton
-                                                    provider={socialLoading.github ? "Connecting..." : "GitHub"}
-                                                    icon={socialLoading.github ? <CircularProgress size={20} /> : <GitHub />}
-                                                    onClick={() => handleSocialLogin("github")}
-                                                    disabled={loading || socialLoading.github || !socialData.user_type}
+                                                    provider={
+                                                        socialLoading.github
+                                                            ? "Connecting..."
+                                                            : "GitHub"
+                                                    }
+                                                    icon={
+                                                        socialLoading.github ? (
+                                                            <CircularProgress
+                                                                size={20}
+                                                            />
+                                                        ) : (
+                                                            <GitHub />
+                                                        )
+                                                    }
+                                                    onClick={() =>
+                                                        handleSocialLogin(
+                                                            "github"
+                                                        )
+                                                    }
+                                                    disabled={
+                                                        loading ||
+                                                        socialLoading.github ||
+                                                        !socialData.user_type
+                                                    }
                                                     fullWidth
                                                     color="#333"
                                                 />
                                             </Box>
 
                                             <SocialButton
-                                                provider={socialLoading.apple ? "Connecting..." : "Continue with Apple"}
-                                                icon={socialLoading.apple ? <CircularProgress size={20} /> : <Apple />}
-                                                onClick={() => handleSocialLogin("apple")}
-                                                disabled={loading || socialLoading.apple || !socialData.user_type}
+                                                provider={
+                                                    socialLoading.apple
+                                                        ? "Connecting..."
+                                                        : "Continue with Apple"
+                                                }
+                                                icon={
+                                                    socialLoading.apple ? (
+                                                        <CircularProgress
+                                                            size={20}
+                                                        />
+                                                    ) : (
+                                                        <Apple />
+                                                    )
+                                                }
+                                                onClick={() =>
+                                                    handleSocialLogin("apple")
+                                                }
+                                                disabled={
+                                                    loading ||
+                                                    socialLoading.apple ||
+                                                    !socialData.user_type
+                                                }
                                                 fullWidth
                                                 color="#000000"
                                             />
@@ -13723,24 +18638,49 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
 
                                         {/* Show helper text when no user type is selected */}
                                         {!socialData.user_type && (
-                                            <Box sx={{ textAlign: "center", mb: 2 }}>
-                                                <Typography variant="caption" color="text.secondary">
-                                                    👆 Please select your role first to continue with social login
+                                            <Box
+                                                sx={{
+                                                    textAlign: "center",
+                                                    mb: 2,
+                                                }}
+                                            >
+                                                <Typography
+                                                    variant="caption"
+                                                    color="text.secondary"
+                                                >
+                                                    👆 Please select your role
+                                                    first to continue with
+                                                    social login
                                                 </Typography>
                                             </Box>
                                         )}
 
                                         {/* Toggle Auth Mode for Social */}
-                                        <Box sx={{ textAlign: "center", mt: 1 }}>
-                                            <Typography variant="body2" color="text.secondary">
-                                                {isLogin ? "Don't have an account? " : "Already have an account? "}
+                                        <Box
+                                            sx={{ textAlign: "center", mt: 1 }}
+                                        >
+                                            <Typography
+                                                variant="body2"
+                                                color="text.secondary"
+                                            >
+                                                {isLogin
+                                                    ? "Don't have an account? "
+                                                    : "Already have an account? "}
                                                 <Link
                                                     component="button"
                                                     type="button"
                                                     onClick={toggleAuthMode}
-                                                    disabled={loading || Object.values(socialLoading).some(loading => loading)}
+                                                    disabled={
+                                                        loading ||
+                                                        Object.values(
+                                                            socialLoading
+                                                        ).some(
+                                                            (loading) => loading
+                                                        )
+                                                    }
                                                     sx={{
-                                                        textDecoration: "underline",
+                                                        textDecoration:
+                                                            "underline",
                                                         color: "primary.main",
                                                         cursor: "pointer",
                                                         "&:disabled": {
@@ -13748,7 +18688,9 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                                         },
                                                     }}
                                                 >
-                                                    {isLogin ? "Sign up" : "Log in"}
+                                                    {isLogin
+                                                        ? "Sign up"
+                                                        : "Log in"}
                                                 </Link>
                                             </Typography>
                                         </Box>
@@ -13775,9 +18717,16 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                             variant="caption"
                                             onClick={() => {
                                                 onClose();
-                                                console.log("Navigate to Terms of Service");
+                                                console.log(
+                                                    "Navigate to Terms of Service"
+                                                );
                                             }}
-                                            disabled={loading || Object.values(socialLoading).some(loading => loading)}
+                                            disabled={
+                                                loading ||
+                                                Object.values(
+                                                    socialLoading
+                                                ).some((loading) => loading)
+                                            }
                                             sx={{
                                                 textDecoration: "underline",
                                                 color: "grey",
@@ -13797,9 +18746,16 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                             variant="caption"
                                             onClick={() => {
                                                 onClose();
-                                                console.log("Navigate to Privacy Policy");
+                                                console.log(
+                                                    "Navigate to Privacy Policy"
+                                                );
                                             }}
-                                            disabled={loading || Object.values(socialLoading).some(loading => loading)}
+                                            disabled={
+                                                loading ||
+                                                Object.values(
+                                                    socialLoading
+                                                ).some((loading) => loading)
+                                            }
                                             sx={{
                                                 textDecoration: "underline",
                                                 color: "grey",
@@ -13829,8 +18785,8 @@ export default LoginModal;
 **resources/js//components/auth/AuthCallback.jsx**
 
 ```jsx
-import React, { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
     Box,
     Typography,
@@ -13840,30 +18796,31 @@ import {
     Avatar,
     Fade,
     LinearProgress,
-} from '@mui/material';
+} from "@mui/material";
 import {
     CheckCircle,
     Person,
     LocalHospital,
     MedicalServices,
     AdminPanelSettings,
-} from '@mui/icons-material';
+} from "@mui/icons-material";
 
 const AuthCallback = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const [progress, setProgress] = useState(0);
-    const [userType, setUserType] = useState('');
-    const [userName, setUserName] = useState('');
+    const [userType, setUserType] = useState("");
+    const [userName, setUserName] = useState("");
 
     useEffect(() => {
         // Get URL parameters for both new and old social auth styles
-        const authToken = searchParams.get('token') || searchParams.get('portal_token');
-        const userParam = searchParams.get('user');
-        const isNewUser = searchParams.get('is_new_user') === 'true';
-        const provider = searchParams.get('provider');
-        const error = searchParams.get('error');
-        const urlUserType = searchParams.get('user_type'); // CRITICAL FIX: Get user_type from URL
+        const authToken =
+            searchParams.get("token") || searchParams.get("portal_token");
+        const userParam = searchParams.get("user");
+        const isNewUser = searchParams.get("is_new_user") === "true";
+        const provider = searchParams.get("provider");
+        const error = searchParams.get("error");
+        const urlUserType = searchParams.get("user_type"); // CRITICAL FIX: Get user_type from URL
 
         console.log("AuthCallback received params:", {
             authToken: !!authToken,
@@ -13871,14 +18828,14 @@ const AuthCallback = () => {
             isNewUser,
             provider,
             error,
-            urlUserType
+            urlUserType,
         });
 
         // Handle error cases
         if (error) {
-            console.error('Social auth error:', error);
+            console.error("Social auth error:", error);
             setTimeout(() => {
-                navigate('/?error=social_auth_failed');
+                navigate("/?error=social_auth_failed");
             }, 1000);
             return;
         }
@@ -13887,27 +18844,28 @@ const AuthCallback = () => {
             try {
                 // Parse user data
                 const userData = JSON.parse(decodeURIComponent(userParam));
-                setUserName(userData.name || 'User');
-                
+                setUserName(userData.name || "User");
+
                 // CRITICAL FIX: Use URL user_type if available, otherwise use userData user_type
-                const finalUserType = urlUserType || userData.user_type || 'patient';
+                const finalUserType =
+                    urlUserType || userData.user_type || "patient";
                 setUserType(finalUserType);
 
                 console.log("Processed user data:", {
                     userId: userData.id,
                     userType: finalUserType,
                     userName: userData.name,
-                    isNewUser
+                    isNewUser,
                 });
 
                 // Clear existing tokens
-                localStorage.removeItem('auth_token');
-                localStorage.removeItem('portal_token');
-                localStorage.removeItem('user_id');
-                localStorage.removeItem('user_data');
-                localStorage.removeItem('selected_user_type');
-                localStorage.removeItem('social_auth_mode');
-                localStorage.removeItem('social_redirect_provider');
+                localStorage.removeItem("auth_token");
+                localStorage.removeItem("portal_token");
+                localStorage.removeItem("user_id");
+                localStorage.removeItem("user_data");
+                localStorage.removeItem("selected_user_type");
+                localStorage.removeItem("social_auth_mode");
+                localStorage.removeItem("social_redirect_provider");
 
                 // Start progress animation
                 const progressInterval = setInterval(() => {
@@ -13923,137 +18881,149 @@ const AuthCallback = () => {
                 // Store auth data after progress completes
                 setTimeout(() => {
                     // Store tokens based on auth type
-                    if (searchParams.get('portal_token')) {
+                    if (searchParams.get("portal_token")) {
                         // Old style mobile auth
-                        localStorage.setItem('portal_token', authToken);
-                        localStorage.setItem('user_id', userData.id);
+                        localStorage.setItem("portal_token", authToken);
+                        localStorage.setItem("user_id", userData.id);
                     } else {
                         // New style email/social auth
-                        localStorage.setItem('auth_token', authToken);
-                        localStorage.setItem('user_id', userData.id);
+                        localStorage.setItem("auth_token", authToken);
+                        localStorage.setItem("user_id", userData.id);
                     }
-                    
+
                     // CRITICAL FIX: Store user data with correct user_type
                     const userDataToStore = {
                         ...userData,
-                        user_type: finalUserType // Ensure correct user_type is stored
+                        user_type: finalUserType, // Ensure correct user_type is stored
                     };
-                    localStorage.setItem('user_data', JSON.stringify(userDataToStore));
+                    localStorage.setItem(
+                        "user_data",
+                        JSON.stringify(userDataToStore)
+                    );
 
                     console.log("Stored user data:", userDataToStore);
 
                     // Role-based redirection
                     redirectBasedOnRole(finalUserType);
                 }, 3000);
-
             } catch (error) {
-                console.error('Auth callback error:', error);
+                console.error("Auth callback error:", error);
                 setTimeout(() => {
-                    navigate('/?error=auth_data_invalid');
+                    navigate("/?error=auth_data_invalid");
                 }, 1000);
             }
         } else {
-            console.error('Missing auth data in callback');
+            console.error("Missing auth data in callback");
             setTimeout(() => {
-                navigate('/?error=missing_auth_data');
+                navigate("/?error=missing_auth_data");
             }, 1000);
         }
     }, [searchParams, navigate]);
 
     const redirectBasedOnRole = (role) => {
         console.log("Redirecting based on role:", role);
-        
+
         switch (role) {
-            case 'patient':
-                navigate('/');
+            case "patient":
+                navigate("/");
                 break;
-            case 'doctor':
-                navigate('/doctor/dashboard');
+            case "doctor":
+                navigate("/doctor/dashboard");
                 break;
-            case 'healthcare':
-                navigate('/healthcare/dashboard');
+            case "healthcare":
+                navigate("/healthcare/dashboard");
                 break;
-            case 'admin':
-                navigate('/admin/dashboard');
+            case "admin":
+                navigate("/admin/dashboard");
                 break;
             default:
                 console.log("Unknown role, redirecting to home:", role);
-                navigate('/');
+                navigate("/");
         }
     };
 
     const getRoleIcon = () => {
         switch (userType) {
-            case 'patient':
-                return <Person sx={{ fontSize: 40, color: 'primary.main' }} />;
-            case 'doctor':
-                return <MedicalServices sx={{ fontSize: 40, color: 'success.main' }} />;
-            case 'healthcare':
-                return <LocalHospital sx={{ fontSize: 40, color: 'info.main' }} />;
-            case 'admin':
-                return <AdminPanelSettings sx={{ fontSize: 40, color: 'warning.main' }} />;
+            case "patient":
+                return <Person sx={{ fontSize: 40, color: "primary.main" }} />;
+            case "doctor":
+                return (
+                    <MedicalServices
+                        sx={{ fontSize: 40, color: "success.main" }}
+                    />
+                );
+            case "healthcare":
+                return (
+                    <LocalHospital sx={{ fontSize: 40, color: "info.main" }} />
+                );
+            case "admin":
+                return (
+                    <AdminPanelSettings
+                        sx={{ fontSize: 40, color: "warning.main" }}
+                    />
+                );
             default:
-                return <Person sx={{ fontSize: 40, color: 'primary.main' }} />;
+                return <Person sx={{ fontSize: 40, color: "primary.main" }} />;
         }
     };
 
     const getRoleColor = () => {
         switch (userType) {
-            case 'patient':
-                return 'primary.main';
-            case 'doctor':
-                return 'success.main';
-            case 'healthcare':
-                return 'info.main';
-            case 'admin':
-                return 'warning.main';
+            case "patient":
+                return "primary.main";
+            case "doctor":
+                return "success.main";
+            case "healthcare":
+                return "info.main";
+            case "admin":
+                return "warning.main";
             default:
-                return 'primary.main';
+                return "primary.main";
         }
     };
 
     const getRoleEmoji = () => {
         switch (userType) {
-            case 'patient':
-                return '👤';
-            case 'doctor':
-                return '👨‍⚕️';
-            case 'healthcare':
-                return '🏥';
-            case 'admin':
-                return '👑';
+            case "patient":
+                return "👤";
+            case "doctor":
+                return "👨‍⚕️";
+            case "healthcare":
+                return "🏥";
+            case "admin":
+                return "👑";
             default:
-                return '👤';
+                return "👤";
         }
     };
 
     const getRoleDisplayName = () => {
         switch (userType) {
-            case 'patient':
-                return 'Patient';
-            case 'doctor':
-                return 'Doctor';
-            case 'healthcare':
-                return 'Healthcare Provider';
-            case 'admin':
-                return 'Administrator';
+            case "patient":
+                return "Patient";
+            case "doctor":
+                return "Doctor";
+            case "healthcare":
+                return "Healthcare Provider";
+            case "admin":
+                return "Administrator";
             default:
-                return 'User';
+                return "User";
         }
     };
 
     return (
         <Box
             sx={{
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                height: '100vh',
-                width: '100vw',
-                position: 'fixed',
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                height: "100vh",
+                width: "100vw",
+                position: "fixed",
                 top: 0,
                 left: 0,
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
                 zIndex: 9999,
             }}
         >
@@ -14062,24 +19032,24 @@ const AuthCallback = () => {
                     elevation={24}
                     sx={{
                         maxWidth: 400,
-                        width: '90%',
+                        width: "90%",
                         borderRadius: 4,
-                        overflow: 'hidden',
-                        background: 'rgba(255, 255, 255, 0.95)',
-                        backdropFilter: 'blur(20px)',
-                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        overflow: "hidden",
+                        background: "rgba(255, 255, 255, 0.95)",
+                        backdropFilter: "blur(20px)",
+                        border: "1px solid rgba(255, 255, 255, 0.2)",
                     }}
                 >
-                    <CardContent sx={{ p: 4, textAlign: 'center' }}>
+                    <CardContent sx={{ p: 4, textAlign: "center" }}>
                         {/* Logo */}
                         <Avatar
                             src="/images/common/icon.webp"
                             sx={{
                                 width: 80,
                                 height: 80,
-                                mx: 'auto',
+                                mx: "auto",
                                 mb: 3,
-                                border: '3px solid',
+                                border: "3px solid",
                                 borderColor: getRoleColor(),
                                 boxShadow: 6,
                             }}
@@ -14090,11 +19060,11 @@ const AuthCallback = () => {
                             sx={{
                                 mb: 3,
                                 p: 2,
-                                borderRadius: '50%',
-                                bgcolor: 'rgba(255, 255, 255, 0.8)',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
+                                borderRadius: "50%",
+                                bgcolor: "rgba(255, 255, 255, 0.8)",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
                                 boxShadow: 4,
                             }}
                         >
@@ -14105,12 +19075,12 @@ const AuthCallback = () => {
                         <Typography
                             variant="h5"
                             sx={{
-                                fontWeight: 'bold',
+                                fontWeight: "bold",
                                 mb: 1,
-                                color: 'text.primary',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
+                                color: "text.primary",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
                                 gap: 1,
                             }}
                         >
@@ -14120,12 +19090,13 @@ const AuthCallback = () => {
                         <Typography
                             variant="body1"
                             sx={{
-                                color: 'text.secondary',
+                                color: "text.secondary",
                                 mb: 3,
                                 fontWeight: 500,
                             }}
                         >
-                            🎉 Login successful! Setting up your {getRoleDisplayName()} dashboard...
+                            🎉 Login successful! Setting up your{" "}
+                            {getRoleDisplayName()} dashboard...
                         </Typography>
 
                         {/* Progress Bar */}
@@ -14136,8 +19107,8 @@ const AuthCallback = () => {
                                 sx={{
                                     height: 8,
                                     borderRadius: 4,
-                                    bgcolor: 'rgba(0, 0, 0, 0.1)',
-                                    '& .MuiLinearProgress-bar': {
+                                    bgcolor: "rgba(0, 0, 0, 0.1)",
+                                    "& .MuiLinearProgress-bar": {
                                         borderRadius: 4,
                                         background: `linear-gradient(45deg, ${getRoleColor()}, ${getRoleColor()}dd)`,
                                     },
@@ -14146,9 +19117,9 @@ const AuthCallback = () => {
                             <Typography
                                 variant="caption"
                                 sx={{
-                                    display: 'block',
+                                    display: "block",
                                     mt: 1,
-                                    color: 'text.secondary',
+                                    color: "text.secondary",
                                     fontWeight: 500,
                                 }}
                             >
@@ -14159,18 +19130,18 @@ const AuthCallback = () => {
                         {/* Status Message */}
                         <Box
                             sx={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
                                 gap: 2,
                                 p: 2,
                                 borderRadius: 3,
-                                bgcolor: 'rgba(76, 175, 80, 0.1)',
-                                border: '1px solid rgba(76, 175, 80, 0.3)',
+                                bgcolor: "rgba(76, 175, 80, 0.1)",
+                                border: "1px solid rgba(76, 175, 80, 0.3)",
                             }}
                         >
                             {progress >= 100 ? (
-                                <CheckCircle sx={{ color: 'success.main' }} />
+                                <CheckCircle sx={{ color: "success.main" }} />
                             ) : (
                                 <CircularProgress
                                     size={20}
@@ -14180,19 +19151,30 @@ const AuthCallback = () => {
                             <Typography
                                 variant="body2"
                                 sx={{
-                                    color: progress >= 100 ? 'success.main' : 'text.secondary',
+                                    color:
+                                        progress >= 100
+                                            ? "success.main"
+                                            : "text.secondary",
                                     fontWeight: 600,
                                 }}
                             >
                                 {progress >= 100
-                                    ? '✅ Redirecting to dashboard...'
-                                    : '🔄 Completing authentication...'}
+                                    ? "✅ Redirecting to dashboard..."
+                                    : "🔄 Completing authentication..."}
                             </Typography>
                         </Box>
 
                         {/* Debug Info - Remove in production */}
-                        {process.env.NODE_ENV === 'development' && (
-                            <Box sx={{ mt: 2, p: 1, bgcolor: "#f0f0f0", borderRadius: 1, fontSize: "0.8rem" }}>
+                        {process.env.NODE_ENV === "development" && (
+                            <Box
+                                sx={{
+                                    mt: 2,
+                                    p: 1,
+                                    bgcolor: "#f0f0f0",
+                                    borderRadius: 1,
+                                    fontSize: "0.8rem",
+                                }}
+                            >
                                 <Typography variant="caption">
                                     Debug - User Type: {userType}
                                 </Typography>
@@ -14212,14 +19194,2633 @@ const AuthCallback = () => {
 export default AuthCallback;
 ```
 
+### Step 28: Enhanced Doctor Functionality
 
+**resources/js/components/doctor/ClinicSearchModal.jsx**
 
-### Step 28: Enhanced CSS Styles
+```jsx
+import React, { useState, useEffect } from "react";
+import {
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    TextField,
+    Button,
+    Grid,
+    Typography,
+    Card,
+    CardContent,
+    Avatar,
+    Chip,
+    Box,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    CircularProgress,
+    Alert,
+    Pagination,
+    IconButton,
+    Tooltip,
+    List,
+    ListItem,
+    ListItemText,
+    ListItemIcon,
+    Divider,
+} from "@mui/material";
+import {
+    Search,
+    LocationOn,
+    Phone,
+    Email,
+    Business,
+    Send,
+    CheckCircle,
+    Schedule,
+    MedicalServices,
+    Close,
+    Star,
+} from "@mui/icons-material";
+import axios from "axios";
+
+const ClinicSearchModal = ({ open, onClose }) => {
+    const apiUrl = import.meta.env.VITE_API_URL;
+    const [searchParams, setSearchParams] = useState({
+        name: "",
+        specialty: "",
+        location: "",
+        type: "",
+    });
+    const [clinics, setClinics] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [selectedClinic, setSelectedClinic] = useState(null);
+    const [showConnectionDialog, setShowConnectionDialog] = useState(false);
+
+    const organizationTypes = [
+        { value: "", label: "All Types" },
+        { value: "hospital", label: "Hospital" },
+        { value: "clinic", label: "Clinic" },
+        { value: "diagnostic_center", label: "Diagnostic Center" },
+        { value: "pharmacy", label: "Pharmacy" },
+        { value: "nursing_home", label: "Nursing Home" },
+    ];
+
+    const handleSearch = async (page = 1) => {
+        setLoading(true);
+        setError("");
+
+        try {
+            const token = localStorage.getItem("auth_token");
+            const params = {
+                ...searchParams,
+                page,
+            };
+
+            const response = await axios.get(
+                `${apiUrl}/doctor/search-clinics`,
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                    params,
+                }
+            );
+
+            setClinics(response.data.data);
+            setCurrentPage(response.data.current_page);
+            setTotalPages(response.data.last_page);
+        } catch (error) {
+            console.error("Search failed:", error);
+            setError("Failed to search clinics");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (open) {
+            handleSearch();
+        }
+    }, [open]);
+
+    const handleInputChange = (field, value) => {
+        setSearchParams((prev) => ({
+            ...prev,
+            [field]: value,
+        }));
+    };
+
+    const handlePageChange = (event, value) => {
+        handleSearch(value);
+    };
+
+    const getConnectionStatusColor = (status) => {
+        switch (status) {
+            case "connected":
+                return "success";
+            case "pending":
+                return "warning";
+            default:
+                return "default";
+        }
+    };
+
+    const getConnectionStatusText = (status) => {
+        switch (status) {
+            case "connected":
+                return "Connected";
+            case "pending":
+                return "Request Pending";
+            default:
+                return "Not Connected";
+        }
+    };
+
+    const handleSendRequest = (clinic) => {
+        setSelectedClinic(clinic);
+        setShowConnectionDialog(true);
+    };
+
+    return (
+        <>
+            <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
+                <DialogTitle>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                        <Search color="primary" />
+                        <Typography variant="h5" sx={{ fontWeight: "bold" }}>
+                            Find Healthcare Facilities
+                        </Typography>
+                    </Box>
+                </DialogTitle>
+
+                <DialogContent>
+                    {/* Search Filters */}
+                    <Card elevation={1} sx={{ mb: 3 }}>
+                        <CardContent>
+                            <Grid container spacing={2}>
+                                <Grid item xs={12} sm={6} md={3}>
+                                    <TextField
+                                        fullWidth
+                                        size="small"
+                                        label="Clinic Name"
+                                        value={searchParams.name}
+                                        onChange={(e) =>
+                                            handleInputChange(
+                                                "name",
+                                                e.target.value
+                                            )
+                                        }
+                                        placeholder="Search by name..."
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6} md={3}>
+                                    <TextField
+                                        fullWidth
+                                        size="small"
+                                        label="Specialty"
+                                        value={searchParams.specialty}
+                                        onChange={(e) =>
+                                            handleInputChange(
+                                                "specialty",
+                                                e.target.value
+                                            )
+                                        }
+                                        placeholder="e.g., Cardiology"
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6} md={3}>
+                                    <TextField
+                                        fullWidth
+                                        size="small"
+                                        label="Location"
+                                        value={searchParams.location}
+                                        onChange={(e) =>
+                                            handleInputChange(
+                                                "location",
+                                                e.target.value
+                                            )
+                                        }
+                                        placeholder="City, area..."
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6} md={3}>
+                                    <FormControl fullWidth size="small">
+                                        <InputLabel>Type</InputLabel>
+                                        <Select
+                                            value={searchParams.type}
+                                            onChange={(e) =>
+                                                handleInputChange(
+                                                    "type",
+                                                    e.target.value
+                                                )
+                                            }
+                                        >
+                                            {organizationTypes.map((type) => (
+                                                <MenuItem
+                                                    key={type.value}
+                                                    value={type.value}
+                                                >
+                                                    {type.label}
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <Button
+                                        variant="contained"
+                                        startIcon={<Search />}
+                                        onClick={() => handleSearch(1)}
+                                        disabled={loading}
+                                        sx={{ color: "white" }}
+                                    >
+                                        Search Clinics
+                                    </Button>
+                                </Grid>
+                            </Grid>
+                        </CardContent>
+                    </Card>
+
+                    {error && (
+                        <Alert severity="error" sx={{ mb: 3 }}>
+                            {error}
+                        </Alert>
+                    )}
+
+                    {/* Search Results */}
+                    {loading ? (
+                        <Box sx={{ textAlign: "center", py: 4 }}>
+                            <CircularProgress />
+                            <Typography variant="body1" sx={{ mt: 2 }}>
+                                Searching clinics...
+                            </Typography>
+                        </Box>
+                    ) : (
+                        <>
+                            <Typography variant="h6" sx={{ mb: 2 }}>
+                                Search Results ({clinics.length} found)
+                            </Typography>
+
+                            <Grid container spacing={2}>
+                                {clinics.map((clinic) => (
+                                    <Grid item xs={12} md={6} key={clinic.id}>
+                                        <Card
+                                            elevation={2}
+                                            sx={{ height: "100%" }}
+                                        >
+                                            <CardContent>
+                                                <Box
+                                                    sx={{
+                                                        display: "flex",
+                                                        alignItems:
+                                                            "flex-start",
+                                                        gap: 2,
+                                                        mb: 2,
+                                                    }}
+                                                >
+                                                    <Avatar
+                                                        src={clinic.logo}
+                                                        sx={{
+                                                            width: 60,
+                                                            height: 60,
+                                                        }}
+                                                    >
+                                                        <Business />
+                                                    </Avatar>
+                                                    <Box sx={{ flex: 1 }}>
+                                                        <Typography
+                                                            variant="h6"
+                                                            sx={{
+                                                                fontWeight:
+                                                                    "bold",
+                                                                mb: 1,
+                                                            }}
+                                                        >
+                                                            {clinic.name}
+                                                        </Typography>
+                                                        <Box
+                                                            sx={{
+                                                                display: "flex",
+                                                                gap: 1,
+                                                                mb: 1,
+                                                            }}
+                                                        >
+                                                            <Chip
+                                                                label={clinic.organization_type
+                                                                    ?.replace(
+                                                                        "_",
+                                                                        " "
+                                                                    )
+                                                                    .toUpperCase()}
+                                                                size="small"
+                                                                color="primary"
+                                                            />
+                                                            <Chip
+                                                                label={getConnectionStatusText(
+                                                                    clinic.connection_status
+                                                                )}
+                                                                size="small"
+                                                                color={getConnectionStatusColor(
+                                                                    clinic.connection_status
+                                                                )}
+                                                                icon={
+                                                                    clinic.connection_status ===
+                                                                    "connected" ? (
+                                                                        <CheckCircle />
+                                                                    ) : undefined
+                                                                }
+                                                            />
+                                                        </Box>
+                                                        {clinic.rating > 0 && (
+                                                            <Box
+                                                                sx={{
+                                                                    display:
+                                                                        "flex",
+                                                                    alignItems:
+                                                                        "center",
+                                                                    gap: 1,
+                                                                    mb: 1,
+                                                                }}
+                                                            >
+                                                                <Star
+                                                                    fontSize="small"
+                                                                    color="warning"
+                                                                />
+                                                                <Typography variant="body2">
+                                                                    {
+                                                                        clinic.rating
+                                                                    }{" "}
+                                                                    (
+                                                                    {
+                                                                        clinic.total_reviews
+                                                                    }{" "}
+                                                                    reviews)
+                                                                </Typography>
+                                                            </Box>
+                                                        )}
+                                                    </Box>
+                                                </Box>
+
+                                                <Typography
+                                                    variant="body2"
+                                                    color="text.secondary"
+                                                    sx={{ mb: 2 }}
+                                                >
+                                                    {clinic.description?.substring(
+                                                        0,
+                                                        120
+                                                    )}
+                                                    ...
+                                                </Typography>
+
+                                                <Box sx={{ mb: 2 }}>
+                                                    <Box
+                                                        sx={{
+                                                            display: "flex",
+                                                            alignItems:
+                                                                "center",
+                                                            gap: 1,
+                                                            mb: 1,
+                                                        }}
+                                                    >
+                                                        <LocationOn
+                                                            fontSize="small"
+                                                            color="action"
+                                                        />
+                                                        <Typography variant="body2">
+                                                            {clinic.address?.substring(
+                                                                0,
+                                                                50
+                                                            )}
+                                                            ...
+                                                        </Typography>
+                                                    </Box>
+                                                    <Box
+                                                        sx={{
+                                                            display: "flex",
+                                                            alignItems:
+                                                                "center",
+                                                            gap: 1,
+                                                            mb: 1,
+                                                        }}
+                                                    >
+                                                        <Phone
+                                                            fontSize="small"
+                                                            color="action"
+                                                        />
+                                                        <Typography variant="body2">
+                                                            {clinic.phone}
+                                                        </Typography>
+                                                    </Box>
+                                                    <Box
+                                                        sx={{
+                                                            display: "flex",
+                                                            alignItems:
+                                                                "center",
+                                                            gap: 1,
+                                                        }}
+                                                    >
+                                                        <Schedule
+                                                            fontSize="small"
+                                                            color="action"
+                                                        />
+                                                        <Typography variant="body2">
+                                                            {
+                                                                clinic.opening_time
+                                                            }{" "}
+                                                            -{" "}
+                                                            {
+                                                                clinic.closing_time
+                                                            }
+                                                        </Typography>
+                                                    </Box>
+                                                </Box>
+
+                                                {/* Specialties */}
+                                                {clinic.specialties &&
+                                                    clinic.specialties.length >
+                                                        0 && (
+                                                        <Box sx={{ mb: 2 }}>
+                                                            <Typography
+                                                                variant="caption"
+                                                                color="text.secondary"
+                                                            >
+                                                                Specialties:
+                                                            </Typography>
+                                                            <Box
+                                                                sx={{
+                                                                    display:
+                                                                        "flex",
+                                                                    flexWrap:
+                                                                        "wrap",
+                                                                    gap: 0.5,
+                                                                    mt: 0.5,
+                                                                }}
+                                                            >
+                                                                {clinic.specialties
+                                                                    .slice(0, 3)
+                                                                    .map(
+                                                                        (
+                                                                            specialty,
+                                                                            index
+                                                                        ) => (
+                                                                            <Chip
+                                                                                key={
+                                                                                    index
+                                                                                }
+                                                                                label={
+                                                                                    specialty
+                                                                                }
+                                                                                size="small"
+                                                                                variant="outlined"
+                                                                            />
+                                                                        )
+                                                                    )}
+                                                                {clinic
+                                                                    .specialties
+                                                                    .length >
+                                                                    3 && (
+                                                                    <Chip
+                                                                        label={`+${
+                                                                            clinic
+                                                                                .specialties
+                                                                                .length -
+                                                                            3
+                                                                        } more`}
+                                                                        size="small"
+                                                                        variant="outlined"
+                                                                        color="secondary"
+                                                                    />
+                                                                )}
+                                                            </Box>
+                                                        </Box>
+                                                    )}
+
+                                                {/* Action Button */}
+                                                <Box
+                                                    sx={{
+                                                        display: "flex",
+                                                        gap: 1,
+                                                    }}
+                                                >
+                                                    {clinic.connection_status ===
+                                                        "not_connected" && (
+                                                        <Button
+                                                            variant="contained"
+                                                            size="small"
+                                                            startIcon={<Send />}
+                                                            onClick={() =>
+                                                                handleSendRequest(
+                                                                    clinic
+                                                                )
+                                                            }
+                                                            sx={{
+                                                                color: "white",
+                                                            }}
+                                                        >
+                                                            Send Request
+                                                        </Button>
+                                                    )}
+                                                    {clinic.connection_status ===
+                                                        "pending" && (
+                                                        <Button
+                                                            variant="outlined"
+                                                            size="small"
+                                                            disabled
+                                                        >
+                                                            Request Pending
+                                                        </Button>
+                                                    )}
+                                                    {clinic.connection_status ===
+                                                        "connected" && (
+                                                        <Button
+                                                            variant="outlined"
+                                                            size="small"
+                                                            color="success"
+                                                            startIcon={
+                                                                <CheckCircle />
+                                                            }
+                                                        >
+                                                            Connected
+                                                        </Button>
+                                                    )}
+                                                </Box>
+                                            </CardContent>
+                                        </Card>
+                                    </Grid>
+                                ))}
+                            </Grid>
+
+                            {clinics.length === 0 && !loading && (
+                                <Box sx={{ textAlign: "center", py: 4 }}>
+                                    <Typography
+                                        variant="h6"
+                                        color="text.secondary"
+                                    >
+                                        No clinics found
+                                    </Typography>
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                    >
+                                        Try adjusting your search criteria
+                                    </Typography>
+                                </Box>
+                            )}
+
+                            {/* Pagination */}
+                            {totalPages > 1 && (
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        justifyContent: "center",
+                                        mt: 3,
+                                    }}
+                                >
+                                    <Pagination
+                                        count={totalPages}
+                                        page={currentPage}
+                                        onChange={handlePageChange}
+                                        color="primary"
+                                    />
+                                </Box>
+                            )}
+                        </>
+                    )}
+                </DialogContent>
+
+                <DialogActions>
+                    <Button onClick={onClose}>Close</Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Connection Request Dialog */}
+            <ConnectionRequestDialog
+                open={showConnectionDialog}
+                onClose={() => setShowConnectionDialog(false)}
+                clinic={selectedClinic}
+                onSuccess={() => {
+                    setShowConnectionDialog(false);
+                    handleSearch(currentPage); // Refresh results
+                }}
+            />
+        </>
+    );
+};
+
+// Connection Request Dialog Component
+const ConnectionRequestDialog = ({ open, onClose, clinic, onSuccess }) => {
+    const apiUrl = import.meta.env.VITE_API_URL;
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+    const [formData, setFormData] = useState({
+        message: "",
+        available_days: [],
+        start_time: "09:00",
+        end_time: "17:00",
+        slot_duration: 30,
+    });
+
+    const weekDays = [
+        { value: "monday", label: "Monday" },
+        { value: "tuesday", label: "Tuesday" },
+        { value: "wednesday", label: "Wednesday" },
+        { value: "thursday", label: "Thursday" },
+        { value: "friday", label: "Friday" },
+        { value: "saturday", label: "Saturday" },
+        { value: "sunday", label: "Sunday" },
+    ];
+
+    const handleDayToggle = (day) => {
+        setFormData((prev) => ({
+            ...prev,
+            available_days: prev.available_days.includes(day)
+                ? prev.available_days.filter((d) => d !== day)
+                : [...prev.available_days, day],
+        }));
+    };
+
+    const handleSubmit = async () => {
+        if (formData.available_days.length === 0) {
+            setError("Please select at least one working day");
+            return;
+        }
+
+        setLoading(true);
+        setError("");
+
+        try {
+            const token = localStorage.getItem("auth_token");
+            await axios.post(
+                `${apiUrl}/doctor/send-connection-request`,
+                {
+                    clinic_id: clinic.id,
+                    message: formData.message,
+                    proposed_schedule: {
+                        available_days: formData.available_days,
+                        start_time: formData.start_time,
+                        end_time: formData.end_time,
+                        slot_duration: formData.slot_duration,
+                    },
+                },
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
+
+            onSuccess();
+        } catch (error) {
+            console.error("Failed to send request:", error);
+            setError(
+                error.response?.data?.message ||
+                    "Failed to send connection request"
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (!clinic) return null;
+
+    return (
+        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+            <DialogTitle>
+                <Box
+                    sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                    }}
+                >
+                    <Typography variant="h6">
+                        Send Connection Request
+                    </Typography>
+                    <IconButton onClick={onClose}>
+                        <Close />
+                    </IconButton>
+                </Box>
+            </DialogTitle>
+
+            <DialogContent>
+                {error && (
+                    <Alert severity="error" sx={{ mb: 2 }}>
+                        {error}
+                    </Alert>
+                )}
+
+                {/* Clinic Info */}
+                <Card elevation={1} sx={{ mb: 3 }}>
+                    <CardContent>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 2,
+                            }}
+                        >
+                            <Avatar src={clinic.logo}>
+                                <Business />
+                            </Avatar>
+                            <Box>
+                                <Typography variant="h6">
+                                    {clinic.name}
+                                </Typography>
+                                <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                >
+                                    {clinic.organization_type
+                                        ?.replace("_", " ")
+                                        .toUpperCase()}
+                                </Typography>
+                            </Box>
+                        </Box>
+                    </CardContent>
+                </Card>
+
+                <Grid container spacing={3}>
+                    <Grid item xs={12}>
+                        <TextField
+                            fullWidth
+                            multiline
+                            rows={3}
+                            label="Message (Optional)"
+                            value={formData.message}
+                            onChange={(e) =>
+                                setFormData((prev) => ({
+                                    ...prev,
+                                    message: e.target.value,
+                                }))
+                            }
+                            placeholder="Introduce yourself and explain why you'd like to join this clinic..."
+                            inputProps={{ maxLength: 500 }}
+                            helperText={`${formData.message.length}/500 characters`}
+                        />
+                    </Grid>
+
+                    <Grid item xs={12}>
+                        <Typography variant="h6" gutterBottom>
+                            Proposed Schedule
+                        </Typography>
+                    </Grid>
+
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            type="time"
+                            label="Start Time"
+                            value={formData.start_time}
+                            onChange={(e) =>
+                                setFormData((prev) => ({
+                                    ...prev,
+                                    start_time: e.target.value,
+                                }))
+                            }
+                            InputLabelProps={{ shrink: true }}
+                        />
+                    </Grid>
+
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            type="time"
+                            label="End Time"
+                            value={formData.end_time}
+                            onChange={(e) =>
+                                setFormData((prev) => ({
+                                    ...prev,
+                                    end_time: e.target.value,
+                                }))
+                            }
+                            InputLabelProps={{ shrink: true }}
+                        />
+                    </Grid>
+
+                    <Grid item xs={12}>
+                        <FormControl fullWidth>
+                            <InputLabel>Slot Duration (minutes)</InputLabel>
+                            <Select
+                                value={formData.slot_duration}
+                                onChange={(e) =>
+                                    setFormData((prev) => ({
+                                        ...prev,
+                                        slot_duration: e.target.value,
+                                    }))
+                                }
+                            >
+                                <MenuItem value={15}>15 minutes</MenuItem>
+                                <MenuItem value={30}>30 minutes</MenuItem>
+                                <MenuItem value={45}>45 minutes</MenuItem>
+                                <MenuItem value={60}>60 minutes</MenuItem>
+                            </Select>
+                        </FormControl>
+                    </Grid>
+
+                    <Grid item xs={12}>
+                        <Typography variant="subtitle1" gutterBottom>
+                            Available Days *
+                        </Typography>
+                        <Grid container spacing={1}>
+                            {weekDays.map((day) => (
+                                <Grid item xs={6} sm={4} key={day.value}>
+                                    <Button
+                                        variant={
+                                            formData.available_days.includes(
+                                                day.value
+                                            )
+                                                ? "contained"
+                                                : "outlined"
+                                        }
+                                        size="small"
+                                        onClick={() =>
+                                            handleDayToggle(day.value)
+                                        }
+                                        sx={{ width: "100%" }}
+                                    >
+                                        {day.label}
+                                    </Button>
+                                </Grid>
+                            ))}
+                        </Grid>
+                        {formData.available_days.length === 0 && (
+                            <Typography variant="caption" color="error">
+                                Please select at least one day
+                            </Typography>
+                        )}
+                    </Grid>
+                </Grid>
+            </DialogContent>
+
+            <DialogActions>
+                <Button onClick={onClose} disabled={loading}>
+                    Cancel
+                </Button>
+                <Button
+                    variant="contained"
+                    onClick={handleSubmit}
+                    disabled={loading || formData.available_days.length === 0}
+                    startIcon={
+                        loading ? <CircularProgress size={20} /> : <Send />
+                    }
+                    sx={{ color: "white" }}
+                >
+                    {loading ? "Sending..." : "Send Request"}
+                </Button>
+            </DialogActions>
+        </Dialog>
+    );
+};
+
+export default ClinicSearchModal;
+```
+
+**resources/js/components/doctor/ProfileSetupModal.jsx**
+
+```jsx
+import React, { useState } from "react";
+import {
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    TextField,
+    Button,
+    Grid,
+    Typography,
+    Chip,
+    Box,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    Alert,
+    CircularProgress,
+    Stepper,
+    Step,
+    StepLabel,
+    Paper,
+    InputAdornment,
+} from "@mui/material";
+import {
+    Person,
+    School,
+    Work,
+    MedicalServices,
+    MonetizationOn,
+    Language,
+    CloudUpload,
+} from "@mui/icons-material";
+import axios from "axios";
+
+const ProfileSetupModal = ({ open, onClose, onComplete }) => {
+    const apiUrl = import.meta.env.VITE_API_URL;
+    const [activeStep, setActiveStep] = useState(0);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+
+    // Form data
+    const [formData, setFormData] = useState({
+        specialization: "",
+        license_number: "",
+        experience_years: "",
+        bio: "",
+        education: "",
+        consultation_fee: "",
+        qualification: "",
+        languages: [],
+        services: [],
+        profile_image: null,
+    });
+
+    const [newLanguage, setNewLanguage] = useState("");
+    const [newService, setNewService] = useState("");
+
+    const steps = [
+        "Basic Information",
+        "Professional Details",
+        "Additional Information",
+    ];
+
+    const specializations = [
+        "Cardiology",
+        "Dermatology",
+        "Endocrinology",
+        "Gastroenterology",
+        "General Medicine",
+        "Neurology",
+        "Orthopedics",
+        "Pediatrics",
+        "Psychiatry",
+        "Pulmonology",
+        "Radiology",
+        "Surgery",
+    ];
+
+    const handleInputChange = (field, value) => {
+        setFormData((prev) => ({
+            ...prev,
+            [field]: value,
+        }));
+    };
+
+    const handleFileChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setFormData((prev) => ({
+                ...prev,
+                profile_image: file,
+            }));
+        }
+    };
+
+    const addLanguage = () => {
+        if (newLanguage && !formData.languages.includes(newLanguage)) {
+            setFormData((prev) => ({
+                ...prev,
+                languages: [...prev.languages, newLanguage],
+            }));
+            setNewLanguage("");
+        }
+    };
+
+    const removeLanguage = (language) => {
+        setFormData((prev) => ({
+            ...prev,
+            languages: prev.languages.filter((lang) => lang !== language),
+        }));
+    };
+
+    const addService = () => {
+        if (newService && !formData.services.includes(newService)) {
+            setFormData((prev) => ({
+                ...prev,
+                services: [...prev.services, newService],
+            }));
+            setNewService("");
+        }
+    };
+
+    const removeService = (service) => {
+        setFormData((prev) => ({
+            ...prev,
+            services: prev.services.filter((serv) => serv !== service),
+        }));
+    };
+
+    const handleNext = () => {
+        setActiveStep((prev) => prev + 1);
+    };
+
+    const handleBack = () => {
+        setActiveStep((prev) => prev - 1);
+    };
+
+    const validateStep = (step) => {
+        switch (step) {
+            case 0:
+                return (
+                    formData.specialization &&
+                    formData.license_number &&
+                    formData.experience_years
+                );
+            case 1:
+                return (
+                    formData.bio &&
+                    formData.qualification &&
+                    formData.consultation_fee
+                );
+            case 2:
+                return true; // Optional step
+            default:
+                return false;
+        }
+    };
+
+    const handleSubmit = async () => {
+        setLoading(true);
+        setError("");
+
+        try {
+            const submitData = new FormData();
+
+            // Add all form fields
+            Object.keys(formData).forEach((key) => {
+                if (key === "languages" || key === "services") {
+                    formData[key].forEach((item, index) => {
+                        submitData.append(`${key}[${index}]`, item);
+                    });
+                } else if (key === "profile_image" && formData[key]) {
+                    submitData.append(key, formData[key]);
+                } else {
+                    submitData.append(key, formData[key]);
+                }
+            });
+
+            const token = localStorage.getItem("auth_token");
+            const response = await axios.post(
+                `${apiUrl}/doctor/profile`,
+                submitData,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        "Content-Type": "multipart/form-data",
+                    },
+                }
+            );
+
+            onComplete(response.data.doctor);
+            onClose();
+        } catch (error) {
+            console.error("Profile setup failed:", error);
+            setError(
+                error.response?.data?.message || "Failed to setup profile"
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const renderStepContent = (step) => {
+        switch (step) {
+            case 0:
+                return (
+                    <Grid container spacing={3}>
+                        <Grid item xs={12}>
+                            <FormControl fullWidth required>
+                                <InputLabel>Specialization</InputLabel>
+                                <Select
+                                    value={formData.specialization}
+                                    onChange={(e) =>
+                                        handleInputChange(
+                                            "specialization",
+                                            e.target.value
+                                        )
+                                    }
+                                    startAdornment={
+                                        <MedicalServices sx={{ mr: 1 }} />
+                                    }
+                                >
+                                    {specializations.map((spec) => (
+                                        <MenuItem key={spec} value={spec}>
+                                            {spec}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <TextField
+                                fullWidth
+                                required
+                                label="Medical License Number"
+                                value={formData.license_number}
+                                onChange={(e) =>
+                                    handleInputChange(
+                                        "license_number",
+                                        e.target.value
+                                    )
+                                }
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <Work />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <TextField
+                                fullWidth
+                                required
+                                type="number"
+                                label="Years of Experience"
+                                value={formData.experience_years}
+                                onChange={(e) =>
+                                    handleInputChange(
+                                        "experience_years",
+                                        e.target.value
+                                    )
+                                }
+                                inputProps={{ min: 0, max: 50 }}
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <TextField
+                                fullWidth
+                                required
+                                multiline
+                                rows={4}
+                                label="Professional Bio"
+                                value={formData.bio}
+                                onChange={(e) =>
+                                    handleInputChange("bio", e.target.value)
+                                }
+                                placeholder="Tell patients about yourself, your approach to medicine, and your expertise..."
+                                inputProps={{ maxLength: 1000 }}
+                                helperText={`${formData.bio.length}/1000 characters`}
+                            />
+                        </Grid>
+                    </Grid>
+                );
+
+            case 1:
+                return (
+                    <Grid container spacing={3}>
+                        <Grid item xs={12}>
+                            <TextField
+                                fullWidth
+                                required
+                                label="Qualification"
+                                value={formData.qualification}
+                                onChange={(e) =>
+                                    handleInputChange(
+                                        "qualification",
+                                        e.target.value
+                                    )
+                                }
+                                placeholder="MBBS, MD, MS, etc."
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <School />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <TextField
+                                fullWidth
+                                label="Education Background"
+                                multiline
+                                rows={3}
+                                value={formData.education}
+                                onChange={(e) =>
+                                    handleInputChange(
+                                        "education",
+                                        e.target.value
+                                    )
+                                }
+                                placeholder="Medical college, university, certifications..."
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <TextField
+                                fullWidth
+                                required
+                                type="number"
+                                label="Consultation Fee (₹)"
+                                value={formData.consultation_fee}
+                                onChange={(e) =>
+                                    handleInputChange(
+                                        "consultation_fee",
+                                        e.target.value
+                                    )
+                                }
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <MonetizationOn />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                        </Grid>
+                    </Grid>
+                );
+
+            case 2:
+                return (
+                    <Grid container spacing={3}>
+                        {/* Languages */}
+                        <Grid item xs={12}>
+                            <Typography variant="h6" gutterBottom>
+                                Languages Spoken
+                            </Typography>
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    gap: 1,
+                                    mb: 2,
+                                    alignItems: "center",
+                                }}
+                            >
+                                <TextField
+                                    size="small"
+                                    label="Add Language"
+                                    value={newLanguage}
+                                    onChange={(e) =>
+                                        setNewLanguage(e.target.value)
+                                    }
+                                    onKeyPress={(e) =>
+                                        e.key === "Enter" && addLanguage()
+                                    }
+                                    InputProps={{
+                                        startAdornment: (
+                                            <InputAdornment position="start">
+                                                <Language />
+                                            </InputAdornment>
+                                        ),
+                                    }}
+                                />
+                                <Button
+                                    variant="outlined"
+                                    onClick={addLanguage}
+                                >
+                                    Add
+                                </Button>
+                            </Box>
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    flexWrap: "wrap",
+                                    gap: 1,
+                                }}
+                            >
+                                {formData.languages.map((language, index) => (
+                                    <Chip
+                                        key={index}
+                                        label={language}
+                                        onDelete={() =>
+                                            removeLanguage(language)
+                                        }
+                                        color="primary"
+                                        variant="outlined"
+                                    />
+                                ))}
+                            </Box>
+                        </Grid>
+
+                        {/* Services */}
+                        <Grid item xs={12}>
+                            <Typography variant="h6" gutterBottom>
+                                Services Offered
+                            </Typography>
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    gap: 1,
+                                    mb: 2,
+                                    alignItems: "center",
+                                }}
+                            >
+                                <TextField
+                                    size="small"
+                                    label="Add Service"
+                                    value={newService}
+                                    onChange={(e) =>
+                                        setNewService(e.target.value)
+                                    }
+                                    onKeyPress={(e) =>
+                                        e.key === "Enter" && addService()
+                                    }
+                                />
+                                <Button variant="outlined" onClick={addService}>
+                                    Add
+                                </Button>
+                            </Box>
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    flexWrap: "wrap",
+                                    gap: 1,
+                                }}
+                            >
+                                {formData.services.map((service, index) => (
+                                    <Chip
+                                        key={index}
+                                        label={service}
+                                        onDelete={() => removeService(service)}
+                                        color="secondary"
+                                        variant="outlined"
+                                    />
+                                ))}
+                            </Box>
+                        </Grid>
+
+                        {/* Profile Image */}
+                        <Grid item xs={12}>
+                            <Typography variant="h6" gutterBottom>
+                                Profile Photo
+                            </Typography>
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 2,
+                                }}
+                            >
+                                <Button
+                                    variant="outlined"
+                                    component="label"
+                                    startIcon={<CloudUpload />}
+                                >
+                                    Upload Photo
+                                    <input
+                                        type="file"
+                                        hidden
+                                        accept="image/*"
+                                        onChange={handleFileChange}
+                                    />
+                                </Button>
+                                {formData.profile_image && (
+                                    <Typography variant="body2" color="primary">
+                                        {formData.profile_image.name}
+                                    </Typography>
+                                )}
+                            </Box>
+                        </Grid>
+                    </Grid>
+                );
+
+            default:
+                return null;
+        }
+    };
+
+    return (
+        <Dialog
+            open={open}
+            onClose={!loading ? onClose : undefined}
+            maxWidth="md"
+            fullWidth
+            disableEscapeKeyDown={loading}
+        >
+            <DialogTitle>
+                <Typography
+                    variant="h5"
+                    component="div"
+                    sx={{ fontWeight: "bold" }}
+                >
+                    Complete Your Doctor Profile
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                    Please provide your professional details to start connecting
+                    with clinics
+                </Typography>
+            </DialogTitle>
+
+            <DialogContent>
+                {error && (
+                    <Alert severity="error" sx={{ mb: 3 }}>
+                        {error}
+                    </Alert>
+                )}
+
+                <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
+                    <Stepper activeStep={activeStep} alternativeLabel>
+                        {steps.map((label) => (
+                            <Step key={label}>
+                                <StepLabel>{label}</StepLabel>
+                            </Step>
+                        ))}
+                    </Stepper>
+                </Paper>
+
+                <Box sx={{ mt: 3 }}>{renderStepContent(activeStep)}</Box>
+            </DialogContent>
+
+            <DialogActions sx={{ p: 3, pt: 1 }}>
+                <Button
+                    onClick={handleBack}
+                    disabled={activeStep === 0 || loading}
+                >
+                    Back
+                </Button>
+                <Box sx={{ flex: 1 }} />
+                {activeStep === steps.length - 1 ? (
+                    <Button
+                        variant="contained"
+                        onClick={handleSubmit}
+                        disabled={loading}
+                        startIcon={
+                            loading ? (
+                                <CircularProgress size={20} />
+                            ) : (
+                                <Person />
+                            )
+                        }
+                        sx={{ color: "white" }}
+                    >
+                        {loading ? "Setting up..." : "Complete Profile"}
+                    </Button>
+                ) : (
+                    <Button
+                        variant="contained"
+                        onClick={handleNext}
+                        disabled={!validateStep(activeStep)}
+                        sx={{ color: "white" }}
+                    >
+                        Next
+                    </Button>
+                )}
+            </DialogActions>
+        </Dialog>
+    );
+};
+
+export default ProfileSetupModal;
+```
+
+### Step 29: Enhanced healthcare functionality
+
+**resources/js/components/healthcare/HealthcareProfileSetupModal.jsx**
+
+```jsx
+import React, { useState } from "react";
+import {
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    TextField,
+    Button,
+    Grid,
+    Typography,
+    Chip,
+    Box,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    Alert,
+    CircularProgress,
+    Stepper,
+    Step,
+    StepLabel,
+    Paper,
+    InputAdornment,
+    FormControlLabel,
+    Checkbox,
+} from "@mui/material";
+import {
+    Business,
+    School,
+    Work,
+    MedicalServices,
+    LocationOn,
+    Phone,
+    Email,
+    CloudUpload,
+    Schedule,
+    Language,
+} from "@mui/icons-material";
+import axios from "axios";
+
+const HealthcareProfileSetupModal = ({ open, onClose, onComplete }) => {
+    const apiUrl = import.meta.env.VITE_API_URL;
+    const [activeStep, setActiveStep] = useState(0);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+
+    // Form data with proper initialization
+    const [formData, setFormData] = useState({
+        name: "",
+        registration_number: "",
+        license_number: "",
+        organization_type: "clinic",
+        description: "",
+        address: "",
+        phone: "",
+        email: "",
+        website: "",
+        opening_time: "09:00",
+        closing_time: "18:00",
+        working_days: [],
+        established_date: "",
+        bed_count: "",
+        facilities: [],
+        specialties: [],
+        certifications: [],
+        logo: null,
+        image: null,
+        images: [],
+    });
+
+    const [newFacility, setNewFacility] = useState("");
+    const [newSpecialty, setNewSpecialty] = useState("");
+    const [newCertification, setNewCertification] = useState("");
+
+    const steps = [
+        "Organization Details",
+        "Contact & Location",
+        "Services & Facilities",
+        "Additional Information",
+    ];
+
+    const organizationTypes = [
+        { value: "hospital", label: "🏥 Hospital" },
+        { value: "clinic", label: "🏩 Clinic" },
+        { value: "diagnostic_center", label: "🔬 Diagnostic Center" },
+        { value: "pharmacy", label: "💊 Pharmacy" },
+        { value: "nursing_home", label: "🏠 Nursing Home" },
+    ];
+
+    const weekDays = [
+        { value: "monday", label: "Monday" },
+        { value: "tuesday", label: "Tuesday" },
+        { value: "wednesday", label: "Wednesday" },
+        { value: "thursday", label: "Thursday" },
+        { value: "friday", label: "Friday" },
+        { value: "saturday", label: "Saturday" },
+        { value: "sunday", label: "Sunday" },
+    ];
+
+    const commonSpecialties = [
+        "General Medicine",
+        "Cardiology",
+        "Dermatology",
+        "Orthopedics",
+        "Pediatrics",
+        "Neurology",
+        "Gynecology",
+        "Psychiatry",
+        "Dentistry",
+    ];
+
+    const commonFacilities = [
+        "X-Ray",
+        "CT Scan",
+        "MRI",
+        "Ultrasound",
+        "ECG",
+        "Laboratory",
+        "Pharmacy",
+        "Emergency Care",
+        "Surgery Theater",
+        "ICU",
+    ];
+
+    const handleInputChange = (field, value) => {
+        setFormData((prev) => ({
+            ...prev,
+            [field]: value,
+        }));
+    };
+
+    const handleFileChange = (field, file) => {
+        setFormData((prev) => ({
+            ...prev,
+            [field]: file,
+        }));
+    };
+
+    const handleMultipleFilesChange = (files) => {
+        setFormData((prev) => ({
+            ...prev,
+            images: Array.from(files),
+        }));
+    };
+
+    const addToArray = (field, value, newValueState, setNewValueState) => {
+        if (value && !formData[field].includes(value)) {
+            setFormData((prev) => ({
+                ...prev,
+                [field]: [...prev[field], value],
+            }));
+            setNewValueState("");
+        }
+    };
+
+    const addFromPredefined = (field, value) => {
+        if (value && !formData[field].includes(value)) {
+            setFormData((prev) => ({
+                ...prev,
+                [field]: [...prev[field], value],
+            }));
+        }
+    };
+
+    const removeFromArray = (field, value) => {
+        setFormData((prev) => ({
+            ...prev,
+            [field]: prev[field].filter((item) => item !== value),
+        }));
+    };
+
+    const handleWorkingDayToggle = (day) => {
+        const newWorkingDays = formData.working_days.includes(day)
+            ? formData.working_days.filter((d) => d !== day)
+            : [...formData.working_days, day];
+
+        handleInputChange("working_days", newWorkingDays);
+    };
+
+    const handleNext = () => {
+        setActiveStep((prev) => prev + 1);
+    };
+
+    const handleBack = () => {
+        setActiveStep((prev) => prev - 1);
+    };
+
+    const validateStep = (step) => {
+        switch (step) {
+            case 0:
+                return (
+                    formData.name &&
+                    formData.registration_number &&
+                    formData.license_number &&
+                    formData.organization_type
+                );
+            case 1:
+                return (
+                    formData.address &&
+                    formData.phone &&
+                    formData.opening_time &&
+                    formData.closing_time &&
+                    formData.working_days.length > 0
+                );
+            case 2:
+                return formData.description;
+            case 3:
+                return true; // Optional step
+            default:
+                return false;
+        }
+    };
+
+    const validateWebsite = (url) => {
+        if (!url) return true; // Empty is allowed
+        const pattern = /^https?:\/\/.+/i;
+        return pattern.test(url) || url.includes(".");
+    };
+
+    const handleSubmit = async () => {
+        setLoading(true);
+        setError("");
+
+        try {
+            const submitData = new FormData();
+
+            // Add all form fields
+            Object.keys(formData).forEach((key) => {
+                if (
+                    [
+                        "facilities",
+                        "specialties",
+                        "certifications",
+                        "working_days",
+                    ].includes(key)
+                ) {
+                    formData[key].forEach((item, index) => {
+                        submitData.append(`${key}[${index}]`, item);
+                    });
+                } else if (key === "images" && formData[key].length > 0) {
+                    formData[key].forEach((file, index) => {
+                        submitData.append(`images[${index}]`, file);
+                    });
+                } else if (["logo", "image"].includes(key) && formData[key]) {
+                    submitData.append(key, formData[key]);
+                } else if (formData[key] !== null && formData[key] !== "") {
+                    submitData.append(key, formData[key]);
+                }
+            });
+
+            const token = localStorage.getItem("auth_token");
+            const response = await axios.post(
+                `${apiUrl}/healthcare/profile`,
+                submitData,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        "Content-Type": "multipart/form-data",
+                    },
+                }
+            );
+
+            onComplete(response.data.profile);
+            onClose();
+        } catch (error) {
+            console.error("Profile setup failed:", error);
+            if (error.response?.data?.errors) {
+                const errorMessages = Object.values(
+                    error.response.data.errors
+                ).flat();
+                setError(errorMessages.join(", "));
+            } else {
+                setError(
+                    error.response?.data?.message || "Failed to setup profile"
+                );
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const renderStepContent = (step) => {
+        switch (step) {
+            case 0:
+                return (
+                    <Grid container spacing={3}>
+                        <Grid item xs={12}>
+                            <TextField
+                                fullWidth
+                                required
+                                label="Organization Name"
+                                value={formData.name}
+                                onChange={(e) =>
+                                    handleInputChange("name", e.target.value)
+                                }
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <Business />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                                helperText="Enter the full legal name of your healthcare organization"
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <TextField
+                                fullWidth
+                                required
+                                label="Registration Number"
+                                value={formData.registration_number}
+                                onChange={(e) =>
+                                    handleInputChange(
+                                        "registration_number",
+                                        e.target.value
+                                    )
+                                }
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <Work />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                                helperText="Government registration number"
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <TextField
+                                fullWidth
+                                required
+                                label="Medical License Number"
+                                value={formData.license_number}
+                                onChange={(e) =>
+                                    handleInputChange(
+                                        "license_number",
+                                        e.target.value
+                                    )
+                                }
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <School />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                                helperText="Medical practice license number"
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <FormControl fullWidth required>
+                                <InputLabel>Organization Type</InputLabel>
+                                <Select
+                                    value={formData.organization_type}
+                                    onChange={(e) =>
+                                        handleInputChange(
+                                            "organization_type",
+                                            e.target.value
+                                        )
+                                    }
+                                >
+                                    {organizationTypes.map((type) => (
+                                        <MenuItem
+                                            key={type.value}
+                                            value={type.value}
+                                        >
+                                            {type.label}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12}>
+                            <TextField
+                                fullWidth
+                                required
+                                multiline
+                                rows={4}
+                                label="Organization Description"
+                                value={formData.description}
+                                onChange={(e) =>
+                                    handleInputChange(
+                                        "description",
+                                        e.target.value
+                                    )
+                                }
+                                placeholder="Tell patients about your healthcare facility, services, and mission..."
+                                inputProps={{ maxLength: 2000 }}
+                                helperText={`${formData.description.length}/2000 characters`}
+                            />
+                        </Grid>
+                    </Grid>
+                );
+
+            case 1:
+                return (
+                    <Grid container spacing={3}>
+                        <Grid item xs={12}>
+                            <TextField
+                                fullWidth
+                                required
+                                multiline
+                                rows={3}
+                                label="Complete Address"
+                                value={formData.address}
+                                onChange={(e) =>
+                                    handleInputChange("address", e.target.value)
+                                }
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <LocationOn />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                                helperText="Full address including city, state, and postal code"
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <TextField
+                                fullWidth
+                                required
+                                label="Phone Number"
+                                value={formData.phone}
+                                onChange={(e) =>
+                                    handleInputChange("phone", e.target.value)
+                                }
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <Phone />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                                helperText="Primary contact number"
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <TextField
+                                fullWidth
+                                label="Email Address"
+                                type="email"
+                                value={formData.email}
+                                onChange={(e) =>
+                                    handleInputChange("email", e.target.value)
+                                }
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <Email />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                                helperText="Contact email (optional)"
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <TextField
+                                fullWidth
+                                label="Website URL"
+                                value={formData.website}
+                                onChange={(e) =>
+                                    handleInputChange("website", e.target.value)
+                                }
+                                placeholder="https://www.yourwebsite.com"
+                                error={
+                                    formData.website &&
+                                    !validateWebsite(formData.website)
+                                }
+                                helperText={
+                                    formData.website &&
+                                    !validateWebsite(formData.website)
+                                        ? "Please enter a valid website URL"
+                                        : "Your organization's website (optional)"
+                                }
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <Language />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                        </Grid>
+
+                        {/* Working Hours */}
+                        <Grid item xs={12}>
+                            <Typography
+                                variant="h6"
+                                gutterBottom
+                                sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1,
+                                }}
+                            >
+                                <Schedule color="primary" />
+                                Operating Hours
+                            </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <TextField
+                                fullWidth
+                                required
+                                type="time"
+                                label="Opening Time"
+                                value={formData.opening_time}
+                                onChange={(e) =>
+                                    handleInputChange(
+                                        "opening_time",
+                                        e.target.value
+                                    )
+                                }
+                                InputLabelProps={{ shrink: true }}
+                                helperText="Daily opening time"
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <TextField
+                                fullWidth
+                                required
+                                type="time"
+                                label="Closing Time"
+                                value={formData.closing_time}
+                                onChange={(e) =>
+                                    handleInputChange(
+                                        "closing_time",
+                                        e.target.value
+                                    )
+                                }
+                                InputLabelProps={{ shrink: true }}
+                                helperText="Daily closing time"
+                            />
+                        </Grid>
+
+                        {/* Working Days */}
+                        <Grid item xs={12}>
+                            <Typography variant="subtitle1" gutterBottom>
+                                Working Days * (Select at least one)
+                            </Typography>
+                            <Paper
+                                elevation={1}
+                                sx={{ p: 2, bgcolor: "grey.50" }}
+                            >
+                                <Grid container spacing={1}>
+                                    {weekDays.map((day) => (
+                                        <Grid
+                                            item
+                                            xs={6}
+                                            sm={4}
+                                            md={3}
+                                            key={day.value}
+                                        >
+                                            <FormControlLabel
+                                                control={
+                                                    <Checkbox
+                                                        checked={formData.working_days.includes(
+                                                            day.value
+                                                        )}
+                                                        onChange={() =>
+                                                            handleWorkingDayToggle(
+                                                                day.value
+                                                            )
+                                                        }
+                                                        color="primary"
+                                                    />
+                                                }
+                                                label={day.label}
+                                            />
+                                        </Grid>
+                                    ))}
+                                </Grid>
+                            </Paper>
+                        </Grid>
+                    </Grid>
+                );
+
+            case 2:
+                return (
+                    <Grid container spacing={3}>
+                        {/* Specialties */}
+                        <Grid item xs={12}>
+                            <Typography
+                                variant="h6"
+                                gutterBottom
+                                sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1,
+                                }}
+                            >
+                                <MedicalServices color="primary" />
+                                Medical Specialties
+                            </Typography>
+                            <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{ mb: 2 }}
+                            >
+                                Select from common specialties or add custom
+                                ones
+                            </Typography>
+
+                            {/* Quick add buttons for common specialties */}
+                            <Box sx={{ mb: 2 }}>
+                                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                                    Quick Add:
+                                </Typography>
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        flexWrap: "wrap",
+                                        gap: 1,
+                                    }}
+                                >
+                                    {commonSpecialties
+                                        .filter(
+                                            (spec) =>
+                                                !formData.specialties.includes(
+                                                    spec
+                                                )
+                                        )
+                                        .map((specialty) => (
+                                            <Button
+                                                key={specialty}
+                                                size="small"
+                                                variant="outlined"
+                                                onClick={() =>
+                                                    addFromPredefined(
+                                                        "specialties",
+                                                        specialty
+                                                    )
+                                                }
+                                            >
+                                                + {specialty}
+                                            </Button>
+                                        ))}
+                                </Box>
+                            </Box>
+
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    gap: 1,
+                                    mb: 2,
+                                    alignItems: "center",
+                                }}
+                            >
+                                <TextField
+                                    size="small"
+                                    label="Add Custom Specialty"
+                                    value={newSpecialty}
+                                    onChange={(e) =>
+                                        setNewSpecialty(e.target.value)
+                                    }
+                                    onKeyPress={(e) =>
+                                        e.key === "Enter" &&
+                                        addToArray(
+                                            "specialties",
+                                            newSpecialty,
+                                            newSpecialty,
+                                            setNewSpecialty
+                                        )
+                                    }
+                                />
+                                <Button
+                                    variant="outlined"
+                                    onClick={() =>
+                                        addToArray(
+                                            "specialties",
+                                            newSpecialty,
+                                            newSpecialty,
+                                            setNewSpecialty
+                                        )
+                                    }
+                                    disabled={!newSpecialty}
+                                >
+                                    Add
+                                </Button>
+                            </Box>
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    flexWrap: "wrap",
+                                    gap: 1,
+                                    mb: 3,
+                                }}
+                            >
+                                {formData.specialties.map(
+                                    (specialty, index) => (
+                                        <Chip
+                                            key={index}
+                                            label={specialty}
+                                            onDelete={() =>
+                                                removeFromArray(
+                                                    "specialties",
+                                                    specialty
+                                                )
+                                            }
+                                            color="secondary"
+                                            variant="outlined"
+                                        />
+                                    )
+                                )}
+                            </Box>
+                        </Grid>
+
+                        {/* Facilities */}
+                        <Grid item xs={12}>
+                            <Typography variant="h6" gutterBottom>
+                                Facilities Available
+                            </Typography>
+                            <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{ mb: 2 }}
+                            >
+                                Select from common facilities or add custom ones
+                            </Typography>
+
+                            {/* Quick add buttons for common facilities */}
+                            <Box sx={{ mb: 2 }}>
+                                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                                    Quick Add:
+                                </Typography>
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        flexWrap: "wrap",
+                                        gap: 1,
+                                    }}
+                                >
+                                    {commonFacilities
+                                        .filter(
+                                            (fac) =>
+                                                !formData.facilities.includes(
+                                                    fac
+                                                )
+                                        )
+                                        .map((facility) => (
+                                            <Button
+                                                key={facility}
+                                                size="small"
+                                                variant="outlined"
+                                                onClick={() =>
+                                                    addFromPredefined(
+                                                        "facilities",
+                                                        facility
+                                                    )
+                                                }
+                                            >
+                                                + {facility}
+                                            </Button>
+                                        ))}
+                                </Box>
+                            </Box>
+
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    gap: 1,
+                                    mb: 2,
+                                    alignItems: "center",
+                                }}
+                            >
+                                <TextField
+                                    size="small"
+                                    label="Add Custom Facility"
+                                    value={newFacility}
+                                    onChange={(e) =>
+                                        setNewFacility(e.target.value)
+                                    }
+                                    onKeyPress={(e) =>
+                                        e.key === "Enter" &&
+                                        addToArray(
+                                            "facilities",
+                                            newFacility,
+                                            newFacility,
+                                            setNewFacility
+                                        )
+                                    }
+                                />
+                                <Button
+                                    variant="outlined"
+                                    onClick={() =>
+                                        addToArray(
+                                            "facilities",
+                                            newFacility,
+                                            newFacility,
+                                            setNewFacility
+                                        )
+                                    }
+                                    disabled={!newFacility}
+                                >
+                                    Add
+                                </Button>
+                            </Box>
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    flexWrap: "wrap",
+                                    gap: 1,
+                                }}
+                            >
+                                {formData.facilities.map((facility, index) => (
+                                    <Chip
+                                        key={index}
+                                        label={facility}
+                                        onDelete={() =>
+                                            removeFromArray(
+                                                "facilities",
+                                                facility
+                                            )
+                                        }
+                                        color="primary"
+                                        variant="outlined"
+                                    />
+                                ))}
+                            </Box>
+                        </Grid>
+                    </Grid>
+                );
+
+            case 3:
+                return (
+                    <Grid container spacing={3}>
+                        {/* Additional Details */}
+                        <Grid item xs={12} sm={6}>
+                            <TextField
+                                fullWidth
+                                type="date"
+                                label="Established Date"
+                                value={formData.established_date}
+                                onChange={(e) =>
+                                    handleInputChange(
+                                        "established_date",
+                                        e.target.value
+                                    )
+                                }
+                                InputLabelProps={{ shrink: true }}
+                                helperText="When was your organization established? (optional)"
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <TextField
+                                fullWidth
+                                type="number"
+                                label="Number of Beds"
+                                value={formData.bed_count}
+                                onChange={(e) =>
+                                    handleInputChange(
+                                        "bed_count",
+                                        e.target.value
+                                    )
+                                }
+                                inputProps={{ min: 0, max: 10000 }}
+                                helperText="Total bed capacity (if applicable)"
+                            />
+                        </Grid>
+
+                        {/* Certifications */}
+                        <Grid item xs={12}>
+                            <Typography variant="h6" gutterBottom>
+                                Certifications & Accreditations
+                            </Typography>
+                            <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{ mb: 2 }}
+                            >
+                                Add any certifications, accreditations, or
+                                awards
+                            </Typography>
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    gap: 1,
+                                    mb: 2,
+                                    alignItems: "center",
+                                }}
+                            >
+                                <TextField
+                                    size="small"
+                                    label="Add Certification"
+                                    value={newCertification}
+                                    onChange={(e) =>
+                                        setNewCertification(e.target.value)
+                                    }
+                                    onKeyPress={(e) =>
+                                        e.key === "Enter" &&
+                                        addToArray(
+                                            "certifications",
+                                            newCertification,
+                                            newCertification,
+                                            setNewCertification
+                                        )
+                                    }
+                                />
+                                <Button
+                                    variant="outlined"
+                                    onClick={() =>
+                                        addToArray(
+                                            "certifications",
+                                            newCertification,
+                                            newCertification,
+                                            setNewCertification
+                                        )
+                                    }
+                                    disabled={!newCertification}
+                                >
+                                    Add
+                                </Button>
+                            </Box>
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    flexWrap: "wrap",
+                                    gap: 1,
+                                    mb: 3,
+                                }}
+                            >
+                                {formData.certifications.map((cert, index) => (
+                                    <Chip
+                                        key={index}
+                                        label={cert}
+                                        onDelete={() =>
+                                            removeFromArray(
+                                                "certifications",
+                                                cert
+                                            )
+                                        }
+                                        color="success"
+                                        variant="outlined"
+                                    />
+                                ))}
+                            </Box>
+                        </Grid>
+
+                        {/* Images */}
+                        <Grid item xs={12}>
+                            <Typography variant="h6" gutterBottom>
+                                Images & Media
+                            </Typography>
+
+                            {/* Logo */}
+                            <Box sx={{ mb: 3 }}>
+                                <Typography variant="subtitle1" gutterBottom>
+                                    Organization Logo
+                                </Typography>
+                                <Button
+                                    variant="outlined"
+                                    component="label"
+                                    startIcon={<CloudUpload />}
+                                >
+                                    Upload Logo
+                                    <input
+                                        type="file"
+                                        hidden
+                                        accept="image/*"
+                                        onChange={(e) =>
+                                            handleFileChange(
+                                                "logo",
+                                                e.target.files[0]
+                                            )
+                                        }
+                                    />
+                                </Button>
+                                {formData.logo && (
+                                    <Typography
+                                        variant="body2"
+                                        color="primary"
+                                        sx={{ ml: 2 }}
+                                    >
+                                        ✓ {formData.logo.name}
+                                    </Typography>
+                                )}
+                            </Box>
+
+                            {/* Main Image */}
+                            <Box sx={{ mb: 3 }}>
+                                <Typography variant="subtitle1" gutterBottom>
+                                    Main Facility Image
+                                </Typography>
+                                <Button
+                                    variant="outlined"
+                                    component="label"
+                                    startIcon={<CloudUpload />}
+                                >
+                                    Upload Main Image
+                                    <input
+                                        type="file"
+                                        hidden
+                                        accept="image/*"
+                                        onChange={(e) =>
+                                            handleFileChange(
+                                                "image",
+                                                e.target.files[0]
+                                            )
+                                        }
+                                    />
+                                </Button>
+                                {formData.image && (
+                                    <Typography
+                                        variant="body2"
+                                        color="primary"
+                                        sx={{ ml: 2 }}
+                                    >
+                                        ✓ {formData.image.name}
+                                    </Typography>
+                                )}
+                            </Box>
+
+                            {/* Additional Images */}
+                            <Box>
+                                <Typography variant="subtitle1" gutterBottom>
+                                    Additional Images (Optional)
+                                </Typography>
+                                <Button
+                                    variant="outlined"
+                                    component="label"
+                                    startIcon={<CloudUpload />}
+                                >
+                                    Upload Multiple Images
+                                    <input
+                                        type="file"
+                                        hidden
+                                        accept="image/*"
+                                        multiple
+                                        onChange={(e) =>
+                                            handleMultipleFilesChange(
+                                                e.target.files
+                                            )
+                                        }
+                                    />
+                                </Button>
+                                {formData.images.length > 0 && (
+                                    <Typography
+                                        variant="body2"
+                                        color="primary"
+                                        sx={{ ml: 2 }}
+                                    >
+                                        ✓ {formData.images.length} image(s)
+                                        selected
+                                    </Typography>
+                                )}
+                            </Box>
+                        </Grid>
+                    </Grid>
+                );
+
+            default:
+                return null;
+        }
+    };
+
+    return (
+        <Dialog
+            open={open}
+            onClose={!loading ? onClose : undefined}
+            maxWidth="lg"
+            fullWidth
+            disableEscapeKeyDown={loading}
+        >
+            <DialogTitle>
+                <Typography
+                    variant="h5"
+                    component="div"
+                    sx={{ fontWeight: "bold" }}
+                >
+                    🏥 Setup Healthcare Organization Profile
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                    Please provide your organization details to start connecting
+                    with doctors
+                </Typography>
+            </DialogTitle>
+
+            <DialogContent>
+                {error && (
+                    <Alert
+                        severity="error"
+                        sx={{ mb: 3 }}
+                        onClose={() => setError("")}
+                    >
+                        {error}
+                    </Alert>
+                )}
+
+                <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
+                    <Stepper activeStep={activeStep} alternativeLabel>
+                        {steps.map((label) => (
+                            <Step key={label}>
+                                <StepLabel>{label}</StepLabel>
+                            </Step>
+                        ))}
+                    </Stepper>
+                </Paper>
+
+                <Box sx={{ mt: 3, minHeight: "500px" }}>
+                    {renderStepContent(activeStep)}
+                </Box>
+            </DialogContent>
+
+            <DialogActions sx={{ p: 3, pt: 1 }}>
+                <Button
+                    onClick={handleBack}
+                    disabled={activeStep === 0 || loading}
+                >
+                    Back
+                </Button>
+                <Box sx={{ flex: 1 }} />
+                {activeStep === steps.length - 1 ? (
+                    <Button
+                        variant="contained"
+                        onClick={handleSubmit}
+                        disabled={loading || !validateStep(activeStep)}
+                        startIcon={
+                            loading ? (
+                                <CircularProgress size={20} />
+                            ) : (
+                                <Business />
+                            )
+                        }
+                        sx={{ color: "white" }}
+                    >
+                        {loading ? "Setting up..." : "Complete Profile"}
+                    </Button>
+                ) : (
+                    <Button
+                        variant="contained"
+                        onClick={handleNext}
+                        disabled={!validateStep(activeStep)}
+                        sx={{ color: "white" }}
+                    >
+                        Next
+                    </Button>
+                )}
+            </DialogActions>
+        </Dialog>
+    );
+};
+
+export default HealthcareProfileSetupModal;
+```
+
+### Step 30: Enhanced CSS Styles
 
 **resources/css/app.css**
 
 ```css
-@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap");
 
 * {
     margin: 0;
@@ -14230,7 +21831,7 @@ export default AuthCallback;
 body {
     margin: 0;
     padding: 0;
-    font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -14300,7 +21901,7 @@ button:focus {
 }
 
 .gradient-primary {
-    background: linear-gradient(45deg, var(--primary-color) 30%, #21CBF3 90%);
+    background: linear-gradient(45deg, var(--primary-color) 30%, #21cbf3 90%);
 }
 
 .gradient-secondary {
@@ -14313,13 +21914,13 @@ button:focus {
 }
 
 @keyframes fadeIn {
-    from { 
-        opacity: 0; 
-        transform: translateY(20px); 
+    from {
+        opacity: 0;
+        transform: translateY(20px);
     }
-    to { 
-        opacity: 1; 
-        transform: translateY(0); 
+    to {
+        opacity: 1;
+        transform: translateY(0);
     }
 }
 
@@ -14351,16 +21952,21 @@ button:focus {
 }
 
 @keyframes bounce {
-    0%, 20%, 53%, 80%, 100% {
-        animation-timing-function: cubic-bezier(0.215, 0.610, 0.355, 1.000);
+    0%,
+    20%,
+    53%,
+    80%,
+    100% {
+        animation-timing-function: cubic-bezier(0.215, 0.61, 0.355, 1);
         transform: translate3d(0, 0, 0);
     }
-    40%, 43% {
-        animation-timing-function: cubic-bezier(0.755, 0.050, 0.855, 0.060);
+    40%,
+    43% {
+        animation-timing-function: cubic-bezier(0.755, 0.05, 0.855, 0.06);
         transform: translate3d(0, -30px, 0);
     }
     70% {
-        animation-timing-function: cubic-bezier(0.755, 0.050, 0.855, 0.060);
+        animation-timing-function: cubic-bezier(0.755, 0.05, 0.855, 0.06);
         transform: translate3d(0, -15px, 0);
     }
     90% {
@@ -14389,9 +21995,15 @@ button:focus {
 
 /* Loading animation */
 @keyframes pulse {
-    0% { opacity: 1; }
-    50% { opacity: 0.5; }
-    100% { opacity: 1; }
+    0% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+    100% {
+        opacity: 1;
+    }
 }
 
 .pulse {
@@ -14399,8 +22011,12 @@ button:focus {
 }
 
 @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .spin {
@@ -14435,7 +22051,7 @@ button:focus {
 
 /* Enhanced button styles */
 .btn-gradient {
-    background: linear-gradient(45deg, #1976d2 30%, #21CBF3 90%);
+    background: linear-gradient(45deg, #1976d2 30%, #21cbf3 90%);
     border: none;
     border-radius: 8px;
     color: white;
@@ -14553,15 +22169,15 @@ button:focus {
     .MuiTypography-h1 {
         font-size: 2rem !important;
     }
-    
+
     .MuiTypography-h2 {
         font-size: 1.75rem !important;
     }
-    
+
     .MuiTypography-h3 {
         font-size: 1.5rem !important;
     }
-    
+
     .MuiTypography-h4 {
         font-size: 1.25rem !important;
     }
@@ -14574,8 +22190,13 @@ button:focus {
 }
 
 @keyframes emojiBounce {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-10px); }
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
 }
 
 .emoji-pulse {
@@ -14584,8 +22205,13 @@ button:focus {
 }
 
 @keyframes emojiPulse {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.1); }
+    0%,
+    100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.1);
+    }
 }
 
 /* Enhanced accessibility */
@@ -14604,7 +22230,7 @@ button:focus {
     .no-print {
         display: none !important;
     }
-    
+
     body {
         background: white !important;
         color: black !important;
@@ -14632,7 +22258,6 @@ button:focus {
     color: inherit;
 }
 ```
-
 
 ### Step 29: Database Seeders
 
@@ -15317,11 +22942,11 @@ class DoctorClinicScheduleSeeder extends Seeder
 
         foreach ($schedules as $doctorEmail => $clinicSchedules) {
             $doctor = $doctors->where('user.email', $doctorEmail)->first();
-            
+
             if ($doctor) {
                 foreach ($clinicSchedules as $clinicName => $schedule) {
                     $clinic = $clinics->where('name', $clinicName)->first();
-                    
+
                     if ($clinic) {
                         $doctor->clinics()->attach($clinic->id, [
                             'available_days' => json_encode($schedule['available_days']),
@@ -15472,10 +23097,10 @@ class AppointmentSeeder extends Seeder
         foreach ($appointmentsData as $appointmentData) {
             $patient = $patients->where('email', $appointmentData['patient_email'])->first();
             $doctor = $doctors->where('user.email', $appointmentData['doctor_email'])->first();
-            
+
             if ($patient && $doctor) {
                 $clinic = $doctor->clinics->where('name', $appointmentData['clinic_name'])->first();
-                
+
                 if ($clinic) {
                     Appointment::create([
                         'patient_id' => $patient->id,
@@ -15537,7 +23162,7 @@ class DatabaseSeeder extends Seeder
         $this->command->newLine();
         $this->command->info('🎯 Database seeding completed successfully!');
         $this->command->newLine();
-        
+
         // Seeding Summary with emojis
         $this->command->info('📊 Seeding Summary:');
         $this->command->info('🏥 Clinics: 5 healthcare facilities created');
@@ -15546,7 +23171,7 @@ class DatabaseSeeder extends Seeder
         $this->command->info('📅 Schedules: Doctor-Clinic availability schedules linked');
         $this->command->info('📋 Appointments: 5 sample appointment records added');
         $this->command->newLine();
-        
+
         $this->command->info('🎉 Visit Care database is ready for use! 🚀');
         $this->command->info('');
         $this->command->info('📝 Login Credentials:');
@@ -15556,7 +23181,6 @@ class DatabaseSeeder extends Seeder
     }
 }
 ```
-
 
 ### Step 30: Final Installation \& Setup Commands
 
@@ -15592,46 +23216,45 @@ php artisan serve
 npm run dev
 ```
 
-
 ### 🎉 Completion Summary
 
 **Visit Care Application is now complete with:**
 
 ✅ **Full-Stack Implementation**
 
-- Laravel 12 backend with UUID-based models
-- React 18 + Material-UI frontend
-- Sanctum API authentication
-- Location-based search functionality
+-   Laravel 12 backend with UUID-based models
+-   React 18 + Material-UI frontend
+-   Sanctum API authentication
+-   Location-based search functionality
 
 ✅ **Enhanced Features**
 
-- Beautiful emoji-enhanced UI components
-- Responsive design for all devices
-- Google Maps integration
-- Real-time search with typewriter effects
-- Animated statistics counters
-- Professional testimonials section
+-   Beautiful emoji-enhanced UI components
+-   Responsive design for all devices
+-   Google Maps integration
+-   Real-time search with typewriter effects
+-   Animated statistics counters
+-   Professional testimonials section
 
 ✅ **Database Structure**
 
-- Complete migrations for all entities
-- Comprehensive seeders with sample data
-- Proper relationships and constraints
-- UUID primary keys throughout
+-   Complete migrations for all entities
+-   Comprehensive seeders with sample data
+-   Proper relationships and constraints
+-   UUID primary keys throughout
 
 ✅ **API Implementation**
 
-- RESTful API endpoints
-- Authentication \& authorization
-- Location-based filtering
-- Appointment booking system
+-   RESTful API endpoints
+-   Authentication \& authorization
+-   Location-based filtering
+-   Appointment booking system
 
 ✅ **Production Ready**
 
-- Optimized build configuration
-- Error handling \& validation
-- Security best practices
-- Performance optimizations
+-   Optimized build configuration
+-   Error handling \& validation
+-   Security best practices
+-   Performance optimizations
 
 **🚀 Your Visit Care application is ready for deployment and use!**
