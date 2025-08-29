@@ -19,6 +19,8 @@ visit_care/
 |   |   |       |── SocialAuthController.php
 │   │   |       ├── DoctorController.php
 │   │   |       ├── ClinicController.php
+│   │   |       ├── PatientController.php
+│   │   |       ├── UserController.php
 │   │   |       └── AppointmentController.php
 │   │   └── Middleware/
 │   │   |       ├── AdminMiddleware.php
@@ -49,6 +51,7 @@ visit_care/
 │   │   ├── xxxx_create_doctors_table.php
 │   │   ├── xxxx_create_clinic_doctor_table.php
 │   │   ├── xxxx_create_appointments_table.php
+│   │   ├── xxxx_add_patient_fields_to_users_table.php
 │   │   └── xxxx_create_personal_access_tokens_table.php
 │   └── seeders/
 │       ├── DatabaseSeeder.php
@@ -66,6 +69,12 @@ visit_care/
 │   │   │   ├── common/
 │   │   │   │   ├── Header.jsx
 │   │   │   │   └── Footer.jsx
+│   │   │   └── admin/
+│   │   │   │   ├── AdminSidebar.jsx
+│   │   │   │   ├── AdminUserManagement.jsx
+│   │   │   │   ├── AdminHealthcareManagement.jsx
+│   │   │   │   ├── AdminDoctorManagement.jsx
+│   │   │   |   └── AdminAppointmentManagement.jsx
 │   │   │   └── doctor/
 │   │   │   │   ├── ProfileSetupModal.jsx
 │   │   │   |   └── ClinicSearchModal.jsx
@@ -85,12 +94,17 @@ visit_care/
 │   │   │   ├── ClinicDetailPage.jsx
 │   │   │   ├── DoctorDetailPage.jsx
 │   │   │   └── HomePage.jsx
-│   │   |    ├── admin/
-│   │   │    |   └── AdminDashboard.jsx
-│   │   |    ├── doctor/
-│   │   │    |   └── DoctorDashboard.jsx
-│   │   |    ├── healthcare/
-│   │   │    |   └── HealthcareDashboard.jsx
+│   │   |   ├── admin/
+│   │   │   |   └── AdminDashboard.jsx
+│   │   |   ├── doctor/
+│   │   │   |   ├── DoctorProfile.jsx
+│   │   │   |   └── DoctorDashboard.jsx
+│   │   |   ├── healthcare/
+│   │   │   |   ├── HealthcareProfile.jsx
+│   │   │   |   └── HealthcareDashboard.jsx
+│   │   |   ├── patient/
+│   │   │   |   ├── PatientAppointments.jsx
+│   │   │   |   └── PatientProfile.jsx
 │   │   ├── data/
 │   │   │   └── dummyData.js
 │   │   ├── theme/
@@ -866,6 +880,45 @@ return new class extends Migration
 };
 ```
 
+**database/migrations/xxxx_add_patient_fields_to_users_table.php**
+
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('users', function (Blueprint $table) {
+            $table->date('date_of_birth')->nullable()->after('phone');
+            $table->enum('gender', ['male', 'female', 'other', 'prefer_not_to_say'])->nullable()->after('date_of_birth');
+            $table->string('emergency_contact')->nullable()->after('gender');
+            $table->enum('blood_group', ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'])->nullable()->after('emergency_contact');
+            $table->text('allergies')->nullable()->after('blood_group');
+            $table->text('medical_conditions')->nullable()->after('allergies');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropColumn([
+                'date_of_birth',
+                'gender', 
+                'emergency_contact',
+                'blood_group',
+                'allergies',
+                'medical_conditions'
+            ]);
+        });
+    }
+};
+```
+
 **database/migrations/xxxx_create_personal_access_tokens_table.php**
 
 ```php
@@ -930,7 +983,13 @@ class User extends Authenticatable
         'longitude',
         'login_time',
         'logout_time',
-        'is_social_user'
+        'is_social_user',
+        'date_of_birth',
+        'gender',
+        'emergency_contact',
+        'blood_group',
+        'allergies',
+        'medical_conditions',
     ];
 
     protected $hidden = ['password', 'remember_token'];
@@ -939,7 +998,8 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'login_time' => 'datetime',
         'logout_time' => 'datetime',
-        'is_social_user' => 'boolean'
+        'is_social_user' => 'boolean',
+        'date_of_birth' => 'date',
     ];
 
     public function doctor()
@@ -1392,15 +1452,19 @@ use App\Models\Doctor;
 use App\Models\Clinic;
 use App\Models\Appointment;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Carbon\Carbon;
 
 class AdminController extends Controller
 {
-    // Dashboard Statistics
-    public function getDashboardStats(Request $request)
+    
+    public function getDashboardStats()
     {
+        $today = Carbon::today();
+        $thisMonth = Carbon::now()->startOfMonth();
+        $lastMonth = Carbon::now()->subMonth()->startOfMonth();
+
         $stats = [
             'total_users' => User::count(),
             'total_patients' => User::where('user_type', 'patient')->count(),
@@ -1408,74 +1472,86 @@ class AdminController extends Controller
             'total_healthcare' => User::where('user_type', 'healthcare')->count(),
             'total_clinics' => Clinic::count(),
             'total_appointments' => Appointment::count(),
-            'today_appointments' => Appointment::whereDate('appointment_date', today())->count(),
+            'today_appointments' => Appointment::whereDate('appointment_date', $today)->count(),
+            'monthly_appointments' => Appointment::whereDate('appointment_date', '>=', $thisMonth)->count(),
             'pending_appointments' => Appointment::where('status', 'pending')->count(),
-            'monthly_revenue' => Appointment::where('payment_status', 'paid')
-                ->whereMonth('created_at', now()->month)
+            'verified_doctors' => Doctor::where('is_verified', true)->count(),
+            'unverified_doctors' => Doctor::where('is_verified', false)->count(),
+            'monthly_revenue' => Appointment::whereDate('appointment_date', '>=', $thisMonth)
+                ->where('payment_status', 'paid')
                 ->sum('amount'),
-            'weekly_appointments' => Appointment::whereBetween('appointment_date', [
-                now()->startOfWeek(),
-                now()->endOfWeek()
-            ])->count(),
         ];
 
-        // Monthly data for charts (last 12 months)
-        $monthlyData = [];
-        for ($i = 11; $i >= 0; $i--) {
-            $date = now()->subMonths($i);
-            $monthlyData[] = [
+        // Growth calculations
+        $lastMonthUsers = User::whereBetween('created_at', [$lastMonth, $thisMonth])->count();
+        $currentMonthUsers = User::where('created_at', '>=', $thisMonth)->count();
+        
+        $stats['user_growth'] = $lastMonthUsers > 0 ? 
+            round((($currentMonthUsers - $lastMonthUsers) / $lastMonthUsers) * 100, 2) : 0;
+
+        return response()->json($stats);
+    }
+
+    public function getChartData()
+    {
+        // User registration trend (last 12 months)
+        $userTrend = collect(range(11, 0))->map(function ($monthsBack) {
+            $date = Carbon::now()->subMonths($monthsBack)->startOfMonth();
+            return [
                 'month' => $date->format('M Y'),
-                'appointments' => Appointment::whereYear('created_at', $date->year)
-                    ->whereMonth('created_at', $date->month)
+                'patients' => User::where('user_type', 'patient')
+                    ->whereBetween('created_at', [$date, $date->copy()->endOfMonth()])
                     ->count(),
-                'revenue' => Appointment::where('payment_status', 'paid')
-                    ->whereYear('created_at', $date->year)
-                    ->whereMonth('created_at', $date->month)
-                    ->sum('amount'),
-                'new_users' => User::whereYear('created_at', $date->year)
-                    ->whereMonth('created_at', $date->month)
+                'doctors' => User::where('user_type', 'doctor')
+                    ->whereBetween('created_at', [$date, $date->copy()->endOfMonth()])
+                    ->count(),
+                'healthcare' => User::where('user_type', 'healthcare')
+                    ->whereBetween('created_at', [$date, $date->copy()->endOfMonth()])
                     ->count(),
             ];
-        }
+        });
 
-        // User type distribution
-        $userTypeStats = [
-            'patients' => User::where('user_type', 'patient')->count(),
-            'doctors' => User::where('user_type', 'doctor')->count(),
-            'healthcare' => User::where('user_type', 'healthcare')->count(),
-            'admins' => User::where('user_type', 'admin')->count(),
+        // Appointment status distribution
+        $appointmentStats = [
+            'pending' => Appointment::where('status', 'pending')->count(),
+            'confirmed' => Appointment::where('status', 'confirmed')->count(),
+            'completed' => Appointment::where('status', 'completed')->count(),
+            'cancelled' => Appointment::where('status', 'cancelled')->count(),
         ];
 
-        // Recent activities
-        $recentActivities = [
-            'recent_users' => User::with(['doctor', 'ownedClinics'])
-                ->latest()
-                ->limit(10)
-                ->get(),
-            'recent_appointments' => Appointment::with(['patient', 'doctor.user', 'clinic'])
-                ->latest()
-                ->limit(10)
-                ->get(),
-        ];
+        // Top specializations
+        $topSpecializations = Doctor::select('specialization', DB::raw('count(*) as count'))
+            ->groupBy('specialization')
+            ->orderBy('count', 'desc')
+            ->limit(10)
+            ->get();
+
+        // Revenue trend (last 6 months)
+        $revenueTrend = collect(range(5, 0))->map(function ($monthsBack) {
+            $date = Carbon::now()->subMonths($monthsBack)->startOfMonth();
+            return [
+                'month' => $date->format('M Y'),
+                'revenue' => Appointment::whereDate('appointment_date', '>=', $date)
+                    ->whereDate('appointment_date', '<=', $date->copy()->endOfMonth())
+                    ->where('payment_status', 'paid')
+                    ->sum('amount'),
+            ];
+        });
 
         return response()->json([
-            'stats' => $stats,
-            'monthly_data' => $monthlyData,
-            'user_type_stats' => $userTypeStats,
-            'recent_activities' => $recentActivities,
+            'user_trend' => $userTrend,
+            'appointment_stats' => $appointmentStats,
+            'top_specializations' => $topSpecializations,
+            'revenue_trend' => $revenueTrend,
         ]);
     }
 
     // User Management
     public function getUsers(Request $request)
     {
-        $query = User::with(['doctor', 'ownedClinics', 'socialProviders']);
+        $query = User::with(['doctor', 'socialProviders']);
 
-        if ($request->has('user_type') && $request->user_type !== 'all') {
-            $query->where('user_type', $request->user_type);
-        }
-
-        if ($request->has('search') && !empty($request->search)) {
+        if ($request->has('search')) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
@@ -1483,31 +1559,45 @@ class AdminController extends Controller
             });
         }
 
-        $users = $query->orderBy('created_at', 'desc')
-                      ->paginate($request->get('per_page', 15));
+        if ($request->has('user_type') && $request->user_type !== 'all') {
+            $query->where('user_type', $request->user_type);
+        }
+
+        if ($request->has('is_verified')) {
+            $query->whereHas('doctor', function($q) use ($request) {
+                $q->where('is_verified', $request->is_verified);
+            });
+        }
+
+        $users = $query->latest()->paginate($request->per_page ?? 15);
 
         return response()->json($users);
     }
 
     public function createUser(Request $request)
     {
-        $validatedData = $request->validate([
+        $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:8',
+            'password' => 'required|min:8|confirmed',
             'user_type' => 'required|in:patient,doctor,healthcare,admin',
             'phone' => 'nullable|string|max:15',
-            'address' => 'nullable|string|max:500',
+            'address' => 'nullable|string',
         ]);
 
-        $validatedData['password'] = Hash::make($validatedData['password']);
-        $validatedData['email_verified_at'] = now();
-
-        $user = User::create($validatedData);
+        $user = User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+            'user_type' => $request->user_type,
+            'phone' => $request->phone,
+            'address' => $request->address,
+            'email_verified_at' => now(),
+        ]);
 
         return response()->json([
             'message' => 'User created successfully',
-            'user' => $user->load(['doctor', 'ownedClinics'])
+            'user' => $user->load(['doctor', 'socialProviders'])
         ], 201);
     }
 
@@ -1515,23 +1605,32 @@ class AdminController extends Controller
     {
         $user = User::findOrFail($id);
 
-        $validatedData = $request->validate([
+        $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email,' . $id,
+            'password' => 'nullable|min:8|confirmed',
             'user_type' => 'required|in:patient,doctor,healthcare,admin',
             'phone' => 'nullable|string|max:15',
-            'address' => 'nullable|string|max:500',
+            'address' => 'nullable|string',
         ]);
 
+        $updateData = [
+            'name' => $request->name,
+            'email' => $request->email,
+            'user_type' => $request->user_type,
+            'phone' => $request->phone,
+            'address' => $request->address,
+        ];
+
         if ($request->filled('password')) {
-            $validatedData['password'] = Hash::make($request->password);
+            $updateData['password'] = Hash::make($request->password);
         }
 
-        $user->update($validatedData);
+        $user->update($updateData);
 
         return response()->json([
             'message' => 'User updated successfully',
-            'user' => $user->load(['doctor', 'ownedClinics'])
+            'user' => $user->load(['doctor', 'socialProviders'])
         ]);
     }
 
@@ -1539,98 +1638,95 @@ class AdminController extends Controller
     {
         $user = User::findOrFail($id);
         
-        // Prevent deleting the last admin
-        if ($user->user_type === 'admin' && User::where('user_type', 'admin')->count() <= 1) {
-            return response()->json([
-                'error' => 'Cannot delete the last admin user'
-            ], 400);
+        // Prevent deletion of current admin
+        if ($user->id === auth()->id()) {
+            return response()->json(['error' => 'Cannot delete your own account'], 422);
         }
 
         $user->delete();
 
-        return response()->json([
-            'message' => 'User deleted successfully'
-        ]);
+        return response()->json(['message' => 'User deleted successfully']);
     }
 
-    // Doctor Management
-    public function getDoctors(Request $request)
-    {
-        $query = Doctor::with(['user', 'clinics']);
-
-        if ($request->has('search') && !empty($request->search)) {
-            $search = $request->search;
-            $query->whereHas('user', function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%");
-            })->orWhere('specialization', 'like', "%{$search}%");
-        }
-
-        if ($request->has('specialization') && !empty($request->specialization)) {
-            $query->where('specialization', $request->specialization);
-        }
-
-        $doctors = $query->orderBy('created_at', 'desc')
-                        ->paginate($request->get('per_page', 15));
-
-        return response()->json($doctors);
-    }
-
-    public function updateDoctorStatus(Request $request, $id)
+    public function verifyDoctor($id)
     {
         $doctor = Doctor::findOrFail($id);
-
-        $validatedData = $request->validate([
-            'is_verified' => 'boolean',
-            'is_available' => 'boolean',
-        ]);
-
-        $doctor->update($validatedData);
+        $doctor->update(['is_verified' => true]);
 
         return response()->json([
-            'message' => 'Doctor status updated successfully',
-            'doctor' => $doctor->load(['user', 'clinics'])
+            'message' => 'Doctor verified successfully',
+            'doctor' => $doctor->load('user')
         ]);
     }
 
-    // Healthcare/Clinic Management
+    public function unverifyDoctor($id)
+    {
+        $doctor = Doctor::findOrFail($id);
+        $doctor->update(['is_verified' => false]);
+
+        return response()->json([
+            'message' => 'Doctor verification removed',
+            'doctor' => $doctor->load('user')
+        ]);
+    }
+
+    // Healthcare Management
     public function getClinics(Request $request)
     {
-        $query = Clinic::with(['owner', 'doctors']);
+        $query = Clinic::with(['owner']);
 
-        if ($request->has('search') && !empty($request->search)) {
+        if ($request->has('search')) {
             $search = $request->search;
-            $query->where('name', 'like', "%{$search}%")
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
                   ->orWhere('address', 'like', "%{$search}%");
+            });
         }
 
-        $clinics = $query->orderBy('created_at', 'desc')
-                        ->paginate($request->get('per_page', 15));
+        if ($request->has('is_verified')) {
+            $query->where('is_verified', $request->is_verified);
+        }
+
+        $clinics = $query->latest()->paginate($request->per_page ?? 15);
 
         return response()->json($clinics);
     }
 
-    public function updateClinicStatus(Request $request, $id)
+    public function verifyClinic($id)
     {
         $clinic = Clinic::findOrFail($id);
-
-        $validatedData = $request->validate([
-            'is_active' => 'boolean',
-            'is_verified' => 'boolean',
-            'is_featured' => 'boolean',
-        ]);
-
-        $clinic->update($validatedData);
+        $clinic->update(['is_verified' => true]);
 
         return response()->json([
-            'message' => 'Clinic status updated successfully',
-            'clinic' => $clinic->load(['owner', 'doctors'])
+            'message' => 'Healthcare facility verified successfully',
+            'clinic' => $clinic->load('owner')
         ]);
     }
 
-    // Appointment Management
+    public function unverifyClinic($id)
+    {
+        $clinic = Clinic::findOrFail($id);
+        $clinic->update(['is_verified' => false]);
+
+        return response()->json([
+            'message' => 'Healthcare facility verification removed',
+            'clinic' => $clinic->load('owner')
+        ]);
+    }
+
+    // Appointments Management
     public function getAppointments(Request $request)
     {
         $query = Appointment::with(['patient', 'doctor.user', 'clinic']);
+
+        if ($request->has('search')) {
+            $search = $request->search;
+            $query->whereHas('patient', function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%");
+            })->orWhereHas('doctor.user', function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%");
+            });
+        }
 
         if ($request->has('status') && $request->status !== 'all') {
             $query->where('status', $request->status);
@@ -1644,111 +1740,37 @@ class AdminController extends Controller
             $query->whereDate('appointment_date', '<=', $request->date_to);
         }
 
-        $appointments = $query->orderBy('appointment_date', 'desc')
-                             ->orderBy('appointment_time', 'desc')
-                             ->paginate($request->get('per_page', 15));
+        $appointments = $query->latest()->paginate($request->per_page ?? 15);
 
         return response()->json($appointments);
     }
 
     public function updateAppointmentStatus(Request $request, $id)
     {
-        $appointment = Appointment::findOrFail($id);
-
-        $validatedData = $request->validate([
+        $request->validate([
             'status' => 'required|in:pending,confirmed,completed,cancelled',
-            'payment_status' => 'nullable|in:pending,paid,refunded',
-            'notes' => 'nullable|string|max:500',
+            'notes' => 'nullable|string|max:500'
         ]);
 
-        $appointment->update($validatedData);
+        $appointment = Appointment::findOrFail($id);
+        
+        $appointment->update([
+            'status' => $request->status,
+            'notes' => $request->notes ?? $appointment->notes
+        ]);
 
         return response()->json([
-            'message' => 'Appointment updated successfully',
+            'message' => 'Appointment status updated successfully',
             'appointment' => $appointment->load(['patient', 'doctor.user', 'clinic'])
         ]);
     }
 
-    // System Analytics
-    public function getAnalytics(Request $request)
+    public function deleteAppointment($id)
     {
-        $timeframe = $request->get('timeframe', '30'); // days
+        $appointment = Appointment::findOrFail($id);
+        $appointment->delete();
 
-        $startDate = Carbon::now()->subDays($timeframe);
-        $endDate = Carbon::now();
-
-        $analytics = [
-            // Daily appointment counts
-            'daily_appointments' => Appointment::select(
-                DB::raw('DATE(appointment_date) as date'),
-                DB::raw('COUNT(*) as count')
-            )
-            ->whereBetween('appointment_date', [$startDate, $endDate])
-            ->groupBy('date')
-            ->orderBy('date')
-            ->get(),
-
-            // Revenue by day
-            'daily_revenue' => Appointment::select(
-                DB::raw('DATE(appointment_date) as date'),
-                DB::raw('SUM(amount) as revenue')
-            )
-            ->where('payment_status', 'paid')
-            ->whereBetween('appointment_date', [$startDate, $endDate])
-            ->groupBy('date')
-            ->orderBy('date')
-            ->get(),
-
-            // Popular specializations
-            'popular_specializations' => Doctor::select('specialization', DB::raw('COUNT(*) as count'))
-                ->groupBy('specialization')
-                ->orderBy('count', 'desc')
-                ->limit(10)
-                ->get(),
-
-            // Top performing clinics
-            'top_clinics' => Clinic::select('clinics.name', DB::raw('COUNT(appointments.id) as appointment_count'))
-                ->leftJoin('appointments', 'clinics.id', '=', 'appointments.clinic_id')
-                ->groupBy('clinics.id', 'clinics.name')
-                ->orderBy('appointment_count', 'desc')
-                ->limit(10)
-                ->get(),
-        ];
-
-        return response()->json($analytics);
-    }
-
-    // System Settings
-    public function getSystemSettings()
-    {
-        // You can implement a settings table or use config values
-        $settings = [
-            'platform_name' => config('app.name'),
-            'max_appointment_days' => 30,
-            'default_consultation_fee' => 100,
-            'appointment_cancellation_hours' => 2,
-            'maintenance_mode' => false,
-        ];
-
-        return response()->json($settings);
-    }
-
-    public function updateSystemSettings(Request $request)
-    {
-        $validatedData = $request->validate([
-            'max_appointment_days' => 'integer|min:1|max:365',
-            'default_consultation_fee' => 'numeric|min:0',
-            'appointment_cancellation_hours' => 'integer|min:1|max:48',
-            'maintenance_mode' => 'boolean',
-        ]);
-
-        // Store in database or update config files
-        // Implementation depends on your preference
-
-        return response()->json([
-            'message' => 'Settings updated successfully',
-            'settings' => $validatedData
-        ]);
+        return response()->json(['message' => 'Appointment deleted successfully']);
     }
 }
 ```
@@ -1792,7 +1814,7 @@ class AuthController extends Controller
             'address' => $request->address,
             'login_time' => now(),
             'is_social_user' => false,
-            'email_verified_at' => now(), // Auto-verify email for regular registration
+            'email_verified_at' => now(),
         ]);
 
         $token = $user->createToken('auth_token')->plainTextToken;
@@ -1803,7 +1825,9 @@ class AuthController extends Controller
             'user' => $user->load(['socialProviders']),
             'token' => $token,
             'token_type' => 'Bearer',
-            'message' => 'Registration successful'
+            'message' => 'Registration successful',
+            // ADDED: Include redirect information
+            'redirect_to' => $this->getRedirectPath($user->user_type)
         ], 201);
     }
 
@@ -1837,7 +1861,9 @@ class AuthController extends Controller
             'user' => $user->load(['doctor', 'socialProviders']),
             'token' => $token,
             'token_type' => 'Bearer',
-            'message' => 'Login successful'
+            'message' => 'Login successful',
+            // ADDED: Include redirect information
+            'redirect_to' => $this->getRedirectPath($user->user_type)
         ]);
     }
 
@@ -1861,6 +1887,23 @@ class AuthController extends Controller
         return response()->json(
             $request->user()->load(['doctor', 'socialProviders'])
         );
+    }
+
+    // ADDED: Helper method to get redirect path based on user type
+    private function getRedirectPath($userType)
+    {
+        switch ($userType) {
+            case 'admin':
+                return '/admin/dashboard';
+            case 'doctor':
+                return '/doctor/dashboard';
+            case 'healthcare':
+                return '/healthcare/dashboard';
+            case 'patient':
+                return '/';
+            default:
+                return '/';
+        }
     }
 }
 ```
@@ -3537,6 +3580,482 @@ class AppointmentController extends Controller
     }
 }
 ```
+
+**app/Http/Controllers/Api/UserController.php**
+
+```php
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Hash;
+
+class UserController extends Controller
+{
+    public function getProfile(Request $request)
+    {
+        $user = $request->user()->load(['doctor', 'socialProviders']);
+        
+        return response()->json([
+            'user' => $user,
+            'profile_complete' => $this->isProfileComplete($user)
+        ]);
+    }
+
+    public function updateProfile(Request $request)
+    {
+        $user = $request->user();
+        
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email,' . $user->id,
+            'phone' => 'nullable|string|max:20',
+            'address' => 'nullable|string|max:500',
+            'date_of_birth' => 'nullable|date|before:today',
+            'gender' => 'nullable|in:male,female,other,prefer_not_to_say',
+            'emergency_contact' => 'nullable|string|max:255',
+            'blood_group' => 'nullable|in:A+,A-,B+,B-,AB+,AB-,O+,O-',
+            'allergies' => 'nullable|string|max:1000',
+            'medical_conditions' => 'nullable|string|max:1000',
+            'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'error' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $validatedData = $validator->validated();
+
+        // Handle avatar upload
+        if ($request->hasFile('avatar')) {
+            // Delete old avatar if exists
+            if ($user->avatar) {
+                $oldAvatarPath = str_replace('/storage/', '', $user->avatar);
+                Storage::disk('public')->delete($oldAvatarPath);
+            }
+            
+            $avatar = $request->file('avatar');
+            $avatarPath = $avatar->store('avatars', 'public');
+            $validatedData['avatar'] = Storage::url($avatarPath);
+        }
+
+        $user->update($validatedData);
+
+        // Update localStorage data as well
+        return response()->json([
+            'message' => 'Profile updated successfully',
+            'user' => $user->fresh()->load(['doctor', 'socialProviders'])
+        ]);
+    }
+
+    public function changePassword(Request $request)
+    {
+        $user = $request->user();
+        
+        $validator = Validator::make($request->all(), [
+            'current_password' => 'required',
+            'new_password' => 'required|min:8|confirmed',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'error' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        // Check if user has a password (for social users)
+        if (!$user->password) {
+            return response()->json([
+                'error' => 'Cannot change password for social login accounts'
+            ], 400);
+        }
+
+        // Verify current password
+        if (!Hash::check($request->current_password, $user->password)) {
+            return response()->json([
+                'error' => 'Current password is incorrect'
+            ], 400);
+        }
+
+        // Update password
+        $user->update([
+            'password' => Hash::make($request->new_password)
+        ]);
+
+        return response()->json([
+            'message' => 'Password changed successfully'
+        ]);
+    }
+
+    public function updateNotificationSettings(Request $request)
+    {
+        $user = $request->user();
+        
+        $validator = Validator::make($request->all(), [
+            'email_notifications' => 'boolean',
+            'sms_notifications' => 'boolean',
+            'appointment_reminders' => 'boolean',
+            'promotional_emails' => 'boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'error' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        // For now, we'll store these in a JSON field or create a separate table
+        // Since your current migration doesn't have these fields, I'll add them as JSON
+        $notifications = $request->only([
+            'email_notifications',
+            'sms_notifications', 
+            'appointment_reminders',
+            'promotional_emails'
+        ]);
+
+        // You might want to add a 'notification_settings' JSON field to users table
+        // or create a separate user_settings table
+        // For now, I'll assume you add it to the user model
+        
+        return response()->json([
+            'message' => 'Notification settings updated successfully',
+            'settings' => $notifications
+        ]);
+    }
+
+    protected function isProfileComplete($user)
+    {
+        $requiredFields = ['name', 'email', 'phone'];
+        
+        foreach ($requiredFields as $field) {
+            if (empty($user->$field)) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+
+    public function deleteAccount(Request $request)
+    {
+        $user = $request->user();
+        
+        $validator = Validator::make($request->all(), [
+            'password' => 'required_if:has_password,true',
+            'confirmation' => 'required|in:DELETE',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'error' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        // Verify password if user has one
+        if ($user->password && !Hash::check($request->password, $user->password)) {
+            return response()->json([
+                'error' => 'Password is incorrect'
+            ], 400);
+        }
+
+        // Delete user avatar if exists
+        if ($user->avatar) {
+            $avatarPath = str_replace('/storage/', '', $user->avatar);
+            Storage::disk('public')->delete($avatarPath);
+        }
+
+        // Revoke all tokens
+        $user->tokens()->delete();
+
+        // Delete user (this will cascade to related records if properly set up)
+        $user->delete();
+
+        return response()->json([
+            'message' => 'Account deleted successfully'
+        ]);
+    }
+}
+```
+
+**app/Http/Controllers/Api/PatientController.php**
+
+```php
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\User;
+use App\Models\Appointment;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
+use Carbon\Carbon;
+
+class PatientController extends Controller
+{
+    public function getProfile(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->user_type !== 'patient') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        return response()->json([
+            'user' => $user->load(['socialProviders']),
+            'profile_complete' => $this->isProfileComplete($user),
+            'stats' => $this->getPatientStats($user)
+        ]);
+    }
+
+    public function updateProfile(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->user_type !== 'patient') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email,' . $user->id,
+            'phone' => 'nullable|string|max:20',
+            'address' => 'nullable|string|max:500',
+            'date_of_birth' => 'nullable|date|before:today',
+            'gender' => 'nullable|in:male,female,other,prefer_not_to_say',
+            'emergency_contact' => 'nullable|string|max:255',
+            'blood_group' => 'nullable|in:A+,A-,B+,B-,AB+,AB-,O+,O-',
+            'allergies' => 'nullable|string|max:1000',
+            'medical_conditions' => 'nullable|string|max:1000',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'error' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $user->update($validator->validated());
+
+        return response()->json([
+            'message' => 'Profile updated successfully',
+            'user' => $user->fresh()
+        ]);
+    }
+
+    public function getDashboardStats(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->user_type !== 'patient') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        return response()->json($this->getPatientStats($user));
+    }
+
+    public function getAppointments(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->user_type !== 'patient') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $query = $user->patientAppointments()
+            ->with(['doctor.user', 'clinic'])
+            ->orderBy('appointment_date', 'desc')
+            ->orderBy('appointment_time', 'desc');
+
+        // Filter by status
+        if ($request->has('status') && $request->status !== 'all') {
+            $query->where('status', $request->status);
+        }
+
+        // Search functionality
+        if ($request->has('search') && !empty($request->search)) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('appointment_number', 'like', "%{$search}%")
+                    ->orWhere('symptoms', 'like', "%{$search}%")
+                    ->orWhereHas('doctor.user', function ($doctorQuery) use ($search) {
+                        $doctorQuery->where('name', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('clinic', function ($clinicQuery) use ($search) {
+                        $clinicQuery->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        // Date range filter
+        if ($request->has('date_from')) {
+            $query->whereDate('appointment_date', '>=', $request->date_from);
+        }
+
+        if ($request->has('date_to')) {
+            $query->whereDate('appointment_date', '<=', $request->date_to);
+        }
+
+        $appointments = $query->paginate($request->per_page ?? 10);
+
+        return response()->json($appointments);
+    }
+
+    public function getAppointmentDetails(Request $request, $id)
+    {
+        $user = $request->user();
+
+        $appointment = Appointment::with(['doctor.user', 'clinic', 'patient'])
+            ->where('patient_id', $user->id)
+            ->findOrFail($id);
+
+        return response()->json($appointment);
+    }
+
+    public function cancelAppointment(Request $request, $id)
+    {
+        $user = $request->user();
+
+        $appointment = Appointment::where('patient_id', $user->id)
+            ->findOrFail($id);
+
+        // Check if appointment can be cancelled
+        if ($appointment->status === 'completed') {
+            return response()->json([
+                'error' => 'Cannot cancel completed appointment'
+            ], 400);
+        }
+
+        if ($appointment->status === 'cancelled') {
+            return response()->json([
+                'error' => 'Appointment is already cancelled'
+            ], 400);
+        }
+
+        // Check if appointment is within cancellation window (e.g., 2 hours before)
+        $appointmentDateTime = Carbon::parse($appointment->appointment_date . ' ' . $appointment->appointment_time);
+        if ($appointmentDateTime->diffInHours(now()) < 2) {
+            return response()->json([
+                'error' => 'Cannot cancel appointment less than 2 hours before scheduled time'
+            ], 400);
+        }
+
+        $appointment->update(['status' => 'cancelled']);
+
+        return response()->json([
+            'message' => 'Appointment cancelled successfully',
+            'appointment' => $appointment->load(['doctor.user', 'clinic'])
+        ]);
+    }
+
+    public function getHealthHistory(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->user_type !== 'patient') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $completedAppointments = $user->patientAppointments()
+            ->with(['doctor.user', 'clinic'])
+            ->where('status', 'completed')
+            ->orderBy('appointment_date', 'desc')
+            ->paginate($request->per_page ?? 10);
+
+        return response()->json([
+            'appointments' => $completedAppointments,
+            'summary' => [
+                'total_visits' => $user->patientAppointments()->where('status', 'completed')->count(),
+                'last_visit' => $user->patientAppointments()
+                    ->where('status', 'completed')
+                    ->latest('appointment_date')
+                    ->first(),
+                'frequent_doctors' => $this->getFrequentDoctors($user),
+                'health_overview' => [
+                    'allergies' => $user->allergies,
+                    'medical_conditions' => $user->medical_conditions,
+                    'blood_group' => $user->blood_group,
+                    'emergency_contact' => $user->emergency_contact
+                ]
+            ]
+        ]);
+    }
+
+    protected function getPatientStats($user)
+    {
+        $today = Carbon::today();
+        $thisMonth = Carbon::now()->startOfMonth();
+
+        return [
+            'total_appointments' => $user->patientAppointments()->count(),
+            'upcoming_appointments' => $user->patientAppointments()
+                ->where('appointment_date', '>=', $today)
+                ->where('status', '!=', 'cancelled')
+                ->count(),
+            'completed_appointments' => $user->patientAppointments()
+                ->where('status', 'completed')
+                ->count(),
+            'cancelled_appointments' => $user->patientAppointments()
+                ->where('status', 'cancelled')
+                ->count(),
+            'this_month_appointments' => $user->patientAppointments()
+                ->where('appointment_date', '>=', $thisMonth)
+                ->count(),
+            'next_appointment' => $user->patientAppointments()
+                ->where('appointment_date', '>=', $today)
+                ->where('status', '!=', 'cancelled')
+                ->orderBy('appointment_date')
+                ->orderBy('appointment_time')
+                ->with(['doctor.user', 'clinic'])
+                ->first(),
+            'total_doctors_visited' => $user->patientAppointments()
+                ->where('status', 'completed')
+                ->distinct('doctor_id')
+                ->count(),
+            'total_clinics_visited' => $user->patientAppointments()
+                ->where('status', 'completed')
+                ->distinct('clinic_id')
+                ->count(),
+        ];
+    }
+
+    protected function getFrequentDoctors($user)
+    {
+        return $user->patientAppointments()
+            ->with(['doctor.user'])
+            ->where('status', 'completed')
+            ->selectRaw('doctor_id, count(*) as visit_count')
+            ->groupBy('doctor_id')
+            ->orderBy('visit_count', 'desc')
+            ->limit(5)
+            ->get();
+    }
+
+    protected function isProfileComplete($user)
+    {
+        $requiredFields = ['name', 'email', 'phone'];
+
+        foreach ($requiredFields as $field) {
+            if (empty($user->$field)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+}
+```
 ### Step 8.0: Middleware
 
 
@@ -3857,138 +4376,210 @@ Route::get('/{any}', function () {
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\AdminController;
+use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\PatientController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DoctorController;
 use App\Http\Controllers\Api\ClinicController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\SocialAuthController;
 
-// Authentication routes
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
+// ========================================
+// PUBLIC AUTHENTICATION ROUTES
+// ========================================
+
+// Basic Authentication routes (FIXED: Moved to top and kept separate)
+Route::post('/register', [AuthController::class, 'register'])->name('api.register');
+Route::post('/login', [AuthController::class, 'login'])->name('api.login');
 
 // Social Authentication routes
-Route::prefix('auth/social')->group(function () {
-    Route::get('/providers', [SocialAuthController::class, 'getProviders']);
+Route::prefix('auth/social')->name('api.auth.social.')->group(function () {
+    Route::get('/providers', [SocialAuthController::class, 'getProviders'])->name('providers');
     Route::get('/{provider}', [SocialAuthController::class, 'redirectToProvider'])
-        ->where('provider', 'google|facebook|github|apple');
+        ->where('provider', 'google|facebook|github|apple')
+        ->name('redirect');
     Route::get('/{provider}/callback', [SocialAuthController::class, 'handleProviderCallback'])
-        ->where('provider', 'google|facebook|github|apple');
+        ->where('provider', 'google|facebook|github|apple')
+        ->name('callback');
 });
 
+// ========================================
+// PUBLIC ROUTES - NO AUTH REQUIRED
+// ========================================
+
 // Public routes - Clinics
-Route::prefix('clinics')->group(function () {
-    Route::get('/', [ClinicController::class, 'index']);
-    Route::get('/featured', [ClinicController::class, 'featured']);
-    Route::get('/{id}', [ClinicController::class, 'show']);
-    Route::get('/{id}/doctors', [ClinicController::class, 'getDoctors']);
+Route::prefix('clinics')->name('api.clinics.')->group(function () {
+    Route::get('/', [ClinicController::class, 'index'])->name('index');
+    Route::get('/featured', [ClinicController::class, 'featured'])->name('featured');
+    Route::get('/{id}', [ClinicController::class, 'show'])->name('show');
+    Route::get('/{id}/doctors', [ClinicController::class, 'getDoctors'])->name('doctors');
 });
 
 // Public routes - Doctors
-Route::prefix('doctors')->group(function () {
-    Route::get('/', [DoctorController::class, 'index']);
-    Route::get('/specializations', [DoctorController::class, 'specializations']);
-    Route::get('/{id}', [DoctorController::class, 'show']);
-    Route::get('/{doctorId}/availability/{clinicId}', [DoctorController::class, 'getAvailability']);
+Route::prefix('doctors')->name('api.doctors.')->group(function () {
+    Route::get('/', [DoctorController::class, 'index'])->name('index');
+    Route::get('/specializations', [DoctorController::class, 'specializations'])->name('specializations');
+    Route::get('/{id}', [DoctorController::class, 'show'])->name('show');
+    Route::get('/{doctorId}/availability/{clinicId}', [DoctorController::class, 'getAvailability'])->name('availability');
 });
 
-// Protected routes
-Route::middleware('auth:sanctum')->group(function () {
-    // Auth routes
-    Route::post('/logout', [AuthController::class, 'logout']);
-    Route::get('/user', [AuthController::class, 'user']);
+// ========================================
+// PROTECTED ROUTES - AUTH REQUIRED
+// ========================================
+
+Route::middleware(['auth:sanctum'])->group(function () {
+    
+    // Basic Auth routes
+    Route::post('/logout', [AuthController::class, 'logout'])->name('api.logout');
+    Route::get('/user', [AuthController::class, 'user'])->name('api.user');
+    
+    // General User Profile Management (All User Types)
+    Route::prefix('user')->name('api.user.')->group(function () {
+        Route::get('/profile', [UserController::class, 'getProfile'])->name('profile');
+        Route::put('/profile', [UserController::class, 'updateProfile'])->name('update-profile');
+        Route::post('/change-password', [UserController::class, 'changePassword'])->name('change-password');
+        Route::put('/notification-settings', [UserController::class, 'updateNotificationSettings'])->name('notification-settings');
+        Route::delete('/delete-account', [UserController::class, 'deleteAccount'])->name('delete-account');
+    });
     
     // Social auth management
-    Route::prefix('auth/social')->group(function () {
-        Route::get('/user/providers', [SocialAuthController::class, 'getUserProviders']);
+    Route::prefix('auth/social')->name('api.auth.social.user.')->group(function () {
+        Route::get('/user/providers', [SocialAuthController::class, 'getUserProviders'])->name('providers');
         Route::post('/link/{provider}', [SocialAuthController::class, 'linkProvider'])
-            ->where('provider', 'google|facebook|github|apple');
+            ->where('provider', 'google|facebook|github|apple')
+            ->name('link');
         Route::delete('/unlink/{provider}', [SocialAuthController::class, 'unlinkProvider'])
-            ->where('provider', 'google|facebook|github|apple');
+            ->where('provider', 'google|facebook|github|apple')
+            ->name('unlink');
     });
     
-    // Appointments
-    Route::prefix('appointments')->group(function () {
-        Route::get('/', [AppointmentController::class, 'index']);
-        Route::post('/', [AppointmentController::class, 'store']);
-        Route::get('/{id}', [AppointmentController::class, 'show']);
-        Route::put('/{id}/cancel', [AppointmentController::class, 'cancel']);
+    // General Appointments (for patients)
+    Route::prefix('appointments')->name('api.appointments.')->group(function () {
+        Route::get('/', [AppointmentController::class, 'index'])->name('index');
+        Route::post('/', [AppointmentController::class, 'store'])->name('store');
+        Route::get('/{id}', [AppointmentController::class, 'show'])->name('show');
+        Route::put('/{id}/cancel', [AppointmentController::class, 'cancel'])->name('cancel');
     });
 });
 
-// Doctor-specific routes
-Route::middleware('auth:sanctum')->group(function () {
-    // ... existing routes ...
+// ========================================
+// PATIENT-SPECIFIC ROUTES
+// ========================================
+
+Route::middleware(['auth:sanctum', 'user.type:patient'])->prefix('patient')->name('api.patient.')->group(function () {
+    // Patient Profile Management
+    Route::get('/profile', [PatientController::class, 'getProfile'])->name('profile');
+    Route::put('/profile', [PatientController::class, 'updateProfile'])->name('update-profile');
+    Route::get('/dashboard-stats', [PatientController::class, 'getDashboardStats'])->name('dashboard-stats');
     
+    // Patient Appointments Management
+    Route::get('/appointments', [PatientController::class, 'getAppointments'])->name('appointments');
+    Route::get('/appointments/{id}', [PatientController::class, 'getAppointmentDetails'])->name('appointment-details');
+    Route::put('/appointments/{id}/cancel', [PatientController::class, 'cancelAppointment'])->name('cancel-appointment');
+    
+    // Health History
+    Route::get('/health-history', [PatientController::class, 'getHealthHistory'])->name('health-history');
+});
+
+// ========================================
+// DOCTOR-SPECIFIC ROUTES
+// ========================================
+
+Route::middleware(['auth:sanctum', 'user.type:doctor'])->prefix('doctor')->name('api.doctor.')->group(function () {
     // Doctor Profile Management
-    Route::prefix('doctor')->group(function () {
-        Route::get('/profile', [DoctorController::class, 'getProfile']);
-        Route::post('/profile', [DoctorController::class, 'updateProfile']);
-        Route::get('/dashboard-stats', [DoctorController::class, 'getDashboardStats']);
-        
-        // Clinic Connection Management
-        Route::get('/available-clinics', [DoctorController::class, 'getAvailableClinics']);
-        Route::post('/send-connection-request', [DoctorController::class, 'sendConnectionRequest']);
-        Route::get('/connection-requests', [DoctorController::class, 'getConnectionRequests']);
-        Route::post('/update-connection-status/{id}', [DoctorController::class, 'updateConnectionStatus']);
-        Route::get('/my-clinics', [DoctorController::class, 'getMyClinics']);
-        Route::delete('/disconnect-clinic/{clinicId}', [DoctorController::class, 'disconnectClinic']);
-        
-        // Schedule Management
-        Route::get('/schedule/{clinicId}', [DoctorController::class, 'getSchedule']);
-        Route::post('/schedule/{clinicId}', [DoctorController::class, 'updateSchedule']);
-        
-        // Appointment Management
-        Route::get('/appointments', [DoctorController::class, 'getMyAppointments']);
-        Route::post('/appointments/{id}/update-status', [DoctorController::class, 'updateAppointmentStatus']);
-    });
+    Route::get('/profile', [DoctorController::class, 'getProfile'])->name('profile');
+    Route::post('/profile', [DoctorController::class, 'updateProfile'])->name('update-profile');
+    Route::get('/dashboard-stats', [DoctorController::class, 'getDashboardStats'])->name('dashboard-stats');
+    
+    // Clinic Connection Management
+    Route::get('/available-clinics', [DoctorController::class, 'getAvailableClinics'])->name('available-clinics');
+    Route::get('/search-clinics', [DoctorController::class, 'searchClinics'])->name('search-clinics');
+    Route::post('/send-connection-request', [DoctorController::class, 'sendConnectionRequest'])->name('send-connection-request');
+    Route::get('/connection-requests', [DoctorController::class, 'getConnectionRequests'])->name('connection-requests');
+    Route::get('/my-connection-requests', [DoctorController::class, 'getMyConnectionRequests'])->name('my-connection-requests');
+    Route::get('/my-clinics', [DoctorController::class, 'getMyClinics'])->name('my-clinics');
+    Route::get('/my-connected-clinics', [DoctorController::class, 'getMyConnectedClinics'])->name('my-connected-clinics');
+    Route::delete('/disconnect-clinic/{clinicId}', [DoctorController::class, 'disconnectClinic'])->name('disconnect-clinic');
+    Route::delete('/disconnect-from-clinic/{clinicId}', [DoctorController::class, 'disconnectFromClinic'])->name('disconnect-from-clinic');
+    
+    // Schedule Management
+    Route::get('/schedule/{clinicId}', [DoctorController::class, 'getSchedule'])->name('schedule');
+    Route::post('/schedule/{clinicId}', [DoctorController::class, 'updateSchedule'])->name('update-schedule');
+    
+    // Appointment Management
+    Route::get('/appointments', [DoctorController::class, 'getMyAppointments'])->name('appointments');
+    Route::post('/appointments/{id}/update-status', [DoctorController::class, 'updateAppointmentStatus'])->name('update-appointment-status');
 });
 
-// Healthcare/Clinic-specific routes
-Route::middleware('auth:sanctum')->group(function () {
-    // ... existing routes ...
-    
+// ========================================
+// HEALTHCARE PROVIDER ROUTES
+// ========================================
+
+Route::middleware(['auth:sanctum', 'user.type:healthcare'])->prefix('healthcare')->name('api.healthcare.')->group(function () {
     // Healthcare Profile Management
-    Route::prefix('healthcare')->group(function () {
-        Route::get('/profile', [ClinicController::class, 'getHealthcareProfile']);
-        Route::post('/profile', [ClinicController::class, 'updateHealthcareProfile']);
-        Route::get('/dashboard-stats', [ClinicController::class, 'getHealthcareDashboardStats']);
-        
-        // Doctor Connection Management
-        Route::get('/connection-requests', [ClinicController::class, 'getConnectionRequests']);
-        Route::post('/connection-requests/{id}/respond', [ClinicController::class, 'respondToConnectionRequest']);
-        Route::get('/connected-doctors', [ClinicController::class, 'getConnectedDoctors']);
-        Route::delete('/disconnect-doctor/{doctorId}', [ClinicController::class, 'disconnectDoctor']);
-        
-        // Schedule Management
-        Route::get('/doctor-schedule/{doctorId}', [ClinicController::class, 'getDoctorSchedule']);
-        Route::post('/doctor-schedule/{doctorId}', [ClinicController::class, 'updateDoctorSchedule']);
-        
-        // Appointment Management
-        Route::get('/appointments', [ClinicController::class, 'getClinicAppointments']);
-        Route::post('/appointments/{id}/update-status', [ClinicController::class, 'updateClinicAppointmentStatus']);
-        
-        // Clinic Management (for multiple clinics)
-        Route::get('/my-clinics', [ClinicController::class, 'getMyClinicsList']);
-        Route::post('/add-clinic', [ClinicController::class, 'addNewClinic']);
-    });
+    Route::get('/profile', [ClinicController::class, 'getHealthcareProfile'])->name('profile');
+    Route::post('/profile', [ClinicController::class, 'updateHealthcareProfile'])->name('update-profile');
+    Route::get('/dashboard-stats', [ClinicController::class, 'getHealthcareDashboardStats'])->name('dashboard-stats');
+    
+    // Doctor Connection Management
+    Route::get('/connection-requests', [ClinicController::class, 'getConnectionRequests'])->name('connection-requests');
+    Route::post('/connection-requests/{id}/respond', [ClinicController::class, 'respondToConnectionRequest'])->name('respond-connection-request');
+    Route::get('/connected-doctors', [ClinicController::class, 'getConnectedDoctors'])->name('connected-doctors');
+    Route::delete('/disconnect-doctor/{doctorId}', [ClinicController::class, 'disconnectDoctor'])->name('disconnect-doctor');
+    
+    // Schedule Management
+    Route::get('/doctor-schedule/{doctorId}', [ClinicController::class, 'getDoctorSchedule'])->name('doctor-schedule');
+    Route::post('/doctor-schedule/{doctorId}', [ClinicController::class, 'updateDoctorSchedule'])->name('update-doctor-schedule');
+    
+    // Appointment Management
+    Route::get('/appointments', [ClinicController::class, 'getClinicAppointments'])->name('appointments');
+    Route::post('/appointments/{id}/update-status', [ClinicController::class, 'updateClinicAppointmentStatus'])->name('update-appointment-status');
+    
+    // Clinic Management (for multiple clinics)
+    Route::get('/my-clinics', [ClinicController::class, 'getMyClinicsList'])->name('my-clinics');
+    Route::post('/add-clinic', [ClinicController::class, 'addNewClinic'])->name('add-clinic');
 });
 
-// Doctor-specific routes for clinic connections
-Route::middleware('auth:sanctum')->group(function () {
-    // ... existing routes ...
+// ========================================
+// ADMIN ROUTES - ADMIN ACCESS ONLY
+// ========================================
+
+Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->name('api.admin.')->group(function () {
+    // Dashboard & Analytics
+    Route::get('/dashboard/stats', [AdminController::class, 'getDashboardStats']);
+    Route::get('/dashboard/charts', [AdminController::class, 'getChartData']);
     
-    // Doctor routes for clinic connections
-    Route::prefix('doctor')->group(function () {
-        // ... existing doctor routes ...
-        
-        // Clinic search and connection
-        Route::get('/search-clinics', [DoctorController::class, 'searchClinics']);
-        Route::post('/send-connection-request', [DoctorController::class, 'sendConnectionRequest']);
-        Route::get('/my-connection-requests', [DoctorController::class, 'getMyConnectionRequests']);
-        Route::get('/my-connected-clinics', [DoctorController::class, 'getMyConnectedClinics']);
-        Route::delete('/disconnect-clinic/{clinicId}', [DoctorController::class, 'disconnectFromClinic']);
-    });
+    // User Management
+    Route::get('/users', [AdminController::class, 'getUsers']);
+    Route::post('/users', [AdminController::class, 'createUser']);
+    Route::put('/users/{id}', [AdminController::class, 'updateUser']);
+    Route::delete('/users/{id}', [AdminController::class, 'deleteUser']);
+    
+    // Doctor Management
+    Route::post('/doctors/{id}/verify', [AdminController::class, 'verifyDoctor']);
+    Route::post('/doctors/{id}/unverify', [AdminController::class, 'unverifyDoctor']);
+    
+    // Healthcare Management
+    Route::get('/clinics', [AdminController::class, 'getClinics']);
+    Route::post('/clinics/{id}/verify', [AdminController::class, 'verifyClinic']);
+    Route::post('/clinics/{id}/unverify', [AdminController::class, 'unverifyClinic']);
+    
+    // Appointments Management
+    Route::get('/appointments', [AdminController::class, 'getAppointments']);
+    Route::put('/appointments/{id}/status', [AdminController::class, 'updateAppointmentStatus']);
+    Route::delete('/appointments/{id}', [AdminController::class, 'deleteAppointment']);
+});
+
+// ========================================
+// FALLBACK ROUTE
+// ========================================
+
+Route::fallback(function(){
+    return response()->json([
+        'error' => 'Route not found',
+        'message' => 'The requested API endpoint does not exist'
+    ], 404);
 });
 ```
 
@@ -4190,14 +4781,31 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import theme from './theme/theme';
+
+// Pages
 import HomePage from './pages/HomePage';
 import ClinicDetailPage from './pages/ClinicDetailPage';
 import DoctorDetailPage from './pages/DoctorDetailPage';
 import BookAppointmentPage from './pages/BookAppointmentPage';
+
+// Patient Pages
+import PatientProfile from './pages/patient/PatientProfile';
+import PatientAppointments from './pages/patient/PatientAppointments';
+
+// Doctor Pages
 import DoctorDashboard from './pages/doctor/DoctorDashboard';
+import DoctorProfile from './pages/doctor/DoctorProfile';
+
+// Healthcare Pages
 import HealthcareDashboard from './pages/healthcare/HealthcareDashboard';
+import HealthcareProfile from './pages/healthcare/HealthcareProfile';
+
+// Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
+
+// Auth Components
 import AuthCallback from './components/auth/AuthCallback';
+
 import '../css/app.css';
 import './bootstrap';
 
@@ -4218,9 +4826,19 @@ function App() {
                     {/* Auth Callback Route */}
                     <Route path="/auth/callback" element={<AuthCallback />} />
                     
-                    {/* Role-based Dashboard Routes */}
+                    {/* Patient Routes */}
+                    <Route path="/profile" element={<PatientProfile />} />
+                    <Route path="/appointments" element={<PatientAppointments />} />
+                    
+                    {/* Doctor Routes */}
                     <Route path="/doctor/dashboard" element={<DoctorDashboard />} />
+                    <Route path="/doctor/profile" element={<DoctorProfile />} />
+                    
+                    {/* Healthcare Routes */}
                     <Route path="/healthcare/dashboard" element={<HealthcareDashboard />} />
+                    <Route path="/healthcare/profile" element={<HealthcareProfile />} />
+                    
+                    {/* Admin Routes */}
                     <Route path="/admin/dashboard" element={<AdminDashboard />} />
                     
                     {/* Fallback Route */}
@@ -4649,6 +5267,8 @@ import {
     useMediaQuery,
     useTheme,
     Divider,
+    ListItemIcon,
+    ListItemText,
 } from "@mui/material";
 import {
     LocationOn,
@@ -4657,12 +5277,26 @@ import {
     MyLocation,
     Search,
     Logout,
+    Person,
+    CalendarMonth,
+    Settings,
+    Notifications,
+    Dashboard,
+    MedicalServices,
+    LocalHospital,
+    AdminPanelSettings,
+    Work,
+    Business,
+    Schedule,
+    People,
 } from "@mui/icons-material";
+import { useNavigate } from "react-router-dom";
 import LocationMap from "../home/LocationMap";
 import LoginModal from "../auth/LoginModal";
 
 const Header = () => {
     const theme = useTheme();
+    const navigate = useNavigate();
     const isMobile = useMediaQuery(theme.breakpoints.down("md"));
     const [anchorEl, setAnchorEl] = useState(null);
     const [showLocationMap, setShowLocationMap] = useState(false);
@@ -4670,15 +5304,13 @@ const Header = () => {
     const [currentLocation, setCurrentLocation] = useState(
         "Getting location..."
     );
-    const [currentCoords, setCurrentCoords] = useState([20.2961, 85.8245]); // Default to Bhubaneswar, Odisha
+    const [currentCoords, setCurrentCoords] = useState([20.2961, 85.8245]);
     const [locationLoading, setLocationLoading] = useState(true);
     const [user, setUser] = useState(null);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
 
     useEffect(() => {
-        // Check if user is authenticated on component mount
         checkAuthStatus();
-        // Try to get user's current location on component mount
         getCurrentLocation();
     }, []);
 
@@ -4693,7 +5325,6 @@ const Header = () => {
                 setIsAuthenticated(true);
             } catch (error) {
                 console.error("Error parsing user data:", error);
-                // Clear invalid data
                 localStorage.removeItem("auth_token");
                 localStorage.removeItem("user");
                 setIsAuthenticated(false);
@@ -4732,26 +5363,24 @@ const Header = () => {
                 (error) => {
                     console.error("Geolocation error:", error);
                     setCurrentLocation("Bhubaneswar, Odisha, India");
-                    setCurrentCoords([20.2961, 85.8245]); // Bhubaneswar fallback
+                    setCurrentCoords([20.2961, 85.8245]);
                     setLocationLoading(false);
                 },
                 {
                     enableHighAccuracy: true,
                     timeout: 10000,
-                    maximumAge: 300000, // 5 minutes
+                    maximumAge: 300000,
                 }
             );
         } else {
             setCurrentLocation("Bhubaneswar, Odisha, India");
-            setCurrentCoords([20.2961, 85.8245]); // Bhubaneswar fallback
+            setCurrentCoords([20.2961, 85.8245]);
             setLocationLoading(false);
         }
     };
 
-    // Google Maps Reverse Geocoding
     const reverseGeocodeGoogle = async (lat, lng) => {
         try {
-            // Check if Google Maps is available
             if (
                 window.google &&
                 window.google.maps &&
@@ -4765,7 +5394,6 @@ const Header = () => {
                             if (status === "OK" && results && results[0]) {
                                 const address = results[0].formatted_address;
                                 if (typeof address === "string") {
-                                    // Extract meaningful parts of the address
                                     const parts = address
                                         .split(",")
                                         .slice(0, 3);
@@ -4784,7 +5412,6 @@ const Header = () => {
                     );
                 });
             } else {
-                // Fallback to Google Geocoding API if Maps JS API is not available
                 const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
                 if (!apiKey) {
                     throw new Error("Google API key not available");
@@ -4802,7 +5429,6 @@ const Header = () => {
 
                 if (data.status === "OK" && data.results && data.results[0]) {
                     const address = data.results[0].formatted_address;
-                    // Extract meaningful parts of the address (city, state, country)
                     const parts = address.split(",").slice(0, 3);
                     return parts.join(",").trim();
                 } else {
@@ -4815,63 +5441,10 @@ const Header = () => {
         }
     };
 
-    // COMMENTED OUT: OpenStreetMap reverse geocoding (keeping for reference)
-    /*
-  const reverseGeocode = async (lat, lng) => {
-    try {
-      const response = await fetch(
-        `https://api.allorigins.win/get?url=${encodeURIComponent(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
-        )}`
-      );
-
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-
-      const proxyData = await response.json();
-      const data = JSON.parse(proxyData.contents);
-
-      if (data.display_name) {
-        const address = data.address;
-        if (address) {
-          const parts = [];
-          if (address.house_number && address.road) {
-            parts.push(`${address.house_number} ${address.road}`);
-          } else if (address.road) {
-            parts.push(address.road);
-          }
-          if (address.city || address.town || address.village) {
-            parts.push(address.city || address.town || address.village);
-          }
-          if (address.state) {
-            parts.push(address.state);
-          }
-          if (address.postcode) {
-            parts.push(address.postcode);
-          }
-
-          if (parts.length > 0) {
-            return parts.join(', ');
-          }
-        }
-        return data.display_name.split(',').slice(0, 3).join(',');
-      } else {
-        return 'Location not found';
-      }
-    } catch (error) {
-      console.error('Reverse geocoding error:', error);
-      return 'Location not found';
-    }
-  };
-  */
-
     const handleProfileMenuOpen = (event) => {
         if (!isAuthenticated) {
-            // Show login modal if user is not authenticated
             setShowLoginModal(true);
         } else {
-            // Show profile menu if user is authenticated
             setAnchorEl(event.currentTarget);
         }
     };
@@ -4886,51 +5459,129 @@ const Header = () => {
         setShowLocationMap(false);
     };
 
+    // Fixed role-based navigation
     const handleMenuItemClick = (action) => {
         handleMenuClose();
-        if (action === "changeLocation") {
-            setShowLocationMap(true);
-        } else if (action === "logout") {
-            handleLogout();
+        
+        switch (action) {
+            case "profile":
+                // Navigate to role-specific profile page
+                switch (user?.user_type) {
+                    case "patient":
+                        navigate("/profile");
+                        break;
+                    case "doctor":
+                        navigate("/doctor/profile");
+                        break;
+                    case "healthcare":
+                        navigate("/healthcare/profile");
+                        break;
+                    case "admin":
+                        navigate("/admin/profile");
+                        break;
+                    default:
+                        navigate("/profile");
+                }
+                break;
+            case "dashboard":
+                // Navigate to role-specific dashboard
+                switch (user?.user_type) {
+                    case "doctor":
+                        navigate("/doctor/dashboard");
+                        break;
+                    case "healthcare":
+                        navigate("/healthcare/dashboard");
+                        break;
+                    case "admin":
+                        navigate("/admin/dashboard");
+                        break;
+                    default:
+                        navigate("/");
+                }
+                break;
+            case "appointments":
+                // Navigate to role-specific appointments page
+                switch (user?.user_type) {
+                    case "patient":
+                        navigate("/appointments");
+                        break;
+                }
+                break;
+            case "logout":
+                handleLogout();
+                break;
+            default:
+                break;
         }
-        // Add other menu actions here as needed
     };
 
     const handleLoginSuccess = (userData, token) => {
+        console.log("Login success - User data:", userData);
+        console.log("User type:", userData.user_type);
+
+        // Store user data and token
+        localStorage.setItem("auth_token", token);
+        localStorage.setItem("user", JSON.stringify(userData));
+
+        // Update state
         setUser(userData);
         setIsAuthenticated(true);
         setShowLoginModal(false);
 
-        // Role-based redirection after login
-        const redirectBasedOnRole = (role) => {
-            switch (role) {
-                case "patient":
-                    // Stay on current page
+        // Role-based redirection
+        const redirectBasedOnRole = (userType) => {
+            console.log("Redirecting based on role:", userType);
+
+            switch (userType) {
+                case "admin":
+                    console.log("Redirecting to admin dashboard");
+                    navigate("/admin/dashboard");
                     break;
                 case "doctor":
-                    window.location.href = "/doctor/dashboard";
+                    console.log("Redirecting to doctor dashboard");
+                    navigate("/doctor/dashboard");
                     break;
                 case "healthcare":
-                    window.location.href = "/healthcare/dashboard";
+                    console.log("Redirecting to healthcare dashboard");
+                    navigate("/healthcare/dashboard");
                     break;
-                case "admin":
-                    window.location.href = "/admin/dashboard";
+                case "patient":
+                    console.log("Patient login - staying on current page");
+                    // Patients stay on current page
                     break;
                 default:
-                // Stay on current page
+                    console.log("Unknown user type, staying on homepage");
+                    navigate("/");
             }
         };
 
-        redirectBasedOnRole(userData.user_type);
+        // Small delay to ensure state is updated
+        setTimeout(() => {
+            redirectBasedOnRole(userData.user_type);
+        }, 100);
     };
 
     const handleLogout = () => {
-        // Clear authentication data
         localStorage.removeItem("auth_token");
         localStorage.removeItem("user");
         setUser(null);
         setIsAuthenticated(false);
-        // Optionally redirect to home page or show a success message
+        navigate("/"); // Redirect to home after logout
+    };
+
+    const getUserTypeDisplay = (userType) => {
+        switch (userType) {
+            case "admin":
+                return "Admin";
+            case "doctor":
+                return "Doctor";
+            case "healthcare":
+                return "Healthcare Provider";
+            case "patient":
+                return "Patient";
+            default:
+                return "User";
+        }
     };
 
     const LocationButton = () => (
@@ -4998,7 +5649,6 @@ const Header = () => {
                 }}
             >
                 <Toolbar>
-                    {/* Logo and Location Button for Desktop */}
                     <Box
                         sx={{
                             display: "flex",
@@ -5014,7 +5664,9 @@ const Header = () => {
                                 display: "flex",
                                 alignItems: "center",
                                 gap: 1,
+                                cursor: "pointer",
                             }}
+                            onClick={() => navigate("/")}
                         >
                             <img
                                 src="/images/common/visit_care_logo.webp"
@@ -5033,18 +5685,15 @@ const Header = () => {
                             />
                         </Typography>
 
-                        {/* Desktop Location Button - placed next to logo */}
                         {!isMobile && <LocationButton />}
                     </Box>
 
-                    {/* Spacer for desktop */}
                     <Box sx={{ flexGrow: 1 }} />
 
-                    {/* Profile Menu */}
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                        {!isMobile && isAuthenticated && (
+                        {!isMobile && isAuthenticated && user && (
                             <Chip
-                                label="Patient"
+                                label={getUserTypeDisplay(user.user_type)}
                                 size="small"
                                 variant="outlined"
                                 sx={{
@@ -5070,7 +5719,6 @@ const Header = () => {
                     </Box>
                 </Toolbar>
 
-                {/* Mobile Location Bar */}
                 {isMobile && (
                     <Box
                         sx={{
@@ -5084,7 +5732,7 @@ const Header = () => {
                 )}
             </AppBar>
 
-            {/* Enhanced Profile Menu - Only shown when authenticated */}
+            {/* Role-based Menu */}
             {isAuthenticated && (
                 <Menu
                     anchorEl={anchorEl}
@@ -5094,140 +5742,312 @@ const Header = () => {
                     transformOrigin={{ vertical: "top", horizontal: "right" }}
                     sx={{
                         "& .MuiPaper-root": {
-                            minWidth: isMobile ? "250px" : "200px",
+                            minWidth: isMobile ? "280px" : "320px",
                             mt: 1,
+                            borderRadius: 2,
+                            boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
                         },
                     }}
                 >
-                    {/* User Info Section */}
+                    {/* User Profile Header */}
                     <Box
                         sx={{
                             px: 2,
                             py: 1,
                             borderBottom: "1px solid rgba(0,0,0,0.1)",
+                            color: "body2",
+                            borderTopLeftRadius: 8,
+                            borderTopRightRadius: 8,
                         }}
                     >
-                        <Typography
-                            variant="subtitle2"
-                            sx={{ fontWeight: "bold" }}
+                        <Box
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 2,
+                            }}
                         >
-                            {user?.name || "User"}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                            {user?.email || "user@example.com"}
-                        </Typography>
+                            <Avatar
+                                src={
+                                    user?.avatar || "/images/common/avatar.webp"
+                                }
+                                sx={{
+                                    width: 56,
+                                    height: 56,
+                                    border: "3px solid rgba(255,255,255,0.3)",
+                                }}
+                            />
+                            <Box sx={{ flex: 1 }}>
+                                <Typography
+                                    variant="h6"
+                                    sx={{ fontWeight: "bold", mb: 0.5 }}
+                                >
+                                    {user?.name || "User"}
+                                </Typography>
+                                <Typography
+                                    variant="body2"
+                                    sx={{ opacity: 0.9, fontSize: "0.875rem" }}
+                                >
+                                    {user?.email || "user@example.com"}
+                                </Typography>
+                                <Box sx={{ mt: 1 }}>
+                                    <Chip
+                                        label={getUserTypeDisplay(
+                                            user?.user_type
+                                        )}
+                                        size="small"
+                                        variant="outlined"
+                                        sx={{
+                                            color: "green",
+                                            borderColor:
+                                                "rgba(58, 187, 7, 0.5)",
+                                            fontWeight: 500,
+                                            fontSize: "0.75rem",
+                                        }}
+                                    />
+                                </Box>
+                            </Box>
+                        </Box>
                     </Box>
 
-                    {/* Profile Section */}
-                    <MenuItem onClick={() => handleMenuItemClick("profile")}>
-                        <Box
-                            sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 1,
-                                width: "100%",
-                            }}
-                        >
-                            <AccountCircle />
-                            <Typography>My Profile</Typography>
-                        </Box>
-                    </MenuItem>
+                    {/* PATIENT Menu Items */}
+                    {user?.user_type === "patient" && (
+                        <>
+                            <MenuItem
+                                onClick={() => handleMenuItemClick("profile")}
+                                sx={{
+                                    py: 1.5,
+                                    px: 3,
+                                    "&:hover": {
+                                        backgroundColor:
+                                            "rgba(25, 118, 210, 0.08)",
+                                    },
+                                }}
+                            >
+                                <ListItemIcon>
+                                    <Person color="primary" />
+                                </ListItemIcon>
+                                <ListItemText
+                                    primary="My Profile"
+                                    secondary="View and edit your profile"
+                                    primaryTypographyProps={{ fontWeight: 500 }}
+                                />
+                            </MenuItem>
 
+                            <MenuItem
+                                onClick={() =>
+                                    handleMenuItemClick("appointments")
+                                }
+                                sx={{
+                                    py: 1.5,
+                                    px: 3,
+                                    "&:hover": {
+                                        backgroundColor:
+                                            "rgba(25, 118, 210, 0.08)",
+                                    },
+                                }}
+                            >
+                                <ListItemIcon>
+                                    <CalendarMonth color="primary" />
+                                </ListItemIcon>
+                                <ListItemText
+                                    primary="My Appointments"
+                                    secondary="Manage your appointments"
+                                    primaryTypographyProps={{ fontWeight: 500 }}
+                                />
+                            </MenuItem>
+                        </>
+                    )}
+
+                    {/* DOCTOR Menu Items - REMOVED appointments and change location */}
+                    {user?.user_type === "doctor" && (
+                        <>
+                            <MenuItem
+                                onClick={() => handleMenuItemClick("dashboard")}
+                                sx={{
+                                    py: 1.5,
+                                    px: 3,
+                                    "&:hover": {
+                                        backgroundColor:
+                                            "rgba(25, 118, 210, 0.08)",
+                                    },
+                                }}
+                            >
+                                <ListItemIcon>
+                                    <Dashboard color="primary" />
+                                </ListItemIcon>
+                                <ListItemText
+                                    primary="Dashboard"
+                                    secondary="View your doctor dashboard"
+                                    primaryTypographyProps={{ fontWeight: 500 }}
+                                />
+                            </MenuItem>
+
+                            <MenuItem
+                                onClick={() => handleMenuItemClick("profile")}
+                                sx={{
+                                    py: 1.5,
+                                    px: 3,
+                                    "&:hover": {
+                                        backgroundColor:
+                                            "rgba(25, 118, 210, 0.08)",
+                                    },
+                                }}
+                            >
+                                <ListItemIcon>
+                                    <MedicalServices color="primary" />
+                                </ListItemIcon>
+                                <ListItemText
+                                    primary="Doctor Profile"
+                                    secondary="Manage your professional profile"
+                                    primaryTypographyProps={{ fontWeight: 500 }}
+                                />
+                            </MenuItem>
+
+                            {/* REMOVED: My Appointments and Change Location for doctors */}
+                        </>
+                    )}
+
+                    {/* HEALTHCARE Menu Items */}
+                    {user?.user_type === "healthcare" && (
+                        <>
+                            <MenuItem
+                                onClick={() => handleMenuItemClick("dashboard")}
+                                sx={{
+                                    py: 1.5,
+                                    px: 3,
+                                    "&:hover": {
+                                        backgroundColor:
+                                            "rgba(25, 118, 210, 0.08)",
+                                    },
+                                }}
+                            >
+                                <ListItemIcon>
+                                    <Dashboard color="primary" />
+                                </ListItemIcon>
+                                <ListItemText
+                                    primary="Dashboard"
+                                    secondary="View healthcare dashboard"
+                                    primaryTypographyProps={{ fontWeight: 500 }}
+                                />
+                            </MenuItem>
+
+                            <MenuItem
+                                onClick={() => handleMenuItemClick("profile")}
+                                sx={{
+                                    py: 1.5,
+                                    px: 3,
+                                    "&:hover": {
+                                        backgroundColor:
+                                            "rgba(25, 118, 210, 0.08)",
+                                    },
+                                }}
+                            >
+                                <ListItemIcon>
+                                    <Business color="primary" />
+                                </ListItemIcon>
+                                <ListItemText
+                                    primary="Healthcare Profile"
+                                    secondary="Manage facility profile"
+                                    primaryTypographyProps={{ fontWeight: 500 }}
+                                />
+                            </MenuItem>
+                        </>
+                    )}
+
+                    {/* ADMIN Menu Items */}
+                    {user?.user_type === "admin" && (
+                        <>
+                            <MenuItem
+                                onClick={() => handleMenuItemClick("dashboard")}
+                                sx={{
+                                    py: 1.5,
+                                    px: 3,
+                                    "&:hover": {
+                                        backgroundColor:
+                                            "rgba(25, 118, 210, 0.08)",
+                                    },
+                                }}
+                            >
+                                <ListItemIcon>
+                                    <AdminPanelSettings color="primary" />
+                                </ListItemIcon>
+                                <ListItemText
+                                    primary="Admin Dashboard"
+                                    secondary="Manage system administration"
+                                    primaryTypographyProps={{ fontWeight: 500 }}
+                                />
+                            </MenuItem>
+
+                            <MenuItem
+                                onClick={() => handleMenuItemClick("profile")}
+                                sx={{
+                                    py: 1.5,
+                                    px: 3,
+                                    "&:hover": {
+                                        backgroundColor:
+                                            "rgba(25, 118, 210, 0.08)",
+                                    },
+                                }}
+                            >
+                                <ListItemIcon>
+                                    <Person color="primary" />
+                                </ListItemIcon>
+                                <ListItemText
+                                    primary="Admin Profile"
+                                    secondary="Manage your admin profile"
+                                    primaryTypographyProps={{ fontWeight: 500 }}
+                                />
+                            </MenuItem>
+
+                            <Divider sx={{ my: 1 }} />
+
+                            <MenuItem
+                                onClick={() =>
+                                    handleMenuItemClick("changeLocation")
+                                }
+                            >
+                                <ListItemIcon>
+                                    <MyLocation />
+                                </ListItemIcon>
+                                <ListItemText primary="Change Location" />
+                            </MenuItem>
+                        </>
+                    )}
+
+                    {/* Logout (Common for all user types) */}
                     <MenuItem
-                        onClick={() => handleMenuItemClick("appointments")}
+                        onClick={() => handleMenuItemClick("logout")}
+                        sx={{
+                            py: 1.5,
+                            px: 3,
+                            borderTop: "1px solid rgba(0,0,0,0.1)",
+                            color: "error.main",
+                            "&:hover": {
+                                backgroundColor: "rgba(244, 67, 54, 0.08)",
+                            },
+                        }}
                     >
-                        <Box
-                            sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 1,
-                                width: "100%",
+                        <ListItemIcon>
+                            <Logout color="error" />
+                        </ListItemIcon>
+                        <ListItemText
+                            primary="Logout"
+                            primaryTypographyProps={{
+                                fontWeight: 500,
+                                color: "error.main",
                             }}
-                        >
-                            <Search />
-                            <Typography>My Appointments</Typography>
-                        </Box>
-                    </MenuItem>
-
-                    {/* Divider to separate profile options from navigation options */}
-                    <Divider sx={{ my: 1 }} />
-
-                    {/* Navigation Options */}
-                    <MenuItem
-                        onClick={() => handleMenuItemClick("findDoctors")}
-                    >
-                        <Box
-                            sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 1,
-                                width: "100%",
-                            }}
-                        >
-                            <Search />
-                            <Typography>Find Doctors</Typography>
-                        </Box>
-                    </MenuItem>
-
-                    <MenuItem
-                        onClick={() => handleMenuItemClick("findClinics")}
-                    >
-                        <Box
-                            sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 1,
-                                width: "100%",
-                            }}
-                        >
-                            <LocationOn />
-                            <Typography>Find Clinics</Typography>
-                        </Box>
-                    </MenuItem>
-
-                    <MenuItem
-                        onClick={() => handleMenuItemClick("changeLocation")}
-                    >
-                        <Box
-                            sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 1,
-                                width: "100%",
-                            }}
-                        >
-                            <MyLocation />
-                            <Typography>Change Location</Typography>
-                        </Box>
-                    </MenuItem>
-
-                    {/* Divider before logout */}
-                    <Divider sx={{ my: 1 }} />
-
-                    <MenuItem onClick={() => handleMenuItemClick("logout")}>
-                        <Box
-                            sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 1,
-                                width: "100%",
-                            }}
-                        >
-                            <Logout />
-                            <Typography>Logout</Typography>
-                        </Box>
+                        />
                     </MenuItem>
                 </Menu>
             )}
 
-            {/* Login Modal */}
             <LoginModal
                 open={showLoginModal}
                 onClose={() => setShowLoginModal(false)}
                 onLoginSuccess={handleLoginSuccess}
             />
 
-            {/* Location Map Modal */}
             {showLocationMap && (
                 <LocationMap
                     open={showLocationMap}
@@ -10647,7 +11467,7 @@ export default BookAppointmentPage;
 **resources/js/pages/admin/AdminDashboard.jsx**
 
 ```jsx
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
     Box,
     Container,
@@ -10664,6 +11484,18 @@ import {
     ListItemIcon,
     Chip,
     Divider,
+    Drawer,
+    AppBar,
+    Toolbar,
+    IconButton,
+    Menu,
+    MenuItem,
+    useTheme,
+    useMediaQuery,
+    Tabs,
+    Tab,
+    Alert,
+    CircularProgress,
 } from "@mui/material";
 import {
     AdminPanelSettings,
@@ -10676,259 +11508,1035 @@ import {
     Notifications,
     SupervisorAccount,
     VerifiedUser,
+    Menu as MenuIcon,
+    Dashboard as DashboardIcon,
+    EventNote,
+    Business,
+    Logout,
+    AccountCircle,
+    ChevronLeft,
+    ChevronRight,
 } from "@mui/icons-material";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 import MainLayout from "../../components/layout/MainLayout";
+import AdminSidebar from "../../components/admin/AdminSidebar";
+import AdminUserManagement from "../../components/admin/AdminUserManagement";
+import AdminDoctorManagement from "../../components/admin/AdminDoctorManagement";
+import AdminHealthcareManagement from "../../components/admin/AdminHealthcareManagement";
+import AdminAppointmentManagement from "../../components/admin/AdminAppointmentManagement";
+import axios from "axios";
+
+const DRAWER_WIDTH = 280;
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 const AdminDashboard = () => {
-    const adminStats = [
-        {
-            title: "👥 Total Users",
-            value: "2,456",
-            icon: <People />,
-            color: "primary",
-        },
-        {
-            title: "🏥 Healthcare Providers",
-            value: "156",
-            icon: <LocalHospital />,
-            color: "success",
-        },
-        {
-            title: "🔐 System Security",
-            value: "99.9%",
-            icon: <Security />,
-            color: "warning",
-        },
-        {
-            title: "📈 Platform Growth",
-            value: "+45%",
-            icon: <TrendingUp />,
-            color: "info",
-        },
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+    const apiUrl = import.meta.env.VITE_API_URL;
+
+    const [mobileOpen, setMobileOpen] = useState(false);
+    const [selectedTab, setSelectedTab] = useState(0);
+    const [stats, setStats] = useState(null);
+    const [chartData, setChartData] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [anchorEl, setAnchorEl] = useState(null);
+
+    const tabItems = [
+        { label: 'Dashboard', icon: <DashboardIcon /> },
+        { label: 'Users', icon: <People /> },
+        { label: 'Doctors', icon: <SupervisorAccount /> },
+        { label: 'Healthcare', icon: <LocalHospital /> },
+        { label: 'Appointments', icon: <EventNote /> },
     ];
 
-    const systemAlerts = [
-        {
-            type: "Security",
-            message: "System security scan completed",
-            status: "success",
-            time: "1 hour ago",
-        },
-        {
-            type: "Performance",
-            message: "High traffic detected - scaling resources",
-            status: "warning",
-            time: "3 hours ago",
-        },
-        {
-            type: "Maintenance",
-            message: "Scheduled backup completed successfully",
-            status: "success",
-            time: "6 hours ago",
-        },
-    ];
+    useEffect(() => {
+        const token = localStorage.getItem('auth_token');
+        const userData = JSON.parse(localStorage.getItem('user') || '{}');
+        
+        if (!token || userData.user_type !== 'admin') {
+            window.location.href = '/';
+            return;
+        }
+        
+        loadDashboardData();
+    }, []);
+
+    const loadDashboardData = async () => {
+        try {
+            const token = localStorage.getItem('auth_token');
+            const headers = { Authorization: `Bearer ${token}` };
+
+            const [statsResponse, chartsResponse] = await Promise.all([
+                axios.get(`${apiUrl}/admin/dashboard/stats`, { headers }),
+                axios.get(`${apiUrl}/admin/dashboard/charts`, { headers })
+            ]);
+
+            setStats(statsResponse.data);
+            setChartData(chartsResponse.data);
+        } catch (error) {
+            console.error('Failed to load dashboard data:', error);
+            setError('Failed to load dashboard data');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDrawerToggle = () => {
+        setMobileOpen(!mobileOpen);
+    };
+
+    const handleProfileMenuOpen = (event) => {
+        setAnchorEl(event.currentTarget);
+    };
+
+    const handleProfileMenuClose = () => {
+        setAnchorEl(null);
+    };
+
+    const handleLogout = () => {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user');
+        window.location.href = '/';
+    };
+
+    const renderStatsCards = () => {
+        if (!stats) return null;
+
+        const statsCards = [
+            {
+                title: 'Total Users',
+                value: stats.total_users,
+                icon: <People />,
+                color: 'primary',
+                subtitle: `+${stats.user_growth}% this month`
+            },
+            {
+                title: 'Patients',
+                value: stats.total_patients,
+                icon: <People />,
+                color: 'success',
+            },
+            {
+                title: 'Doctors',
+                value: stats.total_doctors,
+                icon: <SupervisorAccount />,
+                color: 'info',
+                subtitle: `${stats.verified_doctors} verified`
+            },
+            {
+                title: 'Healthcare Providers',
+                value: stats.total_healthcare,
+                icon: <LocalHospital />,
+                color: 'warning',
+            },
+            {
+                title: 'Total Clinics',
+                value: stats.total_clinics,
+                icon: <Business />,
+                color: 'secondary',
+            },
+            {
+                title: 'Total Appointments',
+                value: stats.total_appointments,
+                icon: <EventNote />,
+                color: 'primary',
+                subtitle: `${stats.today_appointments} today`
+            },
+            {
+                title: 'Monthly Revenue',
+                value: `₹${stats.monthly_revenue?.toLocaleString() || 0}`,
+                icon: <TrendingUp />,
+                color: 'success',
+            },
+            {
+                title: 'Pending Appointments',
+                value: stats.pending_appointments,
+                icon: <Assessment />,
+                color: 'error',
+            },
+        ];
+
+        return (
+            <Grid container spacing={3} sx={{ mb: 4 }}>
+                {statsCards.map((stat, index) => (
+                    <Grid item xs={12} sm={6} md={3} key={index}>
+                        <Card 
+                            elevation={3} 
+                            sx={{ 
+                                height: '100%',
+                                '&:hover': {
+                                    transform: 'translateY(-4px)',
+                                    transition: 'transform 0.2s ease-in-out'
+                                }
+                            }}
+                        >
+                            <CardContent>
+                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                    <Avatar
+                                        sx={{
+                                            bgcolor: `${stat.color}.main`,
+                                            mr: 2,
+                                        }}
+                                    >
+                                        {stat.icon}
+                                    </Avatar>
+                                    <Box>
+                                        <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                                            {stat.value}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            {stat.title}
+                                        </Typography>
+                                        {stat.subtitle && (
+                                            <Typography variant="caption" color="success.main">
+                                                {stat.subtitle}
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                </Box>
+                            </CardContent>
+                        </Card>
+                    </Grid>
+                ))}
+            </Grid>
+        );
+    };
+
+    const renderCharts = () => {
+        if (!chartData) return null;
+
+        return (
+            <Grid container spacing={3} sx={{ mb: 4 }}>
+                {/* User Registration Trend */}
+                <Grid item xs={12} md={8}>
+                    <Paper elevation={3} sx={{ p: 3 }}>
+                        <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 3 }}>
+                            User Registration Trend
+                        </Typography>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={chartData.user_trend}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="month" />
+                                <YAxis />
+                                <Tooltip />
+                                <Legend />
+                                <Line type="monotone" dataKey="patients" stroke="#8884d8" strokeWidth={2} />
+                                <Line type="monotone" dataKey="doctors" stroke="#82ca9d" strokeWidth={2} />
+                                <Line type="monotone" dataKey="healthcare" stroke="#ffc658" strokeWidth={2} />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </Paper>
+                </Grid>
+
+                {/* Appointment Status Distribution */}
+                <Grid item xs={12} md={4}>
+                    <Paper elevation={3} sx={{ p: 3 }}>
+                        <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 3 }}>
+                            Appointment Status
+                        </Typography>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <PieChart>
+                                <Pie
+                                    data={Object.entries(chartData.appointment_stats).map(([key, value]) => ({
+                                        name: key.charAt(0).toUpperCase() + key.slice(1),
+                                        value
+                                    }))}
+                                    cx="50%"
+                                    cy="50%"
+                                    outerRadius={80}
+                                    fill="#8884d8"
+                                    dataKey="value"
+                                    label
+                                >
+                                    {Object.entries(chartData.appointment_stats).map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                    ))}
+                                </Pie>
+                                <Tooltip />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </Paper>
+                </Grid>
+
+                {/* Top Specializations */}
+                <Grid item xs={12} md={6}>
+                    <Paper elevation={3} sx={{ p: 3 }}>
+                        <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 3 }}>
+                            Top Medical Specializations
+                        </Typography>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={chartData.top_specializations}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="specialization" />
+                                <YAxis />
+                                <Tooltip />
+                                <Bar dataKey="count" fill="#8884d8" />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </Paper>
+                </Grid>
+
+                {/* Revenue Trend */}
+                <Grid item xs={12} md={6}>
+                    <Paper elevation={3} sx={{ p: 3 }}>
+                        <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 3 }}>
+                            Revenue Trend (Last 6 Months)
+                        </Typography>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={chartData.revenue_trend}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="month" />
+                                <YAxis />
+                                <Tooltip formatter={(value) => [`₹${value.toLocaleString()}`, 'Revenue']} />
+                                <Line type="monotone" dataKey="revenue" stroke="#00C49F" strokeWidth={3} />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </Paper>
+                </Grid>
+            </Grid>
+        );
+    };
+
+    const renderTabContent = () => {
+        switch (selectedTab) {
+            case 0:
+                return (
+                    <>
+                        {renderStatsCards()}
+                        {renderCharts()}
+                    </>
+                );
+            case 1:
+                return <AdminUserManagement />;
+            case 2:
+                return <AdminDoctorManagement />;
+            case 3:
+                return <AdminHealthcareManagement />;
+            case 4:
+                return <AdminAppointmentManagement />;
+            default:
+                return null;
+        }
+    };
+
+    if (loading) {
+        return (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+                <CircularProgress size={60} />
+                <Typography variant="h6" sx={{ ml: 2 }}>
+                    Loading admin dashboard...
+                </Typography>
+            </Box>
+        );
+    }
+
+    if (error) {
+        return (
+            <Container maxWidth="lg" sx={{ mt: 12, mb: 4 }}>
+                <Alert severity="error">{error}</Alert>
+            </Container>
+        );
+    }
+
+    return (
+        <Box sx={{ display: 'flex' }}>
+            {/* App Bar */}
+            <AppBar
+                position="fixed"
+                sx={{
+                    width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
+                    ml: { md: `${DRAWER_WIDTH}px` },
+                    zIndex: theme.zIndex.drawer + 1,
+                }}
+            >
+                <Toolbar>
+                    <IconButton
+                        color="inherit"
+                        aria-label="open drawer"
+                        edge="start"
+                        onClick={handleDrawerToggle}
+                        sx={{ mr: 2, display: { md: 'none' } }}
+                    >
+                        <MenuIcon />
+                    </IconButton>
+                    <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
+                        Admin Dashboard - {tabItems[selectedTab].label}
+                    </Typography>
+                    <IconButton
+                        size="large"
+                        aria-label="account of current user"
+                        aria-controls="menu-appbar"
+                        aria-haspopup="true"
+                        onClick={handleProfileMenuOpen}
+                        color="inherit"
+                    >
+                        <AccountCircle />
+                    </IconButton>
+                    <Menu
+                        id="menu-appbar"
+                        anchorEl={anchorEl}
+                        anchorOrigin={{
+                            vertical: 'top',
+                            horizontal: 'right',
+                        }}
+                        keepMounted
+                        transformOrigin={{
+                            vertical: 'top',
+                            horizontal: 'right',
+                        }}
+                        open={Boolean(anchorEl)}
+                        onClose={handleProfileMenuClose}
+                    >
+                        <MenuItem onClick={handleLogout}>
+                            <Logout sx={{ mr: 1 }} />
+                            Logout
+                        </MenuItem>
+                    </Menu>
+                </Toolbar>
+            </AppBar>
+
+            {/* Sidebar */}
+            <AdminSidebar
+                drawerWidth={DRAWER_WIDTH}
+                mobileOpen={mobileOpen}
+                handleDrawerToggle={handleDrawerToggle}
+                tabItems={tabItems}
+                selectedTab={selectedTab}
+                setSelectedTab={setSelectedTab}
+            />
+
+            {/* Main content */}
+            <Box
+                component="main"
+                sx={{
+                    flexGrow: 1,
+                    p: 3,
+                    width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
+                    mt: 8,
+                }}
+            >
+                {renderTabContent()}
+            </Box>
+        </Box>
+    );
+};
+
+export default AdminDashboard;
+```
+
+**resources/js/pages/doctor/DoctorProfile.jsx**
+
+```jsx
+import React, { useState, useEffect } from 'react';
+import {
+    Container,
+    Typography,
+    Box,
+    Grid,
+    Card,
+    CardContent,
+    Avatar,
+    Button,
+    TextField,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    Alert,
+    CircularProgress,
+    Paper,
+    Chip,
+    List,
+    ListItem,
+    ListItemIcon,
+    ListItemText,
+    Tabs,
+    Tab,
+    useTheme,
+    useMediaQuery,
+    Divider,
+    Rating,
+    Stack,
+} from '@mui/material';
+import {
+    Person,
+    Email,
+    Phone,
+    LocationOn,
+    Edit,
+    Save,
+    Cancel,
+    PhotoCamera,
+    Security,
+    MedicalServices,
+    School,
+    Language,
+    Work,
+    Star,
+    Verified,
+    Schedule,
+    LocalHospital,
+} from '@mui/icons-material';
+import MainLayout from '../../components/layout/MainLayout';
+import axios from 'axios';
+
+const DoctorProfile = () => {
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+    const apiUrl = import.meta.env.VITE_API_URL;
+
+    const [doctor, setDoctor] = useState(null);
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [editing, setEditing] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
+    const [tabValue, setTabValue] = useState(0);
+    const [formData, setFormData] = useState({
+        // User fields
+        name: '',
+        email: '',
+        phone: '',
+        address: '',
+        // Doctor specific fields
+        specialization: '',
+        license_number: '',
+        experience_years: '',
+        bio: '',
+        education: '',
+        consultation_fee: '',
+        qualification: '',
+        languages: [],
+        services: [],
+    });
+
+    useEffect(() => {
+        loadDoctorProfile();
+    }, []);
+
+    const loadDoctorProfile = async () => {
+        try {
+            const token = localStorage.getItem('auth_token');
+            
+            if (!token) {
+                window.location.href = '/';
+                return;
+            }
+
+            const response = await axios.get(`${apiUrl}/doctor/profile`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            const doctorData = response.data.doctor;
+            const userData = doctorData?.user;
+
+            setDoctor(doctorData);
+            setUser(userData);
+            
+            setFormData({
+                // User fields
+                name: userData?.name || '',
+                email: userData?.email || '',
+                phone: userData?.phone || '',
+                address: userData?.address || '',
+                // Doctor specific fields
+                specialization: doctorData?.specialization || '',
+                license_number: doctorData?.license_number || '',
+                experience_years: doctorData?.experience_years || '',
+                bio: doctorData?.bio || '',
+                education: doctorData?.education || '',
+                consultation_fee: doctorData?.consultation_fee || '',
+                qualification: doctorData?.qualification || '',
+                languages: doctorData?.languages || [],
+                services: doctorData?.services || [],
+            });
+        } catch (error) {
+            console.error('Failed to load doctor profile:', error);
+            setError('Failed to load profile data');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleInputChange = (field) => (event) => {
+        setFormData({
+            ...formData,
+            [field]: event.target.value
+        });
+    };
+
+    const handleArrayInputChange = (field, value) => {
+        const arrayValue = value.split(',').map(item => item.trim()).filter(item => item);
+        setFormData({
+            ...formData,
+            [field]: arrayValue
+        });
+    };
+
+    const handleSave = async () => {
+        setSaving(true);
+        setError('');
+        
+        try {
+            const token = localStorage.getItem('auth_token');
+            
+            const response = await axios.post(`${apiUrl}/doctor/profile`, formData, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            setDoctor(response.data.doctor);
+            setUser(response.data.doctor.user);
+            
+            setSuccess('Profile updated successfully!');
+            setEditing(false);
+            
+            setTimeout(() => setSuccess(''), 3000);
+        } catch (error) {
+            console.error('Failed to update profile:', error);
+            setError(error.response?.data?.message || 'Failed to update profile');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleCancel = () => {
+        loadDoctorProfile();
+        setEditing(false);
+        setError('');
+    };
+
+    const renderPersonalInfo = () => (
+        <Card elevation={3} sx={{ mb: 3 }}>
+            <CardContent>
+                <Typography variant="h6" sx={{ mb: 3, fontWeight: 'bold' }}>
+                    Personal Information
+                </Typography>
+                
+                <Grid container spacing={3}>
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            label="Full Name"
+                            value={formData.name}
+                            onChange={handleInputChange('name')}
+                            disabled={!editing}
+                            required
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            label="Email"
+                            type="email"
+                            value={formData.email}
+                            onChange={handleInputChange('email')}
+                            disabled={!editing}
+                            required
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            label="Phone Number"
+                            value={formData.phone}
+                            onChange={handleInputChange('phone')}
+                            disabled={!editing}
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            label="Experience Years"
+                            type="number"
+                            value={formData.experience_years}
+                            onChange={handleInputChange('experience_years')}
+                            disabled={!editing}
+                            required
+                        />
+                    </Grid>
+                    <Grid item xs={12}>
+                        <TextField
+                            fullWidth
+                            label="Address"
+                            multiline
+                            rows={2}
+                            value={formData.address}
+                            onChange={handleInputChange('address')}
+                            disabled={!editing}
+                        />
+                    </Grid>
+                </Grid>
+            </CardContent>
+        </Card>
+    );
+
+    const renderProfessionalInfo = () => (
+        <Card elevation={3} sx={{ mb: 3 }}>
+            <CardContent>
+                <Typography variant="h6" sx={{ mb: 3, fontWeight: 'bold' }}>
+                    Professional Information
+                </Typography>
+                
+                <Grid container spacing={3}>
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            label="Specialization"
+                            value={formData.specialization}
+                            onChange={handleInputChange('specialization')}
+                            disabled={!editing}
+                            required
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            label="License Number"
+                            value={formData.license_number}
+                            onChange={handleInputChange('license_number')}
+                            disabled={!editing}
+                            required
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            label="Consultation Fee (₹)"
+                            type="number"
+                            value={formData.consultation_fee}
+                            onChange={handleInputChange('consultation_fee')}
+                            disabled={!editing}
+                            required
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            label="Qualification"
+                            value={formData.qualification}
+                            onChange={handleInputChange('qualification')}
+                            disabled={!editing}
+                            required
+                        />
+                    </Grid>
+                    <Grid item xs={12}>
+                        <TextField
+                            fullWidth
+                            label="Education"
+                            multiline
+                            rows={2}
+                            value={formData.education}
+                            onChange={handleInputChange('education')}
+                            disabled={!editing}
+                            placeholder="Your educational background"
+                        />
+                    </Grid>
+                    <Grid item xs={12}>
+                        <TextField
+                            fullWidth
+                            label="Bio"
+                            multiline
+                            rows={4}
+                            value={formData.bio}
+                            onChange={handleInputChange('bio')}
+                            disabled={!editing}
+                            placeholder="Tell patients about yourself and your medical practice..."
+                            required
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            label="Languages (comma separated)"
+                            value={formData.languages.join(', ')}
+                            onChange={(e) => handleArrayInputChange('languages', e.target.value)}
+                            disabled={!editing}
+                            placeholder="English, Hindi, Spanish..."
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            label="Services (comma separated)"
+                            value={formData.services.join(', ')}
+                            onChange={(e) => handleArrayInputChange('services', e.target.value)}
+                            disabled={!editing}
+                            placeholder="Consultation, Surgery, Treatment..."
+                        />
+                    </Grid>
+                </Grid>
+            </CardContent>
+        </Card>
+    );
+
+    const renderStats = () => {
+        if (!doctor) return null;
+
+        return (
+            <Card elevation={3} sx={{ mb: 3 }}>
+                <CardContent>
+                    <Typography variant="h6" sx={{ mb: 3, fontWeight: 'bold' }}>
+                        Professional Statistics
+                    </Typography>
+                    
+                    <Grid container spacing={3}>
+                        <Grid item xs={12} sm={6} md={3}>
+                            <Paper elevation={2} sx={{ p: 2, textAlign: 'center', bgcolor: 'primary.50' }}>
+                                <Star sx={{ fontSize: 30, color: 'warning.main', mb: 1 }} />
+                                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                                    {doctor.rating || '0.0'}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    Rating
+                                </Typography>
+                            </Paper>
+                        </Grid>
+                        <Grid item xs={12} sm={6} md={3}>
+                            <Paper elevation={2} sx={{ p: 2, textAlign: 'center', bgcolor: 'success.50' }}>
+                                <Person sx={{ fontSize: 30, color: 'success.main', mb: 1 }} />
+                                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                                    {doctor.total_reviews || 0}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    Reviews
+                                </Typography>
+                            </Paper>
+                        </Grid>
+                        <Grid item xs={12} sm={6} md={3}>
+                            <Paper elevation={2} sx={{ p: 2, textAlign: 'center', bgcolor: 'info.50' }}>
+                                <LocalHospital sx={{ fontSize: 30, color: 'info.main', mb: 1 }} />
+                                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                                    {doctor.clinics?.length || 0}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    Connected Clinics
+                                </Typography>
+                            </Paper>
+                        </Grid>
+                        <Grid item xs={12} sm={6} md={3}>
+                            <Paper elevation={2} sx={{ p: 2, textAlign: 'center', bgcolor: 'warning.50' }}>
+                                <Work sx={{ fontSize: 30, color: 'warning.main', mb: 1 }} />
+                                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                                    {doctor.experience_years || 0}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    Years Experience
+                                </Typography>
+                            </Paper>
+                        </Grid>
+                    </Grid>
+                </CardContent>
+            </Card>
+        );
+    };
+
+    if (loading) {
+        return (
+            <MainLayout>
+                <Container maxWidth="lg" sx={{ mt: 12, mb: 4, textAlign: 'center' }}>
+                    <CircularProgress size={60} />
+                    <Typography variant="h6" sx={{ mt: 2 }}>
+                        Loading your profile...
+                    </Typography>
+                </Container>
+            </MainLayout>
+        );
+    }
+
+    if (!doctor || !user) {
+        return (
+            <MainLayout>
+                <Container maxWidth="lg" sx={{ mt: 12, mb: 4 }}>
+                    <Alert severity="error">
+                        Please complete your doctor profile setup to view this page.
+                    </Alert>
+                </Container>
+            </MainLayout>
+        );
+    }
 
     return (
         <MainLayout>
             <Container maxWidth="lg" sx={{ mt: 12, mb: 4 }}>
                 {/* Header */}
-                <Box sx={{ mb: 4 }}>
-                    <Typography
-                        variant="h4"
-                        sx={{
-                            fontWeight: "bold",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 2,
-                            mb: 1,
-                        }}
-                    >
-                        <AdminPanelSettings
-                            sx={{ fontSize: 40, color: "primary.main" }}
-                        />
-                        👑 Admin Dashboard
-                    </Typography>
-                    <Typography variant="h6" color="text.secondary">
-                        🎛️ Complete platform administration and system
-                        management
-                    </Typography>
-                </Box>
-
-                {/* Stats Cards */}
-                <Grid container spacing={3} sx={{ mb: 4 }}>
-                    {adminStats.map((stat, index) => (
-                        <Grid item xs={12} sm={6} md={3} key={index}>
-                            <Card elevation={3} sx={{ height: "100%" }}>
-                                <CardContent>
-                                    <Box
+                <Paper elevation={3} sx={{ p: 3, mb: 3, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
+                    <Grid container spacing={3} alignItems="center">
+                        <Grid item>
+                            <Avatar
+                                src={doctor.profile_image || '/images/common/avatar.webp'}
+                                sx={{ 
+                                    width: isMobile ? 80 : 100, 
+                                    height: isMobile ? 80 : 100,
+                                    border: '4px solid rgba(255,255,255,0.3)'
+                                }}
+                            >
+                                <Person sx={{ fontSize: isMobile ? 40 : 50 }} />
+                            </Avatar>
+                        </Grid>
+                        <Grid item sx={{ flex: 1 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                <Typography variant={isMobile ? "h5" : "h4"} sx={{ fontWeight: 'bold' }}>
+                                    Dr. {user.name || 'Your Profile'}
+                                </Typography>
+                                {doctor.is_verified && (
+                                    <Verified sx={{ color: 'success.light', fontSize: 28 }} />
+                                )}
+                            </Box>
+                            <Typography variant="h6" sx={{ opacity: 0.9, mb: 1 }}>
+                                {doctor.specialization}
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                <Chip 
+                                    label="Doctor" 
+                                    sx={{ 
+                                        backgroundColor: 'rgba(255,255,255,0.2)', 
+                                        color: 'white',
+                                        fontWeight: 500
+                                    }} 
+                                />
+                                {doctor.is_verified && (
+                                    <Chip 
+                                        label="Verified" 
+                                        sx={{ 
+                                            backgroundColor: 'rgba(76, 175, 80, 0.3)', 
+                                            color: 'white',
+                                            fontWeight: 500
+                                        }} 
+                                    />
+                                )}
+                            </Box>
+                        </Grid>
+                        <Grid item>
+                            {!editing ? (
+                                <Button
+                                    variant="contained"
+                                    startIcon={<Edit />}
+                                    onClick={() => setEditing(true)}
+                                    sx={{
+                                        backgroundColor: 'rgba(255,255,255,0.2)',
+                                        color: 'white',
+                                        '&:hover': {
+                                            backgroundColor: 'rgba(255,255,255,0.3)',
+                                        }
+                                    }}
+                                >
+                                    Edit Profile
+                                </Button>
+                            ) : (
+                                <Box sx={{ display: 'flex', gap: 1, flexDirection: isMobile ? 'column' : 'row' }}>
+                                    <Button
+                                        variant="contained"
+                                        startIcon={saving ? <CircularProgress size={16} /> : <Save />}
+                                        onClick={handleSave}
+                                        disabled={saving}
                                         sx={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            mb: 2,
+                                            backgroundColor: 'rgba(76, 175, 80, 0.9)',
+                                            color: 'white',
+                                            '&:hover': {
+                                                backgroundColor: 'rgba(76, 175, 80, 1)',
+                                            }
                                         }}
                                     >
-                                        <Avatar
-                                            sx={{
-                                                bgcolor: `${stat.color}.main`,
-                                                mr: 2,
-                                            }}
-                                        >
-                                            {stat.icon}
-                                        </Avatar>
-                                        <Box>
-                                            <Typography
-                                                variant="h4"
-                                                sx={{ fontWeight: "bold" }}
-                                            >
-                                                {stat.value}
-                                            </Typography>
-                                            <Typography
-                                                variant="body2"
-                                                color="text.secondary"
-                                            >
-                                                {stat.title}
-                                            </Typography>
-                                        </Box>
-                                    </Box>
-                                </CardContent>
-                            </Card>
+                                        {saving ? 'Saving...' : 'Save'}
+                                    </Button>
+                                    <Button
+                                        variant="outlined"
+                                        startIcon={<Cancel />}
+                                        onClick={handleCancel}
+                                        sx={{
+                                            borderColor: 'rgba(255,255,255,0.5)',
+                                            color: 'white',
+                                            '&:hover': {
+                                                borderColor: 'white',
+                                                backgroundColor: 'rgba(255,255,255,0.1)',
+                                            }
+                                        }}
+                                    >
+                                        Cancel
+                                    </Button>
+                                </Box>
+                            )}
                         </Grid>
-                    ))}
-                </Grid>
+                    </Grid>
+                </Paper>
 
-                <Grid container spacing={3}>
-                    {/* System Alerts */}
-                    <Grid item xs={12} md={8}>
-                        <Paper elevation={3} sx={{ p: 3 }}>
-                            <Typography
-                                variant="h6"
-                                sx={{
-                                    fontWeight: "bold",
-                                    mb: 3,
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 1,
-                                }}
-                            >
-                                <Notifications color="primary" />
-                                🚨 System Alerts
+                {/* Alerts */}
+                {error && (
+                    <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
+                        {error}
+                    </Alert>
+                )}
+
+                {success && (
+                    <Alert severity="success" sx={{ mb: 3 }} onClose={() => setSuccess('')}>
+                        {success}
+                    </Alert>
+                )}
+
+                {/* Statistics */}
+                {renderStats()}
+
+                {/* Tabs */}
+                <Box sx={{ mb: 3 }}>
+                    <Tabs 
+                        value={tabValue} 
+                        onChange={(e, newValue) => setTabValue(newValue)}
+                        variant={isMobile ? "scrollable" : "standard"}
+                        scrollButtons="auto"
+                    >
+                        <Tab label="Personal Info" icon={<Person />} iconPosition="start" />
+                        <Tab label="Professional Info" icon={<MedicalServices />} iconPosition="start" />
+                        <Tab label="Security" icon={<Security />} iconPosition="start" />
+                    </Tabs>
+                </Box>
+
+                {/* Tab Content */}
+                {tabValue === 0 && renderPersonalInfo()}
+                {tabValue === 1 && renderProfessionalInfo()}
+                {tabValue === 2 && (
+                    <Card elevation={3}>
+                        <CardContent>
+                            <Typography variant="h6" sx={{ mb: 3, fontWeight: 'bold' }}>
+                                Security Settings
                             </Typography>
                             <List>
-                                {systemAlerts.map((alert, index) => (
-                                    <React.Fragment key={index}>
-                                        <ListItem>
-                                            <ListItemIcon>
-                                                <Security
-                                                    color={
-                                                        alert.status ===
-                                                        "success"
-                                                            ? "success"
-                                                            : alert.status ===
-                                                              "warning"
-                                                            ? "warning"
-                                                            : "error"
-                                                    }
-                                                />
-                                            </ListItemIcon>
-                                            <ListItemText
-                                                primary={`🔔 ${alert.type}: ${alert.message}`}
-                                                secondary={`⏰ ${alert.time}`}
-                                            />
-                                            <Chip
-                                                label={alert.status}
-                                                color={
-                                                    alert.status === "success"
-                                                        ? "success"
-                                                        : alert.status ===
-                                                          "warning"
-                                                        ? "warning"
-                                                        : "error"
-                                                }
-                                                size="small"
-                                            />
-                                        </ListItem>
-                                        {index < systemAlerts.length - 1 && (
-                                            <Divider />
-                                        )}
-                                    </React.Fragment>
-                                ))}
+                                <ListItem>
+                                    <ListItemIcon>
+                                        <Security color="primary" />
+                                    </ListItemIcon>
+                                    <ListItemText 
+                                        primary="Change Password" 
+                                        secondary="Update your account password"
+                                    />
+                                    <Button variant="outlined">Change</Button>
+                                </ListItem>
+                                <Divider />
+                                <ListItem>
+                                    <ListItemIcon>
+                                        <Verified color="primary" />
+                                    </ListItemIcon>
+                                    <ListItemText 
+                                        primary="Verification Status" 
+                                        secondary={doctor.is_verified ? "Your profile is verified" : "Verification pending"}
+                                    />
+                                    <Chip 
+                                        label={doctor.is_verified ? "Verified" : "Pending"} 
+                                        color={doctor.is_verified ? "success" : "warning"}
+                                        size="small"
+                                    />
+                                </ListItem>
                             </List>
-                        </Paper>
-                    </Grid>
-
-                    {/* Admin Actions */}
-                    <Grid item xs={12} md={4}>
-                        <Paper elevation={3} sx={{ p: 3 }}>
-                            <Typography
-                                variant="h6"
-                                sx={{
-                                    fontWeight: "bold",
-                                    mb: 3,
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 1,
-                                }}
-                            >
-                                <Settings color="primary" />
-                                🔧 Admin Controls
-                            </Typography>
-                            <Box
-                                sx={{
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    gap: 2,
-                                }}
-                            >
-                                <Button
-                                    variant="outlined"
-                                    startIcon={<SupervisorAccount />}
-                                    fullWidth
-                                    sx={{ justifyContent: "flex-start" }}
-                                >
-                                    👥 User Management
-                                </Button>
-                                <Button
-                                    variant="outlined"
-                                    startIcon={<VerifiedUser />}
-                                    fullWidth
-                                    sx={{ justifyContent: "flex-start" }}
-                                >
-                                    ✅ Verify Doctors
-                                </Button>
-                                <Button
-                                    variant="outlined"
-                                    startIcon={<LocalHospital />}
-                                    fullWidth
-                                    sx={{ justifyContent: "flex-start" }}
-                                >
-                                    🏥 Platform Settings
-                                </Button>
-                                <Button
-                                    variant="outlined"
-                                    startIcon={<Assessment />}
-                                    fullWidth
-                                    sx={{ justifyContent: "flex-start" }}
-                                >
-                                    📊 Analytics
-                                </Button>
-                                <Button
-                                    variant="outlined"
-                                    startIcon={<Security />}
-                                    fullWidth
-                                    sx={{ justifyContent: "flex-start" }}
-                                >
-                                    🔐 Security Center
-                                </Button>
-                            </Box>
-                        </Paper>
-                    </Grid>
-                </Grid>
+                        </CardContent>
+                    </Card>
+                )}
             </Container>
         </MainLayout>
     );
 };
 
-export default AdminDashboard;
+export default DoctorProfile;
 ```
 
 **resources/js/pages/doctor/DoctorDashboard.jsx**
@@ -11926,6 +13534,688 @@ const DoctorDashboard = () => {
 export default DoctorDashboard;
 ```
 
+**resources/js/pages/healthcare/HealthcareProfile.jsx**
+
+```jsx
+import React, { useState, useEffect } from 'react';
+import {
+    Container,
+    Typography,
+    Box,
+    Grid,
+    Card,
+    CardContent,
+    Avatar,
+    Button,
+    TextField,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    Alert,
+    CircularProgress,
+    Paper,
+    Chip,
+    List,
+    ListItem,
+    ListItemIcon,
+    ListItemText,
+    Tabs,
+    Tab,
+    useTheme,
+    useMediaQuery,
+    Divider,
+    Rating,
+    Stack,
+} from '@mui/material';
+import {
+    Business,
+    Email,
+    Phone,
+    LocationOn,
+    Edit,
+    Save,
+    Cancel,
+    PhotoCamera,
+    Security,
+    LocalHospital,
+    Verified,
+    Star,
+    People,
+    CalendarMonth,
+} from '@mui/icons-material';
+import MainLayout from '../../components/layout/MainLayout';
+import axios from 'axios';
+
+const HealthcareProfile = () => {
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+    const apiUrl = import.meta.env.VITE_API_URL;
+
+    const [clinic, setClinic] = useState(null);
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [editing, setEditing] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
+    const [tabValue, setTabValue] = useState(0);
+    const [formData, setFormData] = useState({
+        name: '',
+        registration_number: '',
+        license_number: '',
+        organization_type: 'clinic',
+        description: '',
+        address: '',
+        phone: '',
+        email: '',
+        website: '',
+        facilities: [],
+        specialties: [],
+        opening_time: '09:00',
+        closing_time: '18:00',
+        working_days: [],
+        established_date: '',
+        bed_count: '',
+        certifications: [],
+    });
+
+    const organizationTypes = [
+        { value: 'hospital', label: 'Hospital' },
+        { value: 'clinic', label: 'Clinic' },
+        { value: 'diagnostic_center', label: 'Diagnostic Center' },
+        { value: 'pharmacy', label: 'Pharmacy' },
+        { value: 'nursing_home', label: 'Nursing Home' },
+    ];
+
+    const workingDaysOptions = [
+        'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'
+    ];
+
+    useEffect(() => {
+        loadHealthcareProfile();
+    }, []);
+
+    const loadHealthcareProfile = async () => {
+        try {
+            const token = localStorage.getItem('auth_token');
+            const userData = JSON.parse(localStorage.getItem('user') || '{}');
+            
+            if (!token) {
+                window.location.href = '/';
+                return;
+            }
+
+            const response = await axios.get(`${apiUrl}/healthcare/profile`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            const clinicData = response.data.profile;
+            setClinic(clinicData);
+            setUser(userData);
+            
+            if (clinicData) {
+                setFormData({
+                    name: clinicData.name || '',
+                    registration_number: clinicData.registration_number || '',
+                    license_number: clinicData.license_number || '',
+                    organization_type: clinicData.organization_type || 'clinic',
+                    description: clinicData.description || '',
+                    address: clinicData.address || '',
+                    phone: clinicData.phone || '',
+                    email: clinicData.email || '',
+                    website: clinicData.website || '',
+                    facilities: clinicData.facilities || [],
+                    specialties: clinicData.specialties || [],
+                    opening_time: clinicData.opening_time || '09:00',
+                    closing_time: clinicData.closing_time || '18:00',
+                    working_days: clinicData.working_days || [],
+                    established_date: clinicData.established_date || '',
+                    bed_count: clinicData.bed_count || '',
+                    certifications: clinicData.certifications || [],
+                });
+            }
+        } catch (error) {
+            console.error('Failed to load healthcare profile:', error);
+            setError('Failed to load profile data');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleInputChange = (field) => (event) => {
+        setFormData({
+            ...formData,
+            [field]: event.target.value
+        });
+    };
+
+    const handleArrayInputChange = (field, value) => {
+        const arrayValue = value.split(',').map(item => item.trim()).filter(item => item);
+        setFormData({
+            ...formData,
+            [field]: arrayValue
+        });
+    };
+
+    const handleMultiSelectChange = (field) => (event) => {
+        setFormData({
+            ...formData,
+            [field]: event.target.value
+        });
+    };
+
+    const handleSave = async () => {
+        setSaving(true);
+        setError('');
+        
+        try {
+            const token = localStorage.getItem('auth_token');
+            
+            const response = await axios.post(`${apiUrl}/healthcare/profile`, formData, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            setClinic(response.data.profile);
+            
+            setSuccess('Profile updated successfully!');
+            setEditing(false);
+            
+            setTimeout(() => setSuccess(''), 3000);
+        } catch (error) {
+            console.error('Failed to update profile:', error);
+            setError(error.response?.data?.message || 'Failed to update profile');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleCancel = () => {
+        loadHealthcareProfile();
+        setEditing(false);
+        setError('');
+    };
+
+    const renderBasicInfo = () => (
+        <Card elevation={3} sx={{ mb: 3 }}>
+            <CardContent>
+                <Typography variant="h6" sx={{ mb: 3, fontWeight: 'bold' }}>
+                    Basic Information
+                </Typography>
+                
+                <Grid container spacing={3}>
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            label="Organization Name"
+                            value={formData.name}
+                            onChange={handleInputChange('name')}
+                            disabled={!editing}
+                            required
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <FormControl fullWidth disabled={!editing}>
+                            <InputLabel>Organization Type</InputLabel>
+                            <Select
+                                value={formData.organization_type}
+                                label="Organization Type"
+                                onChange={handleInputChange('organization_type')}
+                            >
+                                {organizationTypes.map(type => (
+                                    <MenuItem key={type.value} value={type.value}>
+                                        {type.label}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            label="Registration Number"
+                            value={formData.registration_number}
+                            onChange={handleInputChange('registration_number')}
+                            disabled={!editing}
+                            required
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            label="License Number"
+                            value={formData.license_number}
+                            onChange={handleInputChange('license_number')}
+                            disabled={!editing}
+                            required
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            label="Phone Number"
+                            value={formData.phone}
+                            onChange={handleInputChange('phone')}
+                            disabled={!editing}
+                            required
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            label="Email"
+                            type="email"
+                            value={formData.email}
+                            onChange={handleInputChange('email')}
+                            disabled={!editing}
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            label="Website"
+                            value={formData.website}
+                            onChange={handleInputChange('website')}
+                            disabled={!editing}
+                            placeholder="https://your-website.com"
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            label="Established Date"
+                            type="date"
+                            value={formData.established_date}
+                            onChange={handleInputChange('established_date')}
+                            disabled={!editing}
+                            InputLabelProps={{ shrink: true }}
+                        />
+                    </Grid>
+                    <Grid item xs={12}>
+                        <TextField
+                            fullWidth
+                            label="Address"
+                            multiline
+                            rows={3}
+                            value={formData.address}
+                            onChange={handleInputChange('address')}
+                            disabled={!editing}
+                            required
+                        />
+                    </Grid>
+                    <Grid item xs={12}>
+                        <TextField
+                            fullWidth
+                            label="Description"
+                            multiline
+                            rows={4}
+                            value={formData.description}
+                            onChange={handleInputChange('description')}
+                            disabled={!editing}
+                            placeholder="Describe your healthcare facility and services..."
+                            required
+                        />
+                    </Grid>
+                </Grid>
+            </CardContent>
+        </Card>
+    );
+
+    const renderOperationalInfo = () => (
+        <Card elevation={3} sx={{ mb: 3 }}>
+            <CardContent>
+                <Typography variant="h6" sx={{ mb: 3, fontWeight: 'bold' }}>
+                    Operational Information
+                </Typography>
+                
+                <Grid container spacing={3}>
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            label="Opening Time"
+                            type="time"
+                            value={formData.opening_time}
+                            onChange={handleInputChange('opening_time')}
+                            disabled={!editing}
+                            InputLabelProps={{ shrink: true }}
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            label="Closing Time"
+                            type="time"
+                            value={formData.closing_time}
+                            onChange={handleInputChange('closing_time')}
+                            disabled={!editing}
+                            InputLabelProps={{ shrink: true }}
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            label="Bed Count (if applicable)"
+                            type="number"
+                            value={formData.bed_count}
+                            onChange={handleInputChange('bed_count')}
+                            disabled={!editing}
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <FormControl fullWidth disabled={!editing}>
+                            <InputLabel>Working Days</InputLabel>
+                            <Select
+                                multiple
+                                value={formData.working_days}
+                                label="Working Days"
+                                onChange={handleMultiSelectChange('working_days')}
+                                renderValue={(selected) => (
+                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                        {selected.map((value) => (
+                                            <Chip key={value} label={value.charAt(0).toUpperCase() + value.slice(1)} size="small" />
+                                        ))}
+                                    </Box>
+                                )}
+                            >
+                                {workingDaysOptions.map((day) => (
+                                    <MenuItem key={day} value={day}>
+                                        {day.charAt(0).toUpperCase() + day.slice(1)}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            label="Specialties (comma separated)"
+                            value={formData.specialties.join(', ')}
+                            onChange={(e) => handleArrayInputChange('specialties', e.target.value)}
+                            disabled={!editing}
+                            placeholder="Cardiology, Neurology, Pediatrics..."
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            label="Facilities (comma separated)"
+                            value={formData.facilities.join(', ')}
+                            onChange={(e) => handleArrayInputChange('facilities', e.target.value)}
+                            disabled={!editing}
+                            placeholder="X-Ray, Lab, Pharmacy, ICU..."
+                        />
+                    </Grid>
+                    <Grid item xs={12}>
+                        <TextField
+                            fullWidth
+                            label="Certifications (comma separated)"
+                            value={formData.certifications.join(', ')}
+                            onChange={(e) => handleArrayInputChange('certifications', e.target.value)}
+                            disabled={!editing}
+                            placeholder="NABH, ISO 9001, JCI..."
+                        />
+                    </Grid>
+                </Grid>
+            </CardContent>
+        </Card>
+    );
+
+    const renderStats = () => {
+        if (!clinic) return null;
+
+        return (
+            <Card elevation={3} sx={{ mb: 3 }}>
+                <CardContent>
+                    <Typography variant="h6" sx={{ mb: 3, fontWeight: 'bold' }}>
+                        Organization Statistics
+                    </Typography>
+                    
+                    <Grid container spacing={3}>
+                        <Grid item xs={12} sm={6} md={3}>
+                            <Paper elevation={2} sx={{ p: 2, textAlign: 'center', bgcolor: 'primary.50' }}>
+                                <Star sx={{ fontSize: 30, color: 'warning.main', mb: 1 }} />
+                                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                                    {clinic.rating || '0.0'}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    Rating
+                                </Typography>
+                            </Paper>
+                        </Grid>
+                        <Grid item xs={12} sm={6} md={3}>
+                            <Paper elevation={2} sx={{ p: 2, textAlign: 'center', bgcolor: 'success.50' }}>
+                                <People sx={{ fontSize: 30, color: 'success.main', mb: 1 }} />
+                                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                                    {clinic.total_reviews || 0}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    Reviews
+                                </Typography>
+                            </Paper>
+                        </Grid>
+                        <Grid item xs={12} sm={6} md={3}>
+                            <Paper elevation={2} sx={{ p: 2, textAlign: 'center', bgcolor: 'info.50' }}>
+                                <LocalHospital sx={{ fontSize: 30, color: 'info.main', mb: 1 }} />
+                                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                                    {clinic.specialties?.length || 0}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    Specialties
+                                </Typography>
+                            </Paper>
+                        </Grid>
+                        <Grid item xs={12} sm={6} md={3}>
+                            <Paper elevation={2} sx={{ p: 2, textAlign: 'center', bgcolor: 'warning.50' }}>
+                                <CalendarMonth sx={{ fontSize: 30, color: 'warning.main', mb: 1 }} />
+                                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                                    {clinic.working_days?.length || 0}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    Working Days
+                                </Typography>
+                            </Paper>
+                        </Grid>
+                    </Grid>
+                </CardContent>
+            </Card>
+        );
+    };
+
+    if (loading) {
+        return (
+            <MainLayout>
+                <Container maxWidth="lg" sx={{ mt: 12, mb: 4, textAlign: 'center' }}>
+                    <CircularProgress size={60} />
+                    <Typography variant="h6" sx={{ mt: 2 }}>
+                        Loading your profile...
+                    </Typography>
+                </Container>
+            </MainLayout>
+        );
+    }
+
+    return (
+        <MainLayout>
+            <Container maxWidth="lg" sx={{ mt: 12, mb: 4 }}>
+                {/* Header */}
+                <Paper elevation={3} sx={{ p: 3, mb: 3, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
+                    <Grid container spacing={3} alignItems="center">
+                        <Grid item>
+                            <Avatar
+                                src={clinic?.logo || '/images/common/hospital-icon.png'}
+                                sx={{ 
+                                    width: isMobile ? 80 : 100, 
+                                    height: isMobile ? 80 : 100,
+                                    border: '4px solid rgba(255,255,255,0.3)'
+                                }}
+                            >
+                                <LocalHospital sx={{ fontSize: isMobile ? 40 : 50 }} />
+                            </Avatar>
+                        </Grid>
+                        <Grid item sx={{ flex: 1 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                <Typography variant={isMobile ? "h5" : "h4"} sx={{ fontWeight: 'bold' }}>
+                                    {clinic?.name || 'Your Healthcare Facility'}
+                                </Typography>
+                                {clinic?.is_verified && (
+                                    <Verified sx={{ color: 'success.light', fontSize: 28 }} />
+                                )}
+                            </Box>
+                            <Typography variant="h6" sx={{ opacity: 0.9, mb: 1 }}>
+                                {formData.organization_type.charAt(0).toUpperCase() + formData.organization_type.slice(1).replace('_', ' ')}
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                <Chip 
+                                    label="Healthcare Provider" 
+                                    sx={{ 
+                                        backgroundColor: 'rgba(255,255,255,0.2)', 
+                                        color: 'white',
+                                        fontWeight: 500
+                                    }} 
+                                />
+                                {clinic?.is_verified && (
+                                    <Chip 
+                                        label="Verified" 
+                                        sx={{ 
+                                            backgroundColor: 'rgba(76, 175, 80, 0.3)', 
+                                            color: 'white',
+                                            fontWeight: 500
+                                        }} 
+                                    />
+                                )}
+                            </Box>
+                        </Grid>
+                        <Grid item>
+                            {!editing ? (
+                                <Button
+                                    variant="contained"
+                                    startIcon={<Edit />}
+                                    onClick={() => setEditing(true)}
+                                    sx={{
+                                        backgroundColor: 'rgba(255,255,255,0.2)',
+                                        color: 'white',
+                                        '&:hover': {
+                                            backgroundColor: 'rgba(255,255,255,0.3)',
+                                        }
+                                    }}
+                                >
+                                    Edit Profile
+                                </Button>
+                            ) : (
+                                <Box sx={{ display: 'flex', gap: 1, flexDirection: isMobile ? 'column' : 'row' }}>
+                                    <Button
+                                        variant="contained"
+                                        startIcon={saving ? <CircularProgress size={16} /> : <Save />}
+                                        onClick={handleSave}
+                                        disabled={saving}
+                                        sx={{
+                                            backgroundColor: 'rgba(76, 175, 80, 0.9)',
+                                            color: 'white',
+                                            '&:hover': {
+                                                backgroundColor: 'rgba(76, 175, 80, 1)',
+                                            }
+                                        }}
+                                    >
+                                        {saving ? 'Saving...' : 'Save'}
+                                    </Button>
+                                    <Button
+                                        variant="outlined"
+                                        startIcon={<Cancel />}
+                                        onClick={handleCancel}
+                                        sx={{
+                                            borderColor: 'rgba(255,255,255,0.5)',
+                                            color: 'white',
+                                            '&:hover': {
+                                                borderColor: 'white',
+                                                backgroundColor: 'rgba(255,255,255,0.1)',
+                                            }
+                                        }}
+                                    >
+                                        Cancel
+                                    </Button>
+                                </Box>
+                            )}
+                        </Grid>
+                    </Grid>
+                </Paper>
+
+                {/* Alerts */}
+                {error && (
+                    <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
+                        {error}
+                    </Alert>
+                )}
+
+                {success && (
+                    <Alert severity="success" sx={{ mb: 3 }} onClose={() => setSuccess('')}>
+                        {success}
+                    </Alert>
+                )}
+
+                {/* Statistics */}
+                {renderStats()}
+
+                {/* Tabs */}
+                <Box sx={{ mb: 3 }}>
+                    <Tabs 
+                        value={tabValue} 
+                        onChange={(e, newValue) => setTabValue(newValue)}
+                        variant={isMobile ? "scrollable" : "standard"}
+                        scrollButtons="auto"
+                    >
+                        <Tab label="Basic Info" icon={<Business />} iconPosition="start" />
+                        <Tab label="Operational Info" icon={<LocalHospital />} iconPosition="start" />
+                        <Tab label="Security" icon={<Security />} iconPosition="start" />
+                    </Tabs>
+                </Box>
+
+                {/* Tab Content */}
+                {tabValue === 0 && renderBasicInfo()}
+                {tabValue === 1 && renderOperationalInfo()}
+                {tabValue === 2 && (
+                    <Card elevation={3}>
+                        <CardContent>
+                            <Typography variant="h6" sx={{ mb: 3, fontWeight: 'bold' }}>
+                                Security Settings
+                            </Typography>
+                            <List>
+                                <ListItem>
+                                    <ListItemIcon>
+                                        <Security color="primary" />
+                                    </ListItemIcon>
+                                    <ListItemText 
+                                        primary="Change Password" 
+                                        secondary="Update your account password"
+                                    />
+                                    <Button variant="outlined">Change</Button>
+                                </ListItem>
+                                <Divider />
+                                <ListItem>
+                                    <ListItemIcon>
+                                        <Verified color="primary" />
+                                    </ListItemIcon>
+                                    <ListItemText 
+                                        primary="Verification Status" 
+                                        secondary={clinic?.is_verified ? "Your facility is verified" : "Verification pending"}
+                                    />
+                                    <Chip 
+                                        label={clinic?.is_verified ? "Verified" : "Pending"} 
+                                        color={clinic?.is_verified ? "success" : "warning"}
+                                        size="small"
+                                    />
+                                </ListItem>
+                            </List>
+                        </CardContent>
+                    </Card>
+                )}
+            </Container>
+        </MainLayout>
+    );
+};
+
+export default HealthcareProfile;
+```
+
 **resources/js/pages/healthcare/HealthcareDashboard.jsx**
 
 ```jsx
@@ -12883,6 +15173,1271 @@ const HealthcareDashboard = () => {
 };
 
 export default HealthcareDashboard;
+```
+
+**resources/js/pages/patient/PatientProfile.jsx**
+
+```jsx
+import React, { useState, useEffect } from 'react';
+import {
+    Container,
+    Typography,
+    Box,
+    Grid,
+    Card,
+    CardContent,
+    Avatar,
+    Button,
+    TextField,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    Alert,
+    CircularProgress,
+    Paper,
+    Chip,
+    List,
+    ListItem,
+    ListItemIcon,
+    ListItemText,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Tabs,
+    Tab,
+    useTheme,
+    useMediaQuery,
+} from '@mui/material';
+import {
+    Person,
+    Email,
+    Phone,
+    LocationOn,
+    Edit,
+    Save,
+    Cancel,
+    PhotoCamera,
+    Security,
+    Notifications,
+    History,
+    MedicalServices,
+    Verified,
+} from '@mui/icons-material';
+import MainLayout from '../../components/layout/MainLayout';
+import axios from 'axios';
+
+const PatientProfile = () => {
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+    const apiUrl = import.meta.env.VITE_API_URL;
+
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [editing, setEditing] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
+    const [tabValue, setTabValue] = useState(0);
+    const [formData, setFormData] = useState({
+        name: '',
+        email: '',
+        phone: '',
+        address: '',
+        date_of_birth: '',
+        gender: '',
+        emergency_contact: '',
+        blood_group: '',
+        allergies: '',
+        medical_conditions: ''
+    });
+
+    useEffect(() => {
+        loadUserProfile();
+    }, []);
+
+    const loadUserProfile = async () => {
+        try {
+            const token = localStorage.getItem('auth_token');
+            const userData = JSON.parse(localStorage.getItem('user') || '{}');
+            
+            if (!token) {
+                window.location.href = '/';
+                return;
+            }
+
+            // For now, use localStorage data, but you can call an API endpoint
+            setUser(userData);
+            setFormData({
+                name: userData.name || '',
+                email: userData.email || '',
+                phone: userData.phone || '',
+                address: userData.address || '',
+                date_of_birth: userData.date_of_birth || '',
+                gender: userData.gender || '',
+                emergency_contact: userData.emergency_contact || '',
+                blood_group: userData.blood_group || '',
+                allergies: userData.allergies || '',
+                medical_conditions: userData.medical_conditions || ''
+            });
+        } catch (error) {
+            console.error('Failed to load user profile:', error);
+            setError('Failed to load profile data');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleInputChange = (field) => (event) => {
+        setFormData({
+            ...formData,
+            [field]: event.target.value
+        });
+    };
+
+    const handleSave = async () => {
+        setSaving(true);
+        setError('');
+        
+        try {
+            const token = localStorage.getItem('auth_token');
+            
+            // Call your API endpoint to update profile
+            const response = await axios.put(`${apiUrl}/user/profile`, formData, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            // Update local storage
+            const updatedUser = { ...user, ...formData };
+            localStorage.setItem('user', JSON.stringify(updatedUser));
+            setUser(updatedUser);
+            
+            setSuccess('Profile updated successfully!');
+            setEditing(false);
+            
+            // Clear success message after 3 seconds
+            setTimeout(() => setSuccess(''), 3000);
+        } catch (error) {
+            console.error('Failed to update profile:', error);
+            setError(error.response?.data?.message || 'Failed to update profile');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleCancel = () => {
+        // Reset form data to original values
+        setFormData({
+            name: user.name || '',
+            email: user.email || '',
+            phone: user.phone || '',
+            address: user.address || '',
+            date_of_birth: user.date_of_birth || '',
+            gender: user.gender || '',
+            emergency_contact: user.emergency_contact || '',
+            blood_group: user.blood_group || '',
+            allergies: user.allergies || '',
+            medical_conditions: user.medical_conditions || ''
+        });
+        setEditing(false);
+        setError('');
+    };
+
+    const renderPersonalInfo = () => (
+        <Card elevation={3} sx={{ mb: 3 }}>
+            <CardContent>
+                <Typography variant="h6" sx={{ mb: 3, fontWeight: 'bold' }}>
+                    Personal Information
+                </Typography>
+                
+                <Grid container spacing={3}>
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            label="Full Name"
+                            value={formData.name}
+                            onChange={handleInputChange('name')}
+                            disabled={!editing}
+                            required
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            label="Email"
+                            type="email"
+                            value={formData.email}
+                            onChange={handleInputChange('email')}
+                            disabled={!editing}
+                            required
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            label="Phone Number"
+                            value={formData.phone}
+                            onChange={handleInputChange('phone')}
+                            disabled={!editing}
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <TextField
+                            fullWidth
+                            label="Date of Birth"
+                            type="date"
+                            value={formData.date_of_birth}
+                            onChange={handleInputChange('date_of_birth')}
+                            disabled={!editing}
+                            InputLabelProps={{ shrink: true }}
+                        />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <FormControl fullWidth disabled={!editing}>
+                            <InputLabel>Gender</InputLabel>
+                            <Select
+                                value={formData.gender}
+                                label="Gender"
+                                onChange={handleInputChange('gender')}
+                            >
+                                <MenuItem value="male">Male</MenuItem>
+                                <MenuItem value="female">Female</MenuItem>
+                                <MenuItem value="other">Other</MenuItem>
+                                <MenuItem value="prefer_not_to_say">Prefer not to say</MenuItem>
+                            </Select>
+                        </FormControl>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <FormControl fullWidth disabled={!editing}>
+                            <InputLabel>Blood Group</InputLabel>
+                            <Select
+                                value={formData.blood_group}
+                                label="Blood Group"
+                                onChange={handleInputChange('blood_group')}
+                            >
+                                <MenuItem value="A+">A+</MenuItem>
+                                <MenuItem value="A-">A-</MenuItem>
+                                <MenuItem value="B+">B+</MenuItem>
+                                <MenuItem value="B-">B-</MenuItem>
+                                <MenuItem value="AB+">AB+</MenuItem>
+                                <MenuItem value="AB-">AB-</MenuItem>
+                                <MenuItem value="O+">O+</MenuItem>
+                                <MenuItem value="O-">O-</MenuItem>
+                            </Select>
+                        </FormControl>
+                    </Grid>
+                    <Grid item xs={12}>
+                        <TextField
+                            fullWidth
+                            label="Address"
+                            multiline
+                            rows={2}
+                            value={formData.address}
+                            onChange={handleInputChange('address')}
+                            disabled={!editing}
+                        />
+                    </Grid>
+                    <Grid item xs={12}>
+                        <TextField
+                            fullWidth
+                            label="Emergency Contact"
+                            value={formData.emergency_contact}
+                            onChange={handleInputChange('emergency_contact')}
+                            disabled={!editing}
+                            placeholder="Name and phone number"
+                        />
+                    </Grid>
+                </Grid>
+            </CardContent>
+        </Card>
+    );
+
+    const renderMedicalInfo = () => (
+        <Card elevation={3} sx={{ mb: 3 }}>
+            <CardContent>
+                <Typography variant="h6" sx={{ mb: 3, fontWeight: 'bold' }}>
+                    Medical Information
+                </Typography>
+                
+                <Grid container spacing={3}>
+                    <Grid item xs={12}>
+                        <TextField
+                            fullWidth
+                            label="Known Allergies"
+                            multiline
+                            rows={3}
+                            value={formData.allergies}
+                            onChange={handleInputChange('allergies')}
+                            disabled={!editing}
+                            placeholder="List any known allergies (medications, food, environmental, etc.)"
+                            helperText="Please list all known allergies for your safety"
+                        />
+                    </Grid>
+                    <Grid item xs={12}>
+                        <TextField
+                            fullWidth
+                            label="Medical Conditions"
+                            multiline
+                            rows={3}
+                            value={formData.medical_conditions}
+                            onChange={handleInputChange('medical_conditions')}
+                            disabled={!editing}
+                            placeholder="List any chronic conditions, ongoing treatments, or medications"
+                            helperText="This helps doctors provide better care"
+                        />
+                    </Grid>
+                </Grid>
+            </CardContent>
+        </Card>
+    );
+
+    if (loading) {
+        return (
+            <MainLayout>
+                <Container maxWidth="lg" sx={{ mt: 12, mb: 4, textAlign: 'center' }}>
+                    <CircularProgress size={60} />
+                    <Typography variant="h6" sx={{ mt: 2 }}>
+                        Loading your profile...
+                    </Typography>
+                </Container>
+            </MainLayout>
+        );
+    }
+
+    if (!user) {
+        return (
+            <MainLayout>
+                <Container maxWidth="lg" sx={{ mt: 12, mb: 4 }}>
+                    <Alert severity="error">
+                        Please log in to view your profile.
+                    </Alert>
+                </Container>
+            </MainLayout>
+        );
+    }
+
+    return (
+        <MainLayout>
+            <Container maxWidth="lg" sx={{ mt: 12, mb: 4 }}>
+                {/* Header */}
+                <Paper elevation={3} sx={{ p: 3, mb: 3, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
+                    <Grid container spacing={3} alignItems="center">
+                        <Grid item>
+                            <Avatar
+                                src={user.avatar || '/images/common/avatar.webp'}
+                                sx={{ 
+                                    width: isMobile ? 80 : 100, 
+                                    height: isMobile ? 80 : 100,
+                                    border: '4px solid rgba(255,255,255,0.3)'
+                                }}
+                            >
+                                <Person sx={{ fontSize: isMobile ? 40 : 50 }} />
+                            </Avatar>
+                        </Grid>
+                        <Grid item sx={{ flex: 1 }}>
+                            <Typography variant={isMobile ? "h5" : "h4"} sx={{ fontWeight: 'bold', mb: 1 }}>
+                                {user.name || 'Your Profile'}
+                            </Typography>
+                            <Typography variant="body1" sx={{ opacity: 0.9, mb: 1 }}>
+                                {user.email}
+                            </Typography>
+                            <Chip 
+                                label="Patient" 
+                                sx={{ 
+                                    backgroundColor: 'rgba(255,255,255,0.2)', 
+                                    color: 'white',
+                                    fontWeight: 500
+                                }} 
+                            />
+                        </Grid>
+                        <Grid item>
+                            {!editing ? (
+                                <Button
+                                    variant="contained"
+                                    startIcon={<Edit />}
+                                    onClick={() => setEditing(true)}
+                                    sx={{
+                                        backgroundColor: 'rgba(255,255,255,0.2)',
+                                        color: 'white',
+                                        '&:hover': {
+                                            backgroundColor: 'rgba(255,255,255,0.3)',
+                                        }
+                                    }}
+                                >
+                                    Edit Profile
+                                </Button>
+                            ) : (
+                                <Box sx={{ display: 'flex', gap: 1, flexDirection: isMobile ? 'column' : 'row' }}>
+                                    <Button
+                                        variant="contained"
+                                        startIcon={saving ? <CircularProgress size={16} /> : <Save />}
+                                        onClick={handleSave}
+                                        disabled={saving}
+                                        sx={{
+                                            backgroundColor: 'rgba(76, 175, 80, 0.9)',
+                                            color: 'white',
+                                            '&:hover': {
+                                                backgroundColor: 'rgba(76, 175, 80, 1)',
+                                            }
+                                        }}
+                                    >
+                                        {saving ? 'Saving...' : 'Save'}
+                                    </Button>
+                                    <Button
+                                        variant="outlined"
+                                        startIcon={<Cancel />}
+                                        onClick={handleCancel}
+                                        sx={{
+                                            borderColor: 'rgba(255,255,255,0.5)',
+                                            color: 'white',
+                                            '&:hover': {
+                                                borderColor: 'white',
+                                                backgroundColor: 'rgba(255,255,255,0.1)',
+                                            }
+                                        }}
+                                    >
+                                        Cancel
+                                    </Button>
+                                </Box>
+                            )}
+                        </Grid>
+                    </Grid>
+                </Paper>
+
+                {/* Alerts */}
+                {error && (
+                    <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
+                        {error}
+                    </Alert>
+                )}
+
+                {success && (
+                    <Alert severity="success" sx={{ mb: 3 }} onClose={() => setSuccess('')}>
+                        {success}
+                    </Alert>
+                )}
+
+                {/* Tabs */}
+                <Box sx={{ mb: 3 }}>
+                    <Tabs 
+                        value={tabValue} 
+                        onChange={(e, newValue) => setTabValue(newValue)}
+                        variant={isMobile ? "scrollable" : "standard"}
+                        scrollButtons="auto"
+                    >
+                        <Tab label="Personal Info" icon={<Person />} iconPosition="start" />
+                        <Tab label="Medical Info" icon={<MedicalServices />} iconPosition="start" />
+                        <Tab label="Security" icon={<Security />} iconPosition="start" />
+                    </Tabs>
+                </Box>
+
+                {/* Tab Content */}
+                {tabValue === 0 && renderPersonalInfo()}
+                {tabValue === 1 && renderMedicalInfo()}
+                {tabValue === 2 && (
+                    <Card elevation={3}>
+                        <CardContent>
+                            <Typography variant="h6" sx={{ mb: 3, fontWeight: 'bold' }}>
+                                Security Settings
+                            </Typography>
+                            <List>
+                                <ListItem>
+                                    <ListItemIcon>
+                                        <Security color="primary" />
+                                    </ListItemIcon>
+                                    <ListItemText 
+                                        primary="Change Password" 
+                                        secondary="Update your account password"
+                                    />
+                                    <Button variant="outlined">Change</Button>
+                                </ListItem>
+                                <ListItem>
+                                    <ListItemIcon>
+                                        <Notifications color="primary" />
+                                    </ListItemIcon>
+                                    <ListItemText 
+                                        primary="Notification Settings" 
+                                        secondary="Manage email and SMS notifications"
+                                    />
+                                    <Button variant="outlined">Configure</Button>
+                                </ListItem>
+                            </List>
+                        </CardContent>
+                    </Card>
+                )}
+            </Container>
+        </MainLayout>
+    );
+};
+
+export default PatientProfile;
+```
+
+**resources/js/pages/patient/PatientAppointments.jsx**
+
+```jsx
+import React, { useState, useEffect } from 'react';
+import {
+    Container,
+    Typography,
+    Box,
+    Grid,
+    Card,
+    CardContent,
+    Button,
+    Chip,
+    Avatar,
+    Paper,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    CircularProgress,
+    Alert,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Tabs,
+    Tab,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    TextField,
+    useTheme,
+    useMediaQuery,
+    Pagination,
+    IconButton,
+    Tooltip,
+} from '@mui/material';
+import {
+    CalendarMonth,
+    AccessTime,
+    LocalHospital,
+    Person,
+    Phone,
+    LocationOn,
+    Cancel,
+    Visibility,
+    Refresh,
+    FilterList,
+    Search,
+    GetApp,
+    Edit,
+} from '@mui/icons-material';
+import { format, parseISO, isValid } from 'date-fns';
+import MainLayout from '../../components/layout/MainLayout';
+import axios from 'axios';
+
+const PatientAppointments = () => {
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+    const isTablet = useMediaQuery(theme.breakpoints.down('md'));
+    const apiUrl = import.meta.env.VITE_API_URL;
+
+    const [appointments, setAppointments] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [selectedAppointment, setSelectedAppointment] = useState(null);
+    const [showDetailsDialog, setShowDetailsDialog] = useState(false);
+    const [showCancelDialog, setShowCancelDialog] = useState(false);
+    const [cancelling, setCancelling] = useState(false);
+    const [tabValue, setTabValue] = useState(0);
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+
+    const statusOptions = [
+        { value: 'all', label: 'All Appointments' },
+        { value: 'pending', label: 'Pending' },
+        { value: 'confirmed', label: 'Confirmed' },
+        { value: 'completed', label: 'Completed' },
+        { value: 'cancelled', label: 'Cancelled' },
+    ];
+
+    useEffect(() => {
+        loadAppointments();
+    }, [statusFilter, page]);
+
+    const loadAppointments = async () => {
+        try {
+            setLoading(true);
+            const token = localStorage.getItem('auth_token');
+            
+            if (!token) {
+                window.location.href = '/';
+                return;
+            }
+
+            const params = {
+                page,
+                per_page: 10,
+                ...(statusFilter !== 'all' && { status: statusFilter }),
+                ...(searchTerm && { search: searchTerm })
+            };
+
+            const response = await axios.get(`${apiUrl}/appointments`, {
+                headers: { Authorization: `Bearer ${token}` },
+                params
+            });
+
+            setAppointments(response.data.data || []);
+            setTotalPages(response.data.last_page || 1);
+        } catch (error) {
+            console.error('Failed to load appointments:', error);
+            setError('Failed to load appointments');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleCancelAppointment = async () => {
+        if (!selectedAppointment) return;
+
+        setCancelling(true);
+        try {
+            const token = localStorage.getItem('auth_token');
+            await axios.put(`${apiUrl}/appointments/${selectedAppointment.id}/cancel`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            // Reload appointments
+            await loadAppointments();
+            setShowCancelDialog(false);
+            setSelectedAppointment(null);
+        } catch (error) {
+            console.error('Failed to cancel appointment:', error);
+            setError(error.response?.data?.message || 'Failed to cancel appointment');
+        } finally {
+            setCancelling(false);
+        }
+    };
+
+    const getStatusColor = (status) => {
+        switch (status) {
+            case 'confirmed': return 'success';
+            case 'pending': return 'warning';
+            case 'completed': return 'info';
+            case 'cancelled': return 'error';
+            default: return 'default';
+        }
+    };
+
+    const getStatusIcon = (status) => {
+        switch (status) {
+            case 'confirmed': return '✅';
+            case 'pending': return '⏳';
+            case 'completed': return '🏁';
+            case 'cancelled': return '❌';
+            default: return '📝';
+        }
+    };
+
+    const formatAppointmentDate = (date, time) => {
+        try {
+            if (!date) return 'Invalid Date';
+            
+            const dateObj = typeof date === 'string' ? parseISO(date) : date;
+            if (!isValid(dateObj)) return 'Invalid Date';
+            
+            return {
+                date: format(dateObj, 'MMM dd, yyyy'),
+                time: time || 'No time specified'
+            };
+        } catch (error) {
+            return { date: 'Invalid Date', time: 'Invalid Time' };
+        }
+    };
+
+    const canCancelAppointment = (appointment) => {
+        if (appointment.status === 'completed' || appointment.status === 'cancelled') {
+            return false;
+        }
+        
+        // Check if appointment is more than 2 hours away
+        try {
+            const appointmentDateTime = parseISO(`${appointment.appointment_date}T${appointment.appointment_time}`);
+            const now = new Date();
+            const timeDiff = appointmentDateTime.getTime() - now.getTime();
+            const hoursDiff = timeDiff / (1000 * 60 * 60);
+            
+            return hoursDiff > 2;
+        } catch (error) {
+            return false;
+        }
+    };
+
+    const renderAppointmentCard = (appointment) => {
+        const { date, time } = formatAppointmentDate(appointment.appointment_date, appointment.appointment_time);
+        const canCancel = canCancelAppointment(appointment);
+
+        return (
+            <Card 
+                key={appointment.id}
+                elevation={2}
+                sx={{ 
+                    mb: 2,
+                    border: appointment.status === 'confirmed' ? '2px solid' : '1px solid',
+                    borderColor: appointment.status === 'confirmed' ? 'success.main' : 'grey.300',
+                    '&:hover': {
+                        boxShadow: 4,
+                        transform: 'translateY(-2px)',
+                        transition: 'all 0.2s ease-in-out'
+                    }
+                }}
+            >
+                <CardContent>
+                    <Grid container spacing={2}>
+                        {/* Appointment Status Badge */}
+                        <Grid item xs={12} sx={{ mb: 1 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Typography variant="caption" color="text.secondary">
+                                        #{appointment.appointment_number || appointment.id}
+                                    </Typography>
+                                    <Chip
+                                        label={`${getStatusIcon(appointment.status)} ${appointment.status.toUpperCase()}`}
+                                        color={getStatusColor(appointment.status)}
+                                        size="small"
+                                        sx={{ fontWeight: 600 }}
+                                    />
+                                </Box>
+                                <Typography variant="caption" color="text.secondary">
+                                    Booked on: {appointment.created_at ? format(parseISO(appointment.created_at), 'MMM dd, yyyy') : 'Unknown'}
+                                </Typography>
+                            </Box>
+                        </Grid>
+
+                        {/* Doctor Info */}
+                        <Grid item xs={12} sm={6} md={3}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                                <Avatar
+                                    src={appointment.doctor?.profile_image}
+                                    sx={{ width: 50, height: 50 }}
+                                >
+                                    <Person />
+                                </Avatar>
+                                <Box>
+                                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                                        {appointment.doctor?.user?.name || appointment.doctor?.name || 'Unknown Doctor'}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        {appointment.doctor?.specialization || 'General Practice'}
+                                    </Typography>
+                                    <Typography variant="caption" color="primary">
+                                        ₹{appointment.amount || appointment.doctor?.consultation_fee || 0}
+                                    </Typography>
+                                </Box>
+                            </Box>
+                        </Grid>
+
+                        {/* Clinic Info */}
+                        <Grid item xs={12} sm={6} md={3}>
+                            <Box sx={{ mb: 2 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                    <LocalHospital color="primary" fontSize="small" />
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                                        {appointment.clinic?.name || 'Unknown Clinic'}
+                                    </Typography>
+                                </Box>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                                    <LocationOn fontSize="small" color="action" />
+                                    <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem' }}>
+                                        {appointment.clinic?.address ? 
+                                            (appointment.clinic.address.length > 50 ? 
+                                                `${appointment.clinic.address.substring(0, 50)}...` : 
+                                                appointment.clinic.address) 
+                                            : 'Address not available'}
+                                    </Typography>
+                                </Box>
+                                {appointment.clinic?.phone && (
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <Phone fontSize="small" color="action" />
+                                        <Typography variant="body2" color="text.secondary">
+                                            {appointment.clinic.phone}
+                                        </Typography>
+                                    </Box>
+                                )}
+                            </Box>
+                        </Grid>
+
+                        {/* Date & Time */}
+                        <Grid item xs={12} sm={6} md={3}>
+                            <Box sx={{ mb: 2 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                    <CalendarMonth color="primary" fontSize="small" />
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                                        {date}
+                                    </Typography>
+                                </Box>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <AccessTime color="action" fontSize="small" />
+                                    <Typography variant="body2" color="text.secondary">
+                                        {time}
+                                    </Typography>
+                                </Box>
+                                {appointment.symptoms && (
+                                    <Box sx={{ mt: 1 }}>
+                                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                            Reason: {appointment.symptoms.length > 30 ? 
+                                                `${appointment.symptoms.substring(0, 30)}...` : 
+                                                appointment.symptoms}
+                                        </Typography>
+                                    </Box>
+                                )}
+                            </Box>
+                        </Grid>
+
+                        {/* Actions */}
+                        <Grid item xs={12} sm={6} md={3}>
+                            <Box sx={{ display: 'flex', gap: 1, flexDirection: isMobile ? 'column' : 'row', justifyContent: 'flex-end' }}>
+                                <Button
+                                    variant="outlined"
+                                    size="small"
+                                    startIcon={<Visibility />}
+                                    onClick={() => {
+                                        setSelectedAppointment(appointment);
+                                        setShowDetailsDialog(true);
+                                    }}
+                                >
+                                    View
+                                </Button>
+                                {canCancel && (
+                                    <Button
+                                        variant="outlined"
+                                        color="error"
+                                        size="small"
+                                        startIcon={<Cancel />}
+                                        onClick={() => {
+                                            setSelectedAppointment(appointment);
+                                            setShowCancelDialog(true);
+                                        }}
+                                    >
+                                        Cancel
+                                    </Button>
+                                )}
+                            </Box>
+                        </Grid>
+                    </Grid>
+                </CardContent>
+            </Card>
+        );
+    };
+
+    const renderAppointmentDetails = () => {
+        if (!selectedAppointment) return null;
+
+        const { date, time } = formatAppointmentDate(
+            selectedAppointment.appointment_date, 
+            selectedAppointment.appointment_time
+        );
+
+        return (
+            <Dialog 
+                open={showDetailsDialog} 
+                onClose={() => setShowDetailsDialog(false)}
+                maxWidth="md"
+                fullWidth
+                fullScreen={isMobile}
+            >
+                <DialogTitle>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="h6">Appointment Details</Typography>
+                        <Chip
+                            label={`${getStatusIcon(selectedAppointment.status)} ${selectedAppointment.status.toUpperCase()}`}
+                            color={getStatusColor(selectedAppointment.status)}
+                            sx={{ fontWeight: 600 }}
+                        />
+                    </Box>
+                </DialogTitle>
+                <DialogContent dividers>
+                    <Grid container spacing={3}>
+                        <Grid item xs={12} md={6}>
+                            <Paper elevation={2} sx={{ p: 2 }}>
+                                <Typography variant="h6" sx={{ mb: 2, color: 'primary.main' }}>
+                                    Doctor Information
+                                </Typography>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                                    <Avatar
+                                        src={selectedAppointment.doctor?.profile_image}
+                                        sx={{ width: 60, height: 60 }}
+                                    >
+                                        <Person />
+                                    </Avatar>
+                                    <Box>
+                                        <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                                            {selectedAppointment.doctor?.user?.name || selectedAppointment.doctor?.name}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            {selectedAppointment.doctor?.specialization}
+                                        </Typography>
+                                        <Typography variant="body2" color="primary">
+                                            {selectedAppointment.doctor?.experience_years} years experience
+                                        </Typography>
+                                    </Box>
+                                </Box>
+                                <Typography variant="h6" sx={{ color: 'success.main', fontWeight: 'bold' }}>
+                                    Fee: ₹{selectedAppointment.amount}
+                                </Typography>
+                            </Paper>
+                        </Grid>
+
+                        <Grid item xs={12} md={6}>
+                            <Paper elevation={2} sx={{ p: 2 }}>
+                                <Typography variant="h6" sx={{ mb: 2, color: 'primary.main' }}>
+                                    Clinic Information
+                                </Typography>
+                                <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1 }}>
+                                    {selectedAppointment.clinic?.name}
+                                </Typography>
+                                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 1 }}>
+                                    <LocationOn fontSize="small" color="action" />
+                                    <Typography variant="body2" color="text.secondary">
+                                        {selectedAppointment.clinic?.address}
+                                    </Typography>
+                                </Box>
+                                {selectedAppointment.clinic?.phone && (
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <Phone fontSize="small" color="action" />
+                                        <Typography variant="body2" color="text.secondary">
+                                            {selectedAppointment.clinic.phone}
+                                        </Typography>
+                                    </Box>
+                                )}
+                            </Paper>
+                        </Grid>
+
+                        <Grid item xs={12}>
+                            <Paper elevation={2} sx={{ p: 2 }}>
+                                <Typography variant="h6" sx={{ mb: 2, color: 'primary.main' }}>
+                                    Appointment Details
+                                </Typography>
+                                <Grid container spacing={2}>
+                                    <Grid item xs={12} sm={6}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                                            <CalendarMonth color="primary" />
+                                            <Box>
+                                                <Typography variant="subtitle2" color="text.secondary">Date</Typography>
+                                                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>{date}</Typography>
+                                            </Box>
+                                        </Box>
+                                    </Grid>
+                                    <Grid item xs={12} sm={6}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                                            <AccessTime color="primary" />
+                                            <Box>
+                                                <Typography variant="subtitle2" color="text.secondary">Time</Typography>
+                                                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>{time}</Typography>
+                                            </Box>
+                                        </Box>
+                                    </Grid>
+                                </Grid>
+
+                                {selectedAppointment.symptoms && (
+                                    <Box sx={{ mt: 2 }}>
+                                        <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
+                                            Symptoms/Reason for Visit:
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                                            {selectedAppointment.symptoms}
+                                        </Typography>
+                                    </Box>
+                                )}
+
+                                {selectedAppointment.notes && (
+                                    <Box sx={{ mt: 2 }}>
+                                        <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
+                                            Additional Notes:
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                                            {selectedAppointment.notes}
+                                        </Typography>
+                                    </Box>
+                                )}
+
+                                <Box sx={{ mt: 2 }}>
+                                    <Typography variant="subtitle2" color="text.secondary">
+                                        Appointment ID: {selectedAppointment.appointment_number || selectedAppointment.id}
+                                    </Typography>
+                                    <Typography variant="subtitle2" color="text.secondary">
+                                        Booked on: {selectedAppointment.created_at ? 
+                                            format(parseISO(selectedAppointment.created_at), 'MMM dd, yyyy at hh:mm a') : 
+                                            'Unknown'}
+                                    </Typography>
+                                </Box>
+                            </Paper>
+                        </Grid>
+                    </Grid>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setShowDetailsDialog(false)}>Close</Button>
+                    {canCancelAppointment(selectedAppointment) && (
+                        <Button 
+                            color="error" 
+                            variant="outlined"
+                            onClick={() => {
+                                setShowDetailsDialog(false);
+                                setShowCancelDialog(true);
+                            }}
+                        >
+                            Cancel Appointment
+                        </Button>
+                    )}
+                </DialogActions>
+            </Dialog>
+        );
+    };
+
+    if (loading && appointments.length === 0) {
+        return (
+            <MainLayout>
+                <Container maxWidth="lg" sx={{ mt: 12, mb: 4, textAlign: 'center' }}>
+                    <CircularProgress size={60} />
+                    <Typography variant="h6" sx={{ mt: 2 }}>
+                        Loading your appointments...
+                    </Typography>
+                </Container>
+            </MainLayout>
+        );
+    }
+
+    return (
+        <MainLayout>
+            <Container maxWidth="lg" sx={{ mt: 12, mb: 4 }}>
+                {/* Header */}
+                <Paper elevation={3} sx={{ p: 3, mb: 3, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                        <CalendarMonth sx={{ fontSize: 40 }} />
+                        <Box>
+                            <Typography variant={isMobile ? "h5" : "h4"} sx={{ fontWeight: 'bold' }}>
+                                My Appointments
+                            </Typography>
+                            <Typography variant="body1" sx={{ opacity: 0.9 }}>
+                                View and manage all your healthcare appointments
+                            </Typography>
+                        </Box>
+                    </Box>
+                    
+                    {/* Quick Stats */}
+                    <Grid container spacing={2} sx={{ mt: 2 }}>
+                        <Grid item xs={6} sm={3}>
+                            <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 1 }}>
+                                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                                    {appointments.filter(apt => apt.status === 'confirmed').length}
+                                </Typography>
+                                <Typography variant="caption">Confirmed</Typography>
+                            </Box>
+                        </Grid>
+                        <Grid item xs={6} sm={3}>
+                            <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 1 }}>
+                                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                                    {appointments.filter(apt => apt.status === 'pending').length}
+                                </Typography>
+                                <Typography variant="caption">Pending</Typography>
+                            </Box>
+                        </Grid>
+                        <Grid item xs={6} sm={3}>
+                            <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 1 }}>
+                                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                                    {appointments.filter(apt => apt.status === 'completed').length}
+                                </Typography>
+                                <Typography variant="caption">Completed</Typography>
+                            </Box>
+                        </Grid>
+                        <Grid item xs={6} sm={3}>
+                            <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 1 }}>
+                                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                                    {appointments.length}
+                                </Typography>
+                                <Typography variant="caption">Total</Typography>
+                            </Box>
+                        </Grid>
+                    </Grid>
+                </Paper>
+
+                {/* Filters */}
+                <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
+                    <Grid container spacing={2} alignItems="center">
+                        <Grid item xs={12} sm={4} md={3}>
+                            <FormControl fullWidth size="small">
+                                <InputLabel>Filter by Status</InputLabel>
+                                <Select
+                                    value={statusFilter}
+                                    label="Filter by Status"
+                                    onChange={(e) => {
+                                        setStatusFilter(e.target.value);
+                                        setPage(1);
+                                    }}
+                                >
+                                    {statusOptions.map(option => (
+                                        <MenuItem key={option.value} value={option.value}>
+                                            {option.label}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                        
+                        <Grid item xs={12} sm={5} md={6}>
+                            <TextField
+                                fullWidth
+                                size="small"
+                                placeholder="Search by doctor name, clinic, or appointment ID..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                InputProps={{
+                                    startAdornment: <Search sx={{ mr: 1, color: 'action.active' }} />,
+                                }}
+                                onKeyPress={(e) => {
+                                    if (e.key === 'Enter') {
+                                        setPage(1);
+                                        loadAppointments();
+                                    }
+                                }}
+                            />
+                        </Grid>
+                        
+                        <Grid item xs={12} sm={3} md={3}>
+                            <Box sx={{ display: 'flex', gap: 1 }}>
+                                <Button
+                                    variant="outlined"
+                                    onClick={() => {
+                                        setPage(1);
+                                        loadAppointments();
+                                    }}
+                                    disabled={loading}
+                                    startIcon={loading ? <CircularProgress size={16} /> : <Search />}
+                                >
+                                    Search
+                                </Button>
+                                <Tooltip title="Refresh">
+                                    <IconButton onClick={loadAppointments} disabled={loading}>
+                                        <Refresh />
+                                    </IconButton>
+                                </Tooltip>
+                            </Box>
+                        </Grid>
+                    </Grid>
+                </Paper>
+
+                {/* Error Alert */}
+                {error && (
+                    <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
+                        {error}
+                    </Alert>
+                )}
+
+                {/* Appointments List */}
+                {appointments.length === 0 && !loading ? (
+                    <Paper elevation={2} sx={{ p: 4, textAlign: 'center' }}>
+                        <CalendarMonth sx={{ fontSize: 80, color: 'grey.400', mb: 2 }} />
+                        <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
+                            No appointments found
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                            {statusFilter !== 'all' 
+                                ? `You don't have any ${statusFilter} appointments.`
+                                : "You haven't booked any appointments yet. Start by finding a doctor or clinic near you."
+                            }
+                        </Typography>
+                        <Button 
+                            variant="contained" 
+                            onClick={() => window.location.href = '/'}
+                            sx={{ color: 'white' }}
+                        >
+                            Find Doctors
+                        </Button>
+                    </Paper>
+                ) : (
+                    <Box>
+                        {appointments.map(appointment => renderAppointmentCard(appointment))}
+                        
+                        {/* Pagination */}
+                        {totalPages > 1 && (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                                <Pagination
+                                    count={totalPages}
+                                    page={page}
+                                    onChange={(e, newPage) => {
+                                        setPage(newPage);
+                                        window.scrollTo(0, 0);
+                                    }}
+                                    color="primary"
+                                    size={isMobile ? "small" : "medium"}
+                                />
+                            </Box>
+                        )}
+                    </Box>
+                )}
+
+                {/* Loading overlay for pagination */}
+                {loading && appointments.length > 0 && (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                        <CircularProgress />
+                    </Box>
+                )}
+
+                {/* Appointment Details Dialog */}
+                {renderAppointmentDetails()}
+
+                {/* Cancel Confirmation Dialog */}
+                <Dialog 
+                    open={showCancelDialog} 
+                    onClose={() => !cancelling && setShowCancelDialog(false)}
+                    maxWidth="sm"
+                    fullWidth
+                >
+                    <DialogTitle>Cancel Appointment</DialogTitle>
+                    <DialogContent>
+                        <Typography variant="body1" sx={{ mb: 2 }}>
+                            Are you sure you want to cancel this appointment?
+                        </Typography>
+                        {selectedAppointment && (
+                            <Paper elevation={2} sx={{ p: 2, bgcolor: 'grey.50' }}>
+                                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                                    <strong>Doctor:</strong> {selectedAppointment.doctor?.user?.name || selectedAppointment.doctor?.name}
+                                </Typography>
+                                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                                    <strong>Date:</strong> {formatAppointmentDate(selectedAppointment.appointment_date, selectedAppointment.appointment_time).date}
+                                </Typography>
+                                <Typography variant="subtitle2">
+                                    <strong>Time:</strong> {formatAppointmentDate(selectedAppointment.appointment_date, selectedAppointment.appointment_time).time}
+                                </Typography>
+                            </Paper>
+                        )}
+                        <Alert severity="warning" sx={{ mt: 2 }}>
+                            <Typography variant="body2">
+                                <strong>Note:</strong> Cancellation may be subject to clinic policies. 
+                                Please contact the clinic directly if you need to reschedule.
+                            </Typography>
+                        </Alert>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setShowCancelDialog(false)} disabled={cancelling}>
+                            Keep Appointment
+                        </Button>
+                        <Button 
+                            onClick={handleCancelAppointment} 
+                            color="error" 
+                            variant="contained"
+                            disabled={cancelling}
+                            startIcon={cancelling ? <CircularProgress size={16} /> : <Cancel />}
+                        >
+                            {cancelling ? 'Cancelling...' : 'Yes, Cancel'}
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+            </Container>
+        </MainLayout>
+    );
+};
+
+export default PatientAppointments;
 ```
 
 ### Step 21: Enhanced Search Section Component 
@@ -15840,17 +19395,25 @@ import {
     LoginOutlined,
     PersonAddOutlined,
 } from "@mui/icons-material";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
 // Reusable Components
-const UserTypeSelect = ({ value, onChange, error, disabled, required = false, sx = {} }) => {
+const UserTypeSelect = ({
+    value,
+    onChange,
+    error,
+    disabled,
+    required = false,
+    sx = {},
+}) => {
     const theme = useTheme();
-    
+
     const userTypeOptions = [
         { value: "patient", label: "Patient" },
         { value: "doctor", label: "Doctor" },
         { value: "healthcare", label: "Healthcare Provider" },
-        { value: "admin", label: "Admin" }, // ADDED ADMIN OPTION
+        { value: "admin", label: "Admin" },
     ];
 
     return (
@@ -15888,7 +19451,11 @@ const UserTypeSelect = ({ value, onChange, error, disabled, required = false, sx
                 ))}
             </Select>
             {error && (
-                <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.5 }}>
+                <Typography
+                    variant="caption"
+                    color="error"
+                    sx={{ mt: 0.5, ml: 1.5 }}
+                >
                     {Array.isArray(error) ? error[0] : error}
                 </Typography>
             )}
@@ -15919,7 +19486,8 @@ const AuthToggle = ({ authType, setAuthType, disabled }) => (
                 fontWeight: 500,
                 transition: "all 0.2s ease-in-out",
                 ...(authType === "mobile" && {
-                    background: "linear-gradient(135deg, #ff5983 0%, #dc004e 100%)",
+                    background:
+                        "linear-gradient(135deg, #ff5983 0%, #dc004e 100%)",
                     color: "white",
                     boxShadow: "0 4px 8px rgba(196, 9, 25, 0.3)",
                 }),
@@ -15939,7 +19507,8 @@ const AuthToggle = ({ authType, setAuthType, disabled }) => (
                 fontWeight: 500,
                 transition: "all 0.2s ease-in-out",
                 ...(authType === "email" && {
-                    background: "linear-gradient(135deg, #ff5983 0%, #dc004e 100%)",
+                    background:
+                        "linear-gradient(135deg, #ff5983 0%, #dc004e 100%)",
                     color: "white",
                     boxShadow: "0 4px 8px rgba(196, 9, 25, 0.3)",
                 }),
@@ -15959,7 +19528,8 @@ const AuthToggle = ({ authType, setAuthType, disabled }) => (
                 fontWeight: 500,
                 transition: "all 0.2s ease-in-out",
                 ...(authType === "social" && {
-                    background: "linear-gradient(135deg, #ff5983 0%, #dc004e 100%)",
+                    background:
+                        "linear-gradient(135deg, #ff5983 0%, #dc004e 100%)",
                     color: "white",
                     boxShadow: "0 4px 8px rgba(196, 9, 25, 0.3)",
                 }),
@@ -15970,7 +19540,13 @@ const AuthToggle = ({ authType, setAuthType, disabled }) => (
     </Box>
 );
 
-const SubmitButton = ({ loading, disabled, onClick, children, type = "button" }) => (
+const SubmitButton = ({
+    loading,
+    disabled,
+    onClick,
+    children,
+    type = "button",
+}) => (
     <Button
         type={type}
         fullWidth
@@ -16016,7 +19592,14 @@ const SubmitButton = ({ loading, disabled, onClick, children, type = "button" })
     </Button>
 );
 
-const SocialButton = ({ provider, icon, onClick, disabled, fullWidth = false, color }) => (
+const SocialButton = ({
+    provider,
+    icon,
+    onClick,
+    disabled,
+    fullWidth = false,
+    color,
+}) => (
     <Button
         fullWidth={fullWidth}
         variant="outlined"
@@ -16054,6 +19637,7 @@ const SocialButton = ({ provider, icon, onClick, disabled, fullWidth = false, co
 // Main Component
 const LoginModal = ({ open, onClose, onLoginSuccess }) => {
     const theme = useTheme();
+    const navigate = useNavigate();
     const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
     const isTablet = useMediaQuery(theme.breakpoints.between("sm", "md"));
     const apiUrl = import.meta.env.VITE_API_URL;
@@ -16063,14 +19647,14 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
     const [authType, setAuthType] = useState("mobile");
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-    
+
     // Mobile auth data
     const [mobileData, setMobileData] = useState({
         fullName: "",
         mobileNumber: "",
         userType: "",
     });
-    
+
     // Email auth data
     const [emailData, setEmailData] = useState({
         name: "",
@@ -16079,7 +19663,7 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
         password_confirmation: "",
         user_type: "",
     });
-    
+
     // Social auth data
     const [socialData, setSocialData] = useState({
         user_type: "",
@@ -16102,7 +19686,11 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
             const timer = setTimeout(() => {
                 setMobileData({ fullName: "", mobileNumber: "", userType: "" });
                 setEmailData({
-                    name: "", email: "", password: "", password_confirmation: "", user_type: "",
+                    name: "",
+                    email: "",
+                    password: "",
+                    password_confirmation: "",
+                    user_type: "",
                 });
                 setSocialData({ user_type: "" });
                 setMobileErrors({ name: "", number: "" });
@@ -16114,7 +19702,6 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                 setShowPassword(false);
                 setShowConfirmPassword(false);
                 setSocialLoading({});
-                // Clear stored user type on modal close
                 localStorage.removeItem("selected_user_type");
                 localStorage.removeItem("social_auth_mode");
                 localStorage.removeItem("social_redirect_provider");
@@ -16135,14 +19722,15 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
             const response = await axios.get(`${apiUrl}/auth/social/providers`);
             setSocialProviders(response.data.providers || []);
         } catch (error) {
-            console.error('Failed to load social providers:', error);
-            // Set default providers if API fails
-            setSocialProviders(['google', 'facebook', 'github', 'apple']);
+            console.error("Failed to load social providers:", error);
+            setSocialProviders(["google", "facebook", "github", "apple"]);
         }
     };
 
     const checkAlreadyLoggedIn = () => {
-        const token = localStorage.getItem("auth_token") || localStorage.getItem("portal_token");
+        const token =
+            localStorage.getItem("auth_token") ||
+            localStorage.getItem("portal_token");
         const userId = localStorage.getItem("user_id");
         return token && userId;
     };
@@ -16156,19 +19744,28 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
         setMobileErrors({ name: "", number: "" });
 
         if (!trimmedName) {
-            setMobileErrors(prev => ({ ...prev, name: "Name is required" }));
+            setMobileErrors((prev) => ({ ...prev, name: "Name is required" }));
             valid = false;
         } else if (trimmedName.length < 2) {
-            setMobileErrors(prev => ({ ...prev, name: "Name must be at least 2 characters" }));
+            setMobileErrors((prev) => ({
+                ...prev,
+                name: "Name must be at least 2 characters",
+            }));
             valid = false;
         }
 
         const mobileRegex = /^[6-9]\d{9}$/;
         if (!trimmedNumber) {
-            setMobileErrors(prev => ({ ...prev, number: "Mobile number is required" }));
+            setMobileErrors((prev) => ({
+                ...prev,
+                number: "Mobile number is required",
+            }));
             valid = false;
         } else if (!mobileRegex.test(trimmedNumber)) {
-            setMobileErrors(prev => ({ ...prev, number: "Enter a valid 10-digit Indian mobile number" }));
+            setMobileErrors((prev) => ({
+                ...prev,
+                number: "Enter a valid 10-digit Indian mobile number",
+            }));
             valid = false;
         }
 
@@ -16210,7 +19807,10 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
             valid = false;
         }
 
-        if (!isLogin && emailData.password !== emailData.password_confirmation) {
+        if (
+            !isLogin &&
+            emailData.password !== emailData.password_confirmation
+        ) {
             newErrors.password_confirmation = "Passwords do not match";
             valid = false;
         }
@@ -16229,12 +19829,12 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
         setMobileData({ ...mobileData, [field]: event.target.value });
 
         if (field === "fullName" && event.target.value.trim().length >= 2) {
-            setMobileErrors(prev => ({ ...prev, name: "" }));
+            setMobileErrors((prev) => ({ ...prev, name: "" }));
         }
         if (field === "mobileNumber") {
             const mobileRegex = /^[6-9]\d{9}$/;
             if (mobileRegex.test(event.target.value.trim())) {
-                setMobileErrors(prev => ({ ...prev, number: "" }));
+                setMobileErrors((prev) => ({ ...prev, number: "" }));
             }
         }
         if (generalError) setGeneralError("");
@@ -16249,19 +19849,18 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
         if (generalError) setGeneralError("");
     };
 
-    // Handle social input changes - CRITICAL FIX FOR USER TYPE HANDLING
+    // Handle social input changes
     const handleSocialInputChange = (field) => (event) => {
         const newValue = event.target.value;
         console.log(`Social ${field} changed to:`, newValue);
-        
+
         setSocialData({ ...socialData, [field]: newValue });
-        
-        // CRITICAL FIX: Store the selected user type immediately when changed
+
         if (field === "user_type" && newValue) {
             localStorage.setItem("selected_user_type", newValue);
             console.log("Stored user_type in localStorage:", newValue);
         }
-        
+
         if (generalError) setGeneralError("");
     };
 
@@ -16305,17 +19904,28 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
         } catch (error) {
             if (error.response?.data?.errors) {
                 const errs = error.response.data.errors;
-                if (errs.name) setMobileErrors(prev => ({ ...prev, name: errs.name[0] }));
-                if (errs.number) setMobileErrors(prev => ({ ...prev, number: errs.number[0] }));
+                if (errs.name)
+                    setMobileErrors((prev) => ({
+                        ...prev,
+                        name: errs.name[0],
+                    }));
+                if (errs.number)
+                    setMobileErrors((prev) => ({
+                        ...prev,
+                        number: errs.number[0],
+                    }));
             } else {
-                setGeneralError(error.response?.data?.message || "An error occurred during mobile authentication");
+                setGeneralError(
+                    error.response?.data?.message ||
+                        "An error occurred during mobile authentication"
+                );
             }
         } finally {
             setLoading(false);
         }
     };
 
-    // Email authentication
+    // FIXED: Email authentication with proper role-based redirection
     const handleEmailAuth = async (e) => {
         e.preventDefault();
         if (!validateEmailForm()) return;
@@ -16330,73 +19940,73 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
 
         try {
             const endpoint = isLogin ? "/login" : "/register";
-            const payload = isLogin 
+            const payload = isLogin
                 ? {
-                    email: emailData.email.trim(),
-                    password: emailData.password,
-                }
+                      email: emailData.email.trim(),
+                      password: emailData.password,
+                  }
                 : {
-                    name: emailData.name.trim(),
-                    email: emailData.email.trim(),
-                    password: emailData.password,
-                    password_confirmation: emailData.password_confirmation,
-                    user_type: emailData.user_type,
-                };
+                      name: emailData.name.trim(),
+                      email: emailData.email.trim(),
+                      password: emailData.password,
+                      password_confirmation: emailData.password_confirmation,
+                      user_type: emailData.user_type,
+                  };
 
-            console.log(`Making ${isLogin ? 'login' : 'register'} request to:`, `${apiUrl}${endpoint}`);
-            console.log('Payload:', payload);
+            console.log(
+                `Making ${isLogin ? "login" : "register"} request to:`,
+                `${apiUrl}${endpoint}`
+            );
+            console.log("Payload:", payload);
 
-            // FIXED: Use axios.post with full URL
             const response = await axios({
-                method: 'POST',
+                method: "POST",
                 url: `${apiUrl}${endpoint}`,
                 data: payload,
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                }
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                },
             });
 
-            console.log('Auth response:', response.data);
+            console.log("Auth response:", response.data);
 
             // Store authentication data
             localStorage.setItem("auth_token", response.data.token);
-            localStorage.setItem("user_id", response.data.user.id);
-            localStorage.setItem("user_data", JSON.stringify(response.data.user));
+            localStorage.setItem("user", JSON.stringify(response.data.user));
 
-            // Call success handler
-            onLoginSuccess({
-                user: response.data.user,
-                token: response.data.token,
-                isNewUser: !isLogin,
-            });
+            // FIXED: Call success handler with proper user data and token
+            onLoginSuccess(response.data.user, response.data.token);
 
             onClose();
         } catch (error) {
-            console.error('Auth error:', error);
-            console.error('Error response:', error.response?.data);
-            
+            console.error("Auth error:", error);
+            console.error("Error response:", error.response?.data);
+
             if (error.response?.data?.errors) {
                 setEmailErrors(error.response.data.errors);
             } else if (error.response?.data?.message) {
                 setGeneralError(error.response.data.message);
-            } else if (error.message.includes('404')) {
-                setGeneralError("Authentication endpoint not found. Please check your API configuration.");
+            } else if (error.message.includes("404")) {
+                setGeneralError(
+                    "Authentication endpoint not found. Please check your API configuration."
+                );
             } else {
-                setGeneralError("An error occurred during authentication. Please try again.");
+                setGeneralError(
+                    "An error occurred during authentication. Please try again."
+                );
             }
         } finally {
             setLoading(false);
         }
     };
 
-    // CRITICAL FIX: Social Authentication with Proper User Type Handling
+    // FIXED: Social Authentication with Proper User Type Handling
     const handleSocialLogin = async (provider) => {
         console.log("Social login initiated for provider:", provider);
         console.log("Current socialData:", socialData);
         console.log("IsLogin:", isLogin);
-        
-        // CRITICAL FIX: Always require user type selection for social auth
+
         if (!socialData.user_type) {
             setGeneralError("Please select your role first");
             return;
@@ -16408,61 +20018,69 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
         }
 
         try {
-            setSocialLoading(prev => ({ ...prev, [provider]: true }));
+            setSocialLoading((prev) => ({ ...prev, [provider]: true }));
 
-            // CRITICAL FIX: Always store user type in localStorage before redirect
             const userTypeToStore = socialData.user_type;
-            
-            // Clear previous stored data
+
             localStorage.removeItem("selected_user_type");
             localStorage.removeItem("social_auth_mode");
             localStorage.removeItem("social_redirect_provider");
             localStorage.removeItem("social_redirect_timestamp");
-            
-            // Store the selected user type and auth mode
+
             localStorage.setItem("selected_user_type", userTypeToStore);
-            localStorage.setItem("social_auth_mode", isLogin ? "login" : "register");
+            localStorage.setItem(
+                "social_auth_mode",
+                isLogin ? "login" : "register"
+            );
             localStorage.setItem("social_redirect_provider", provider);
-            localStorage.setItem("social_redirect_timestamp", Date.now().toString());
-            
+            localStorage.setItem(
+                "social_redirect_timestamp",
+                Date.now().toString()
+            );
+
             console.log("Stored data before redirect:", {
                 selected_user_type: userTypeToStore,
                 social_auth_mode: isLogin ? "login" : "register",
-                provider: provider
+                provider: provider,
             });
-            
-            // CRITICAL FIX: Always pass user_type in URL regardless of login/register mode
-            const requestUrl = `${apiUrl}/auth/social/${provider}?user_type=${encodeURIComponent(userTypeToStore)}&mode=${isLogin ? 'login' : 'register'}`;
-                
+
+            const requestUrl = `${apiUrl}/auth/social/${provider}?user_type=${encodeURIComponent(
+                userTypeToStore
+            )}&mode=${isLogin ? "login" : "register"}`;
+
             console.log("Making request to:", requestUrl);
-            
+
             const response = await axios.get(requestUrl);
-            
+
             if (response.data.redirect_url) {
-                // CRITICAL FIX: Ensure user_type is always in redirect URL
                 let redirectUrl = response.data.redirect_url;
-                
-                // Parse the existing URL to add user_type parameter
+
                 const url = new URL(redirectUrl);
-                url.searchParams.set('user_type', userTypeToStore);
+                url.searchParams.set("user_type", userTypeToStore);
                 redirectUrl = url.toString();
-                
+
                 console.log("Final redirect URL:", redirectUrl);
-                
-                // Redirect to the OAuth provider
+
                 window.location.href = redirectUrl;
             } else {
                 throw new Error("No redirect URL received");
             }
         } catch (error) {
-            setSocialLoading(prev => ({ ...prev, [provider]: false }));
+            setSocialLoading((prev) => ({ ...prev, [provider]: false }));
             console.error(`${provider} authentication failed:`, error);
-            setGeneralError(`${provider} authentication failed: ${error.response?.data?.message || error.message}`);
+            setGeneralError(
+                `${provider} authentication failed: ${
+                    error.response?.data?.message || error.message
+                }`
+            );
         }
     };
 
     const handleClose = () => {
-        if (!loading && !Object.values(socialLoading).some(loading => loading)) {
+        if (
+            !loading &&
+            !Object.values(socialLoading).some((loading) => loading)
+        ) {
             onClose();
         }
     };
@@ -16473,11 +20091,14 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
         setMobileErrors({ name: "", number: "" });
         setGeneralError("");
         setEmailData({
-            name: "", email: "", password: "", password_confirmation: "", user_type: "",
+            name: "",
+            email: "",
+            password: "",
+            password_confirmation: "",
+            user_type: "",
         });
         setMobileData({ fullName: "", mobileNumber: "", userType: "" });
         setSocialData({ user_type: "" });
-        // Clear stored user type when switching modes
         localStorage.removeItem("selected_user_type");
         localStorage.removeItem("social_auth_mode");
     };
@@ -16567,14 +20188,20 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                             >
                                 <IconButton
                                     onClick={handleClose}
-                                    disabled={loading || Object.values(socialLoading).some(loading => loading)}
+                                    disabled={
+                                        loading ||
+                                        Object.values(socialLoading).some(
+                                            (loading) => loading
+                                        )
+                                    }
                                     sx={{
                                         position: "absolute",
                                         right: 8,
                                         top: 8,
                                         color: "text.secondary",
                                         "&:hover": {
-                                            backgroundColor: "rgba(0, 0, 0, 0.04)",
+                                            backgroundColor:
+                                                "rgba(0, 0, 0, 0.04)",
                                         },
                                         "&:disabled": {
                                             color: "text.disabled",
@@ -16617,12 +20244,11 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                     variant="body2"
                                     sx={{ color: "text.secondary" }}
                                 >
-                                    {authType === "mobile" 
-                                        ? "Log in or Sign up" 
-                                        : isLogin 
-                                        ? "Log in to your account" 
-                                        : "Create your account"
-                                    }
+                                    {authType === "mobile"
+                                        ? "Log in or Sign up"
+                                        : isLogin
+                                        ? "Log in to your account"
+                                        : "Create your account"}
                                 </Typography>
                             </Box>
 
@@ -16643,7 +20269,7 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                 )}
 
                                 {/* Debug Info - Remove in production */}
-                                {process.env.NODE_ENV === 'development' && authType === "social" && (
+                                {/* {process.env.NODE_ENV === 'development' && authType === "social" && (
                                     <Box sx={{ mb: 2, p: 1, bgcolor: "#f0f0f0", borderRadius: 1, fontSize: "0.8rem" }}>
                                         <Typography variant="caption">
                                             Debug - Social Data: {JSON.stringify(socialData)}
@@ -16657,13 +20283,18 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                             Debug - LocalStorage user_type: {localStorage.getItem("selected_user_type")}
                                         </Typography>
                                     </Box>
-                                )}
+                                )} */}
 
                                 {/* Auth Type Toggle */}
                                 <AuthToggle
                                     authType={authType}
                                     setAuthType={setAuthType}
-                                    disabled={loading || Object.values(socialLoading).some(loading => loading)}
+                                    disabled={
+                                        loading ||
+                                        Object.values(socialLoading).some(
+                                            (loading) => loading
+                                        )
+                                    }
                                 />
 
                                 {/* Mobile Authentication */}
@@ -16673,7 +20304,9 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                             fullWidth
                                             label="Enter your name"
                                             value={mobileData.fullName}
-                                            onChange={handleMobileInputChange("fullName")}
+                                            onChange={handleMobileInputChange(
+                                                "fullName"
+                                            )}
                                             margin="dense"
                                             required
                                             disabled={loading}
@@ -16692,9 +20325,14 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                                 "& .MuiOutlinedInput-root": {
                                                     borderRadius: 2,
                                                     "&:hover": {
-                                                        "& .MuiOutlinedInput-notchedOutline": {
-                                                            borderColor: theme.palette.primary.main,
-                                                        },
+                                                        "& .MuiOutlinedInput-notchedOutline":
+                                                            {
+                                                                borderColor:
+                                                                    theme
+                                                                        .palette
+                                                                        .primary
+                                                                        .main,
+                                                            },
                                                     },
                                                 },
                                             }}
@@ -16705,7 +20343,9 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                             label="Enter mobile number"
                                             type="tel"
                                             value={mobileData.mobileNumber}
-                                            onChange={handleMobileInputChange("mobileNumber")}
+                                            onChange={handleMobileInputChange(
+                                                "mobileNumber"
+                                            )}
                                             margin="dense"
                                             required
                                             disabled={loading}
@@ -16732,9 +20372,14 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                                 "& .MuiOutlinedInput-root": {
                                                     borderRadius: 2,
                                                     "&:hover": {
-                                                        "& .MuiOutlinedInput-notchedOutline": {
-                                                            borderColor: theme.palette.primary.main,
-                                                        },
+                                                        "& .MuiOutlinedInput-notchedOutline":
+                                                            {
+                                                                borderColor:
+                                                                    theme
+                                                                        .palette
+                                                                        .primary
+                                                                        .main,
+                                                            },
                                                     },
                                                 },
                                             }}
@@ -16742,7 +20387,9 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
 
                                         <UserTypeSelect
                                             value={mobileData.userType}
-                                            onChange={handleMobileInputChange("userType")}
+                                            onChange={handleMobileInputChange(
+                                                "userType"
+                                            )}
                                             disabled={loading}
                                             required
                                         />
@@ -16769,13 +20416,24 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                                 fullWidth
                                                 label="Full Name"
                                                 value={emailData.name}
-                                                onChange={handleEmailInputChange("name")}
+                                                onChange={handleEmailInputChange(
+                                                    "name"
+                                                )}
                                                 margin="dense"
                                                 required
                                                 disabled={loading}
                                                 placeholder="Enter your full name"
                                                 error={!!emailErrors.name}
-                                                helperText={emailErrors.name ? (Array.isArray(emailErrors.name) ? emailErrors.name[0] : emailErrors.name) : ""}
+                                                helperText={
+                                                    emailErrors.name
+                                                        ? Array.isArray(
+                                                              emailErrors.name
+                                                          )
+                                                            ? emailErrors
+                                                                  .name[0]
+                                                            : emailErrors.name
+                                                        : ""
+                                                }
                                                 InputProps={{
                                                     startAdornment: (
                                                         <InputAdornment position="start">
@@ -16785,14 +20443,20 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                                 }}
                                                 sx={{
                                                     mb: 1,
-                                                    "& .MuiOutlinedInput-root": {
-                                                        borderRadius: 2,
-                                                        "&:hover": {
-                                                            "& .MuiOutlinedInput-notchedOutline": {
-                                                                borderColor: theme.palette.primary.main,
+                                                    "& .MuiOutlinedInput-root":
+                                                        {
+                                                            borderRadius: 2,
+                                                            "&:hover": {
+                                                                "& .MuiOutlinedInput-notchedOutline":
+                                                                    {
+                                                                        borderColor:
+                                                                            theme
+                                                                                .palette
+                                                                                .primary
+                                                                                .main,
+                                                                    },
                                                             },
                                                         },
-                                                    },
                                                 }}
                                             />
                                         )}
@@ -16802,13 +20466,23 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                             label="Email Address"
                                             type="email"
                                             value={emailData.email}
-                                            onChange={handleEmailInputChange("email")}
+                                            onChange={handleEmailInputChange(
+                                                "email"
+                                            )}
                                             margin="dense"
                                             required
                                             disabled={loading}
                                             placeholder="Enter your email"
                                             error={!!emailErrors.email}
-                                            helperText={emailErrors.email ? (Array.isArray(emailErrors.email) ? emailErrors.email[0] : emailErrors.email) : ""}
+                                            helperText={
+                                                emailErrors.email
+                                                    ? Array.isArray(
+                                                          emailErrors.email
+                                                      )
+                                                        ? emailErrors.email[0]
+                                                        : emailErrors.email
+                                                    : ""
+                                            }
                                             InputProps={{
                                                 startAdornment: (
                                                     <InputAdornment position="start">
@@ -16821,9 +20495,14 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                                 "& .MuiOutlinedInput-root": {
                                                     borderRadius: 2,
                                                     "&:hover": {
-                                                        "& .MuiOutlinedInput-notchedOutline": {
-                                                            borderColor: theme.palette.primary.main,
-                                                        },
+                                                        "& .MuiOutlinedInput-notchedOutline":
+                                                            {
+                                                                borderColor:
+                                                                    theme
+                                                                        .palette
+                                                                        .primary
+                                                                        .main,
+                                                            },
                                                     },
                                                 },
                                             }}
@@ -16832,15 +20511,30 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                         <TextField
                                             fullWidth
                                             label="Password"
-                                            type={showPassword ? "text" : "password"}
+                                            type={
+                                                showPassword
+                                                    ? "text"
+                                                    : "password"
+                                            }
                                             value={emailData.password}
-                                            onChange={handleEmailInputChange("password")}
+                                            onChange={handleEmailInputChange(
+                                                "password"
+                                            )}
                                             margin="dense"
                                             required
                                             disabled={loading}
                                             placeholder="Enter your password"
                                             error={!!emailErrors.password}
-                                            helperText={emailErrors.password ? (Array.isArray(emailErrors.password) ? emailErrors.password[0] : emailErrors.password) : ""}
+                                            helperText={
+                                                emailErrors.password
+                                                    ? Array.isArray(
+                                                          emailErrors.password
+                                                      )
+                                                        ? emailErrors
+                                                              .password[0]
+                                                        : emailErrors.password
+                                                    : ""
+                                            }
                                             InputProps={{
                                                 startAdornment: (
                                                     <InputAdornment position="start">
@@ -16850,11 +20544,19 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                                 endAdornment: (
                                                     <InputAdornment position="end">
                                                         <IconButton
-                                                            onClick={() => setShowPassword(!showPassword)}
+                                                            onClick={() =>
+                                                                setShowPassword(
+                                                                    !showPassword
+                                                                )
+                                                            }
                                                             disabled={loading}
                                                             edge="end"
                                                         >
-                                                            {showPassword ? <VisibilityOff /> : <Visibility />}
+                                                            {showPassword ? (
+                                                                <VisibilityOff />
+                                                            ) : (
+                                                                <Visibility />
+                                                            )}
                                                         </IconButton>
                                                     </InputAdornment>
                                                 ),
@@ -16864,9 +20566,14 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                                 "& .MuiOutlinedInput-root": {
                                                     borderRadius: 2,
                                                     "&:hover": {
-                                                        "& .MuiOutlinedInput-notchedOutline": {
-                                                            borderColor: theme.palette.primary.main,
-                                                        },
+                                                        "& .MuiOutlinedInput-notchedOutline":
+                                                            {
+                                                                borderColor:
+                                                                    theme
+                                                                        .palette
+                                                                        .primary
+                                                                        .main,
+                                                            },
                                                     },
                                                 },
                                             }}
@@ -16876,15 +20583,34 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                             <TextField
                                                 fullWidth
                                                 label="Confirm Password"
-                                                type={showConfirmPassword ? "text" : "password"}
-                                                value={emailData.password_confirmation}
-                                                onChange={handleEmailInputChange("password_confirmation")}
+                                                type={
+                                                    showConfirmPassword
+                                                        ? "text"
+                                                        : "password"
+                                                }
+                                                value={
+                                                    emailData.password_confirmation
+                                                }
+                                                onChange={handleEmailInputChange(
+                                                    "password_confirmation"
+                                                )}
                                                 margin="dense"
                                                 required
                                                 disabled={loading}
                                                 placeholder="Confirm your password"
-                                                error={!!emailErrors.password_confirmation}
-                                                helperText={emailErrors.password_confirmation ? (Array.isArray(emailErrors.password_confirmation) ? emailErrors.password_confirmation[0] : emailErrors.password_confirmation) : ""}
+                                                error={
+                                                    !!emailErrors.password_confirmation
+                                                }
+                                                helperText={
+                                                    emailErrors.password_confirmation
+                                                        ? Array.isArray(
+                                                              emailErrors.password_confirmation
+                                                          )
+                                                            ? emailErrors
+                                                                  .password_confirmation[0]
+                                                            : emailErrors.password_confirmation
+                                                        : ""
+                                                }
                                                 InputProps={{
                                                     startAdornment: (
                                                         <InputAdornment position="start">
@@ -16894,25 +20620,41 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                                     endAdornment: (
                                                         <InputAdornment position="end">
                                                             <IconButton
-                                                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                                                disabled={loading}
+                                                                onClick={() =>
+                                                                    setShowConfirmPassword(
+                                                                        !showConfirmPassword
+                                                                    )
+                                                                }
+                                                                disabled={
+                                                                    loading
+                                                                }
                                                                 edge="end"
                                                             >
-                                                                {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                                                                {showConfirmPassword ? (
+                                                                    <VisibilityOff />
+                                                                ) : (
+                                                                    <Visibility />
+                                                                )}
                                                             </IconButton>
                                                         </InputAdornment>
                                                     ),
                                                 }}
                                                 sx={{
                                                     mb: 1,
-                                                    "& .MuiOutlinedInput-root": {
-                                                        borderRadius: 2,
-                                                        "&:hover": {
-                                                            "& .MuiOutlinedInput-notchedOutline": {
-                                                                borderColor: theme.palette.primary.main,
+                                                    "& .MuiOutlinedInput-root":
+                                                        {
+                                                            borderRadius: 2,
+                                                            "&:hover": {
+                                                                "& .MuiOutlinedInput-notchedOutline":
+                                                                    {
+                                                                        borderColor:
+                                                                            theme
+                                                                                .palette
+                                                                                .primary
+                                                                                .main,
+                                                                    },
                                                             },
                                                         },
-                                                    },
                                                 }}
                                             />
                                         )}
@@ -16920,7 +20662,9 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                         {!isLogin && (
                                             <UserTypeSelect
                                                 value={emailData.user_type}
-                                                onChange={handleEmailInputChange("user_type")}
+                                                onChange={handleEmailInputChange(
+                                                    "user_type"
+                                                )}
                                                 error={emailErrors.user_type}
                                                 disabled={loading}
                                                 required
@@ -16931,19 +20675,28 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                             type="submit"
                                             loading={loading}
                                         >
-                                            {isLogin ? "LOGIN" : "CREATE ACCOUNT"}
+                                            {isLogin
+                                                ? "LOGIN"
+                                                : "CREATE ACCOUNT"}
                                         </SubmitButton>
 
                                         {/* Forgot Password Link for Login */}
                                         {isLogin && (
-                                            <Box sx={{ textAlign: "center", mt: 1, mb: 2 }}>
+                                            <Box
+                                                sx={{
+                                                    textAlign: "center",
+                                                    mt: 1,
+                                                    mb: 2,
+                                                }}
+                                            >
                                                 <Link
                                                     component="button"
                                                     type="button"
                                                     variant="body2"
                                                     onClick={() => {
-                                                        // Handle forgot password
-                                                        console.log("Forgot password clicked");
+                                                        console.log(
+                                                            "Forgot password clicked"
+                                                        );
                                                     }}
                                                     disabled={loading}
                                                     sx={{
@@ -16951,7 +20704,8 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                                         color: "primary.main",
                                                         cursor: "pointer",
                                                         "&:hover": {
-                                                            textDecoration: "underline",
+                                                            textDecoration:
+                                                                "underline",
                                                         },
                                                         "&:disabled": {
                                                             color: "text.disabled",
@@ -16964,16 +20718,24 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                         )}
 
                                         {/* Toggle Auth Mode */}
-                                        <Box sx={{ textAlign: "center", mt: 1 }}>
-                                            <Typography variant="body2" color="text.secondary">
-                                                {isLogin ? "Don't have an account? " : "Already have an account? "}
+                                        <Box
+                                            sx={{ textAlign: "center", mt: 1 }}
+                                        >
+                                            <Typography
+                                                variant="body2"
+                                                color="text.secondary"
+                                            >
+                                                {isLogin
+                                                    ? "Don't have an account? "
+                                                    : "Already have an account? "}
                                                 <Link
                                                     component="button"
                                                     type="button"
                                                     onClick={toggleAuthMode}
                                                     disabled={loading}
                                                     sx={{
-                                                        textDecoration: "underline",
+                                                        textDecoration:
+                                                            "underline",
                                                         color: "primary.main",
                                                         cursor: "pointer",
                                                         "&:disabled": {
@@ -16981,26 +20743,33 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                                         },
                                                     }}
                                                 >
-                                                    {isLogin ? "Sign up" : "Log in"}
+                                                    {isLogin
+                                                        ? "Sign up"
+                                                        : "Log in"}
                                                 </Link>
                                             </Typography>
                                         </Box>
                                     </form>
                                 )}
 
-                                {/* CRITICAL FIX: Social Authentication with Proper User Type Handling */}
+                                {/* Social Authentication */}
                                 {authType === "social" && (
                                     <Box>
-                                        {/* ALWAYS SHOW USER TYPE SELECT FOR SOCIAL AUTH */}
                                         <UserTypeSelect
                                             value={socialData.user_type}
-                                            onChange={handleSocialInputChange("user_type")}
-                                            disabled={loading || Object.values(socialLoading).some(loading => loading)}
-                                            required={true} // Always required for social auth
+                                            onChange={handleSocialInputChange(
+                                                "user_type"
+                                            )}
+                                            disabled={
+                                                loading ||
+                                                Object.values(
+                                                    socialLoading
+                                                ).some((loading) => loading)
+                                            }
+                                            required={true}
                                             sx={{ mb: 2 }}
                                         />
 
-                                        {/* Social Login Buttons - Only enable when user type is selected */}
                                         <Box
                                             sx={{
                                                 display: "flex",
@@ -17010,64 +20779,165 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                             }}
                                         >
                                             <SocialButton
-                                                provider={socialLoading.google ? "Connecting..." : "Continue with Google"}
-                                                icon={socialLoading.google ? <CircularProgress size={20} /> : <Google />}
-                                                onClick={() => handleSocialLogin("google")}
-                                                disabled={loading || socialLoading.google || !socialData.user_type}
+                                                provider={
+                                                    socialLoading.google
+                                                        ? "Connecting..."
+                                                        : "Continue with Google"
+                                                }
+                                                icon={
+                                                    socialLoading.google ? (
+                                                        <CircularProgress
+                                                            size={20}
+                                                        />
+                                                    ) : (
+                                                        <Google />
+                                                    )
+                                                }
+                                                onClick={() =>
+                                                    handleSocialLogin("google")
+                                                }
+                                                disabled={
+                                                    loading ||
+                                                    socialLoading.google ||
+                                                    !socialData.user_type
+                                                }
                                                 fullWidth
                                                 color="#db4437"
                                             />
 
-                                            <Box sx={{ display: "flex", gap: 1 }}>
+                                            <Box
+                                                sx={{ display: "flex", gap: 1 }}
+                                            >
                                                 <SocialButton
-                                                    provider={socialLoading.facebook ? "Connecting..." : "Facebook"}
-                                                    icon={socialLoading.facebook ? <CircularProgress size={20} /> : <Facebook />}
-                                                    onClick={() => handleSocialLogin("facebook")}
-                                                    disabled={loading || socialLoading.facebook || !socialData.user_type}
+                                                    provider={
+                                                        socialLoading.facebook
+                                                            ? "Connecting..."
+                                                            : "Facebook"
+                                                    }
+                                                    icon={
+                                                        socialLoading.facebook ? (
+                                                            <CircularProgress
+                                                                size={20}
+                                                            />
+                                                        ) : (
+                                                            <Facebook />
+                                                        )
+                                                    }
+                                                    onClick={() =>
+                                                        handleSocialLogin(
+                                                            "facebook"
+                                                        )
+                                                    }
+                                                    disabled={
+                                                        loading ||
+                                                        socialLoading.facebook ||
+                                                        !socialData.user_type
+                                                    }
                                                     fullWidth
                                                     color="#4267B2"
                                                 />
 
                                                 <SocialButton
-                                                    provider={socialLoading.github ? "Connecting..." : "GitHub"}
-                                                    icon={socialLoading.github ? <CircularProgress size={20} /> : <GitHub />}
-                                                    onClick={() => handleSocialLogin("github")}
-                                                    disabled={loading || socialLoading.github || !socialData.user_type}
+                                                    provider={
+                                                        socialLoading.github
+                                                            ? "Connecting..."
+                                                            : "GitHub"
+                                                    }
+                                                    icon={
+                                                        socialLoading.github ? (
+                                                            <CircularProgress
+                                                                size={20}
+                                                            />
+                                                        ) : (
+                                                            <GitHub />
+                                                        )
+                                                    }
+                                                    onClick={() =>
+                                                        handleSocialLogin(
+                                                            "github"
+                                                        )
+                                                    }
+                                                    disabled={
+                                                        loading ||
+                                                        socialLoading.github ||
+                                                        !socialData.user_type
+                                                    }
                                                     fullWidth
                                                     color="#333"
                                                 />
                                             </Box>
 
                                             <SocialButton
-                                                provider={socialLoading.apple ? "Connecting..." : "Continue with Apple"}
-                                                icon={socialLoading.apple ? <CircularProgress size={20} /> : <Apple />}
-                                                onClick={() => handleSocialLogin("apple")}
-                                                disabled={loading || socialLoading.apple || !socialData.user_type}
+                                                provider={
+                                                    socialLoading.apple
+                                                        ? "Connecting..."
+                                                        : "Continue with Apple"
+                                                }
+                                                icon={
+                                                    socialLoading.apple ? (
+                                                        <CircularProgress
+                                                            size={20}
+                                                        />
+                                                    ) : (
+                                                        <Apple />
+                                                    )
+                                                }
+                                                onClick={() =>
+                                                    handleSocialLogin("apple")
+                                                }
+                                                disabled={
+                                                    loading ||
+                                                    socialLoading.apple ||
+                                                    !socialData.user_type
+                                                }
                                                 fullWidth
                                                 color="#000000"
                                             />
                                         </Box>
 
-                                        {/* Show helper text when no user type is selected */}
                                         {!socialData.user_type && (
-                                            <Box sx={{ textAlign: "center", mb: 2 }}>
-                                                <Typography variant="caption" color="text.secondary">
-                                                    👆 Please select your role first to continue with social login
+                                            <Box
+                                                sx={{
+                                                    textAlign: "center",
+                                                    mb: 2,
+                                                }}
+                                            >
+                                                <Typography
+                                                    variant="caption"
+                                                    color="text.secondary"
+                                                >
+                                                    👆 Please select your role
+                                                    first to continue with
+                                                    social login
                                                 </Typography>
                                             </Box>
                                         )}
 
-                                        {/* Toggle Auth Mode for Social */}
-                                        <Box sx={{ textAlign: "center", mt: 1 }}>
-                                            <Typography variant="body2" color="text.secondary">
-                                                {isLogin ? "Don't have an account? " : "Already have an account? "}
+                                        <Box
+                                            sx={{ textAlign: "center", mt: 1 }}
+                                        >
+                                            <Typography
+                                                variant="body2"
+                                                color="text.secondary"
+                                            >
+                                                {isLogin
+                                                    ? "Don't have an account? "
+                                                    : "Already have an account? "}
                                                 <Link
                                                     component="button"
                                                     type="button"
                                                     onClick={toggleAuthMode}
-                                                    disabled={loading || Object.values(socialLoading).some(loading => loading)}
+                                                    disabled={
+                                                        loading ||
+                                                        Object.values(
+                                                            socialLoading
+                                                        ).some(
+                                                            (loading) => loading
+                                                        )
+                                                    }
                                                     sx={{
-                                                        textDecoration: "underline",
+                                                        textDecoration:
+                                                            "underline",
                                                         color: "primary.main",
                                                         cursor: "pointer",
                                                         "&:disabled": {
@@ -17075,7 +20945,9 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                                         },
                                                     }}
                                                 >
-                                                    {isLogin ? "Sign up" : "Log in"}
+                                                    {isLogin
+                                                        ? "Sign up"
+                                                        : "Log in"}
                                                 </Link>
                                             </Typography>
                                         </Box>
@@ -17102,9 +20974,16 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                             variant="caption"
                                             onClick={() => {
                                                 onClose();
-                                                console.log("Navigate to Terms of Service");
+                                                console.log(
+                                                    "Navigate to Terms of Service"
+                                                );
                                             }}
-                                            disabled={loading || Object.values(socialLoading).some(loading => loading)}
+                                            disabled={
+                                                loading ||
+                                                Object.values(
+                                                    socialLoading
+                                                ).some((loading) => loading)
+                                            }
                                             sx={{
                                                 textDecoration: "underline",
                                                 color: "grey",
@@ -17124,9 +21003,16 @@ const LoginModal = ({ open, onClose, onLoginSuccess }) => {
                                             variant="caption"
                                             onClick={() => {
                                                 onClose();
-                                                console.log("Navigate to Privacy Policy");
+                                                console.log(
+                                                    "Navigate to Privacy Policy"
+                                                );
                                             }}
-                                            disabled={loading || Object.values(socialLoading).some(loading => loading)}
+                                            disabled={
+                                                loading ||
+                                                Object.values(
+                                                    socialLoading
+                                                ).some((loading) => loading)
+                                            }
                                             sx={{
                                                 textDecoration: "underline",
                                                 color: "grey",
@@ -17216,22 +21102,30 @@ const AuthCallback = () => {
                 const userData = JSON.parse(decodeURIComponent(userParam));
                 setUserName(userData.name || 'User');
                 
-                // CRITICAL FIX: Use URL user_type if available, otherwise use userData user_type
-                const finalUserType = urlUserType || userData.user_type || 'patient';
+                // CRITICAL FIX: Use URL user_type if available, otherwise use userData user_type, with fallback priority
+                let finalUserType = urlUserType || userData.user_type;
+                
+                // ADDITIONAL FIX: Check localStorage for stored user type as backup
+                if (!finalUserType) {
+                    finalUserType = localStorage.getItem("selected_user_type") || 'patient';
+                }
+                
                 setUserType(finalUserType);
 
                 console.log("Processed user data:", {
                     userId: userData.id,
                     userType: finalUserType,
                     userName: userData.name,
-                    isNewUser
+                    isNewUser,
+                    source: urlUserType ? 'URL' : userData.user_type ? 'userData' : 'localStorage'
                 });
 
-                // Clear existing tokens
+                // FIXED: Clear existing tokens properly
                 localStorage.removeItem('auth_token');
                 localStorage.removeItem('portal_token');
                 localStorage.removeItem('user_id');
                 localStorage.removeItem('user_data');
+                localStorage.removeItem('user'); // ADDED: Also remove 'user' key
                 localStorage.removeItem('selected_user_type');
                 localStorage.removeItem('social_auth_mode');
                 localStorage.removeItem('social_redirect_provider');
@@ -17249,25 +21143,21 @@ const AuthCallback = () => {
 
                 // Store auth data after progress completes
                 setTimeout(() => {
-                    // Store tokens based on auth type
-                    if (searchParams.get('portal_token')) {
-                        // Old style mobile auth
-                        localStorage.setItem('portal_token', authToken);
-                        localStorage.setItem('user_id', userData.id);
-                    } else {
-                        // New style email/social auth
-                        localStorage.setItem('auth_token', authToken);
-                        localStorage.setItem('user_id', userData.id);
-                    }
+                    // FIXED: Always use 'auth_token' for consistency with LoginModal
+                    localStorage.setItem('auth_token', authToken);
                     
-                    // CRITICAL FIX: Store user data with correct user_type
+                    // CRITICAL FIX: Store user data with correct user_type in the expected format
                     const userDataToStore = {
                         ...userData,
                         user_type: finalUserType // Ensure correct user_type is stored
                     };
-                    localStorage.setItem('user_data', JSON.stringify(userDataToStore));
+                    
+                    // FIXED: Store in both formats for compatibility
+                    localStorage.setItem('user', JSON.stringify(userDataToStore)); // Primary format used by Header.jsx
+                    localStorage.setItem('user_data', JSON.stringify(userDataToStore)); // Backup format
 
                     console.log("Stored user data:", userDataToStore);
+                    console.log("Auth token stored:", authToken);
 
                     // Role-based redirection
                     redirectBasedOnRole(finalUserType);
@@ -17281,32 +21171,41 @@ const AuthCallback = () => {
             }
         } else {
             console.error('Missing auth data in callback');
+            console.log('Available search params:', Object.fromEntries(searchParams));
             setTimeout(() => {
                 navigate('/?error=missing_auth_data');
             }, 1000);
         }
     }, [searchParams, navigate]);
 
+    // FIXED: Enhanced role-based redirection with proper logging
     const redirectBasedOnRole = (role) => {
         console.log("Redirecting based on role:", role);
         
-        switch (role) {
-            case 'patient':
-                navigate('/');
-                break;
-            case 'doctor':
-                navigate('/doctor/dashboard');
-                break;
-            case 'healthcare':
-                navigate('/healthcare/dashboard');
-                break;
-            case 'admin':
-                navigate('/admin/dashboard');
-                break;
-            default:
-                console.log("Unknown role, redirecting to home:", role);
-                navigate('/');
-        }
+        // Small delay to ensure DOM updates are complete
+        setTimeout(() => {
+            switch (role) {
+                case 'admin':
+                    console.log("Redirecting to admin dashboard");
+                    navigate('/admin/dashboard');
+                    break;
+                case 'doctor':
+                    console.log("Redirecting to doctor dashboard");
+                    navigate('/doctor/dashboard');
+                    break;
+                case 'healthcare':
+                    console.log("Redirecting to healthcare dashboard");
+                    navigate('/healthcare/dashboard');
+                    break;
+                case 'patient':
+                    console.log("Redirecting to patient home page");
+                    navigate('/');
+                    break;
+                default:
+                    console.log("Unknown role, redirecting to home:", role);
+                    navigate('/');
+            }
+        }, 100);
     };
 
     const getRoleIcon = () => {
@@ -17366,6 +21265,22 @@ const AuthCallback = () => {
                 return 'Administrator';
             default:
                 return 'User';
+        }
+    };
+
+    // ADDED: Get role-specific welcome message
+    const getRoleWelcomeMessage = () => {
+        switch (userType) {
+            case 'admin':
+                return 'Setting up your administrative controls...';
+            case 'doctor':
+                return 'Preparing your medical practice dashboard...';
+            case 'healthcare':
+                return 'Configuring your healthcare facility portal...';
+            case 'patient':
+                return 'Setting up your health profile...';
+            default:
+                return 'Setting up your dashboard...';
         }
     };
 
@@ -17452,7 +21367,7 @@ const AuthCallback = () => {
                                 fontWeight: 500,
                             }}
                         >
-                            🎉 Login successful! Setting up your {getRoleDisplayName()} dashboard...
+                            🎉 Login successful! {getRoleWelcomeMessage()}
                         </Typography>
 
                         {/* Progress Bar */}
@@ -17512,13 +21427,13 @@ const AuthCallback = () => {
                                 }}
                             >
                                 {progress >= 100
-                                    ? '✅ Redirecting to dashboard...'
+                                    ? `✅ Redirecting to ${getRoleDisplayName()} dashboard...`
                                     : '🔄 Completing authentication...'}
                             </Typography>
                         </Box>
 
                         {/* Debug Info - Remove in production */}
-                        {process.env.NODE_ENV === 'development' && (
+                        {/* {process.env.NODE_ENV === 'development' && (
                             <Box sx={{ mt: 2, p: 1, bgcolor: "#f0f0f0", borderRadius: 1, fontSize: "0.8rem" }}>
                                 <Typography variant="caption">
                                     Debug - User Type: {userType}
@@ -17527,8 +21442,12 @@ const AuthCallback = () => {
                                 <Typography variant="caption">
                                     Debug - User Name: {userName}
                                 </Typography>
+                                <br />
+                                <Typography variant="caption">
+                                    Debug - URL Params: {JSON.stringify(Object.fromEntries(searchParams))}
+                                </Typography>
                             </Box>
-                        )}
+                        )} */}
                     </CardContent>
                 </Card>
             </Fade>
@@ -18157,6 +22076,3557 @@ const ConnectionRequestDialog = ({ open, onClose, clinic, onSuccess }) => {
 };
 
 export default ClinicSearchModal;
+```
+
+**resources/js/components/admin/AdminSidebar.jsx.jsx**
+
+```jsx
+import React from 'react';
+import {
+    Drawer,
+    List,
+    ListItem,
+    ListItemButton,
+    ListItemIcon,
+    ListItemText,
+    Toolbar,
+    Box,
+    Typography,
+    Avatar,
+    Divider,
+    useTheme,
+} from '@mui/material';
+import {
+    AdminPanelSettings,
+    Dashboard as DashboardIcon,
+    People,
+    SupervisorAccount,
+    LocalHospital,
+    EventNote,
+} from '@mui/icons-material';
+
+const AdminSidebar = ({ 
+    drawerWidth, 
+    mobileOpen, 
+    handleDrawerToggle, 
+    tabItems, 
+    selectedTab, 
+    setSelectedTab 
+}) => {
+    const theme = useTheme();
+
+    const drawer = (
+        <div>
+            <Toolbar>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                    <Avatar
+                        sx={{
+                            bgcolor: 'primary.main',
+                            width: 40,
+                            height: 40,
+                        }}
+                    >
+                        <AdminPanelSettings />
+                    </Avatar>
+                    <Box>
+                        <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                            Admin Panel
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                            Visit Care
+                        </Typography>
+                    </Box>
+                </Box>
+            </Toolbar>
+            <Divider />
+            <List>
+                {tabItems.map((item, index) => (
+                    <ListItem key={item.label} disablePadding>
+                        <ListItemButton
+                            selected={selectedTab === index}
+                            onClick={() => setSelectedTab(index)}
+                            sx={{
+                                '&.Mui-selected': {
+                                    backgroundColor: theme.palette.primary.light,
+                                    borderRight: `3px solid ${theme.palette.primary.main}`,
+                                    '& .MuiListItemIcon-root': {
+                                        color: theme.palette.primary.main,
+                                    },
+                                    '& .MuiListItemText-primary': {
+                                        color: theme.palette.primary.main,
+                                        fontWeight: 'bold',
+                                    },
+                                },
+                                '&:hover': {
+                                    backgroundColor: theme.palette.action.hover,
+                                },
+                            }}
+                        >
+                            <ListItemIcon>
+                                {item.icon}
+                            </ListItemIcon>
+                            <ListItemText 
+                                primary={item.label}
+                                primaryTypographyProps={{
+                                    fontSize: '0.95rem',
+                                }}
+                            />
+                        </ListItemButton>
+                    </ListItem>
+                ))}
+            </List>
+            <Divider />
+            <Box sx={{ p: 2, mt: 'auto' }}>
+                <Typography variant="caption" color="text.secondary">
+                    © 2025 Visit Care Admin
+                </Typography>
+            </Box>
+        </div>
+    );
+
+    return (
+        <Box
+            component="nav"
+            sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}
+        >
+            <Drawer
+                variant="temporary"
+                open={mobileOpen}
+                onClose={handleDrawerToggle}
+                ModalProps={{
+                    keepMounted: true,
+                }}
+                sx={{
+                    display: { xs: 'block', md: 'none' },
+                    '& .MuiDrawer-paper': {
+                        boxSizing: 'border-box',
+                        width: drawerWidth,
+                    },
+                }}
+            >
+                {drawer}
+            </Drawer>
+            <Drawer
+                variant="permanent"
+                sx={{
+                    display: { xs: 'none', md: 'block' },
+                    '& .MuiDrawer-paper': {
+                        boxSizing: 'border-box',
+                        width: drawerWidth,
+                    },
+                }}
+                open
+            >
+                {drawer}
+            </Drawer>
+        </Box>
+    );
+};
+
+export default AdminSidebar;
+```
+
+**resources/js/components/admin/AdminUserManagement.jsx**
+
+```jsx
+import React, { useState, useEffect } from 'react';
+import {
+    Box,
+    Paper,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TablePagination,
+    TableRow,
+    TextField,
+    Button,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    Chip,
+    IconButton,
+    Typography,
+    Grid,
+    Alert,
+    CircularProgress,
+    Tooltip,
+    Avatar,
+    Card,
+    CardContent,
+} from '@mui/material';
+import {
+    Add,
+    Edit,
+    Delete,
+    Visibility,
+    Search,
+    FilterList,
+    Person,
+    Email,
+    Phone,
+    Badge,
+    VerifiedUser,
+    Block,
+} from '@mui/icons-material';
+import { format } from 'date-fns';
+import axios from 'axios';
+
+const AdminUserManagement = () => {
+    const apiUrl = import.meta.env.VITE_API_URL;
+    const [users, setUsers] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [totalUsers, setTotalUsers] = useState(0);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [userTypeFilter, setUserTypeFilter] = useState('all');
+    const [verificationFilter, setVerificationFilter] = useState('all');
+
+    // Dialog states
+    const [openDialog, setOpenDialog] = useState(false);
+    const [dialogMode, setDialogMode] = useState('create'); // 'create', 'edit', 'view'
+    const [selectedUser, setSelectedUser] = useState(null);
+    const [formData, setFormData] = useState({
+        name: '',
+        email: '',
+        password: '',
+        password_confirmation: '',
+        user_type: 'patient',
+        phone: '',
+        address: '',
+    });
+
+    useEffect(() => {
+        loadUsers();
+    }, [page, rowsPerPage, searchTerm, userTypeFilter, verificationFilter]);
+
+    const loadUsers = async () => {
+        try {
+            const token = localStorage.getItem('auth_token');
+            const params = {
+                page: page + 1,
+                per_page: rowsPerPage,
+                search: searchTerm,
+                user_type: userTypeFilter,
+                is_verified: verificationFilter === 'all' ? undefined : verificationFilter === 'verified',
+            };
+
+            const response = await axios.get(`${apiUrl}/admin/users`, {
+                headers: { Authorization: `Bearer ${token}` },
+                params
+            });
+
+            setUsers(response.data.data);
+            setTotalUsers(response.data.total);
+        } catch (error) {
+            console.error('Failed to load users:', error);
+            setError('Failed to load users');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleCreateUser = () => {
+        setDialogMode('create');
+        setSelectedUser(null);
+        setFormData({
+            name: '',
+            email: '',
+            password: '',
+            password_confirmation: '',
+            user_type: 'patient',
+            phone: '',
+            address: '',
+        });
+        setOpenDialog(true);
+    };
+
+    const handleEditUser = (user) => {
+        setDialogMode('edit');
+        setSelectedUser(user);
+        setFormData({
+            name: user.name,
+            email: user.email,
+            password: '',
+            password_confirmation: '',
+            user_type: user.user_type,
+            phone: user.phone || '',
+            address: user.address || '',
+        });
+        setOpenDialog(true);
+    };
+
+    const handleViewUser = (user) => {
+        setDialogMode('view');
+        setSelectedUser(user);
+        setOpenDialog(true);
+    };
+
+    const handleSubmit = async () => {
+        try {
+            const token = localStorage.getItem('auth_token');
+            const headers = { Authorization: `Bearer ${token}` };
+
+            if (dialogMode === 'create') {
+                await axios.post(`${apiUrl}/admin/users`, formData, { headers });
+            } else if (dialogMode === 'edit') {
+                await axios.put(`${apiUrl}/admin/users/${selectedUser.id}`, formData, { headers });
+            }
+
+            setOpenDialog(false);
+            loadUsers();
+        } catch (error) {
+            console.error('Failed to save user:', error);
+            setError('Failed to save user');
+        }
+    };
+
+    const handleDeleteUser = async (userId) => {
+        if (!confirm('Are you sure you want to delete this user?')) return;
+
+        try {
+            const token = localStorage.getItem('auth_token');
+            await axios.delete(`${apiUrl}/admin/users/${userId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            loadUsers();
+        } catch (error) {
+            console.error('Failed to delete user:', error);
+            setError('Failed to delete user');
+        }
+    };
+
+    const handleVerifyDoctor = async (doctorId, verify = true) => {
+        try {
+            const token = localStorage.getItem('auth_token');
+            const endpoint = verify ? 'verify' : 'unverify';
+            await axios.post(`${apiUrl}/admin/doctors/${doctorId}/${endpoint}`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            loadUsers();
+        } catch (error) {
+            console.error('Failed to update doctor verification:', error);
+            setError('Failed to update doctor verification');
+        }
+    };
+
+    const getUserTypeChip = (userType) => {
+        const colors = {
+            admin: 'error',
+            doctor: 'primary',
+            healthcare: 'secondary',
+            patient: 'success',
+        };
+        return (
+            <Chip
+                label={userType}
+                color={colors[userType] || 'default'}
+                size="small"
+                sx={{ textTransform: 'capitalize' }}
+            />
+        );
+    };
+
+    const getVerificationStatus = (user) => {
+        if (user.user_type === 'doctor' && user.doctor) {
+            return user.doctor.is_verified ? (
+                <Chip label="Verified" color="success" size="small" icon={<VerifiedUser />} />
+            ) : (
+                <Chip label="Unverified" color="warning" size="small" icon={<Block />} />
+            );
+        }
+        return null;
+    };
+
+    if (loading) {
+        return (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                <CircularProgress />
+                <Typography sx={{ ml: 2 }}>Loading users...</Typography>
+            </Box>
+        );
+    }
+
+    return (
+        <Box>
+            <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 3 }}>
+                User Management
+            </Typography>
+
+            {error && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                    {error}
+                </Alert>
+            )}
+
+            {/* Stats Cards */}
+            <Grid container spacing={3} sx={{ mb: 3 }}>
+                <Grid item xs={12} sm={3}>
+                    <Card>
+                        <CardContent>
+                            <Typography color="text.secondary" gutterBottom>
+                                Total Users
+                            </Typography>
+                            <Typography variant="h4">
+                                {totalUsers}
+                            </Typography>
+                        </CardContent>
+                    </Card>
+                </Grid>
+                <Grid item xs={12} sm={3}>
+                    <Card>
+                        <CardContent>
+                            <Typography color="text.secondary" gutterBottom>
+                                Patients
+                            </Typography>
+                            <Typography variant="h4" color="success.main">
+                                {users.filter(u => u.user_type === 'patient').length}
+                            </Typography>
+                        </CardContent>
+                    </Card>
+                </Grid>
+                <Grid item xs={12} sm={3}>
+                    <Card>
+                        <CardContent>
+                            <Typography color="text.secondary" gutterBottom>
+                                Doctors
+                            </Typography>
+                            <Typography variant="h4" color="primary.main">
+                                {users.filter(u => u.user_type === 'doctor').length}
+                            </Typography>
+                        </CardContent>
+                    </Card>
+                </Grid>
+                <Grid item xs={12} sm={3}>
+                    <Card>
+                        <CardContent>
+                            <Typography color="text.secondary" gutterBottom>
+                                Healthcare Providers
+                            </Typography>
+                            <Typography variant="h4" color="secondary.main">
+                                {users.filter(u => u.user_type === 'healthcare').length}
+                            </Typography>
+                        </CardContent>
+                    </Card>
+                </Grid>
+            </Grid>
+
+            {/* Controls */}
+            <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                <TextField
+                    placeholder="Search users..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    InputProps={{
+                        startAdornment: <Search sx={{ mr: 1 }} />,
+                    }}
+                    sx={{ minWidth: 300 }}
+                />
+                
+                <FormControl sx={{ minWidth: 150 }}>
+                    <InputLabel>User Type</InputLabel>
+                    <Select
+                        value={userTypeFilter}
+                        onChange={(e) => setUserTypeFilter(e.target.value)}
+                        label="User Type"
+                    >
+                        <MenuItem value="all">All Types</MenuItem>
+                        <MenuItem value="patient">Patients</MenuItem>
+                        <MenuItem value="doctor">Doctors</MenuItem>
+                        <MenuItem value="healthcare">Healthcare</MenuItem>
+                        <MenuItem value="admin">Admins</MenuItem>
+                    </Select>
+                </FormControl>
+
+                <FormControl sx={{ minWidth: 150 }}>
+                    <InputLabel>Verification</InputLabel>
+                    <Select
+                        value={verificationFilter}
+                        onChange={(e) => setVerificationFilter(e.target.value)}
+                        label="Verification"
+                    >
+                        <MenuItem value="all">All</MenuItem>
+                        <MenuItem value="verified">Verified</MenuItem>
+                        <MenuItem value="unverified">Unverified</MenuItem>
+                    </Select>
+                </FormControl>
+
+                <Button
+                    variant="contained"
+                    startIcon={<Add />}
+                    onClick={handleCreateUser}
+                    sx={{ ml: 'auto' }}
+                >
+                    Add User
+                </Button>
+            </Box>
+
+            {/* Users Table */}
+            <Paper sx={{ width: '100%', overflow: 'hidden' }}>
+                <TableContainer>
+                    <Table stickyHeader>
+                        <TableHead>
+                            <TableRow>
+                                <TableCell>User</TableCell>
+                                <TableCell>Email</TableCell>
+                                <TableCell>Type</TableCell>
+                                <TableCell>Status</TableCell>
+                                <TableCell>Joined</TableCell>
+                                <TableCell>Actions</TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {users.map((user) => (
+                                <TableRow hover key={user.id}>
+                                    <TableCell>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                            <Avatar src={user.avatar}>
+                                                {user.name?.charAt(0)}
+                                            </Avatar>
+                                            <Box>
+                                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                                    {user.name}
+                                                </Typography>
+                                                {user.phone && (
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        {user.phone}
+                                                    </Typography>
+                                                )}
+                                            </Box>
+                                        </Box>
+                                    </TableCell>
+                                    <TableCell>{user.email}</TableCell>
+                                    <TableCell>{getUserTypeChip(user.user_type)}</TableCell>
+                                    <TableCell>
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                            {getVerificationStatus(user)}
+                                            {user.email_verified_at && (
+                                                <Chip 
+                                                    label="Email Verified" 
+                                                    color="success" 
+                                                    size="small" 
+                                                    variant="outlined"
+                                                />
+                                            )}
+                                        </Box>
+                                    </TableCell>
+                                    <TableCell>
+                                        {format(new Date(user.created_at), 'MMM dd, yyyy')}
+                                    </TableCell>
+                                    <TableCell>
+                                        <Box sx={{ display: 'flex', gap: 1 }}>
+                                            <Tooltip title="View Details">
+                                                <IconButton 
+                                                    size="small"
+                                                    onClick={() => handleViewUser(user)}
+                                                >
+                                                    <Visibility />
+                                                </IconButton>
+                                            </Tooltip>
+                                            <Tooltip title="Edit User">
+                                                <IconButton 
+                                                    size="small"
+                                                    onClick={() => handleEditUser(user)}
+                                                >
+                                                    <Edit />
+                                                </IconButton>
+                                            </Tooltip>
+                                            {user.user_type === 'doctor' && user.doctor && (
+                                                <Tooltip title={user.doctor.is_verified ? "Remove Verification" : "Verify Doctor"}>
+                                                    <IconButton
+                                                        size="small"
+                                                        color={user.doctor.is_verified ? "warning" : "success"}
+                                                        onClick={() => handleVerifyDoctor(user.doctor.id, !user.doctor.is_verified)}
+                                                    >
+                                                        {user.doctor.is_verified ? <Block /> : <VerifiedUser />}
+                                                    </IconButton>
+                                                </Tooltip>
+                                            )}
+                                            <Tooltip title="Delete User">
+                                                <IconButton 
+                                                    size="small"
+                                                    color="error"
+                                                    onClick={() => handleDeleteUser(user.id)}
+                                                >
+                                                    <Delete />
+                                                </IconButton>
+                                            </Tooltip>
+                                        </Box>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+                <TablePagination
+                    rowsPerPageOptions={[5, 10, 25, 50]}
+                    component="div"
+                    count={totalUsers}
+                    rowsPerPage={rowsPerPage}
+                    page={page}
+                    onPageChange={(event, newPage) => setPage(newPage)}
+                    onRowsPerPageChange={(event) => {
+                        setRowsPerPage(parseInt(event.target.value, 10));
+                        setPage(0);
+                    }}
+                />
+            </Paper>
+
+            {/* User Dialog */}
+            <Dialog 
+                open={openDialog} 
+                onClose={() => setOpenDialog(false)}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle>
+                    {dialogMode === 'create' && 'Create New User'}
+                    {dialogMode === 'edit' && 'Edit User'}
+                    {dialogMode === 'view' && 'User Details'}
+                </DialogTitle>
+                <DialogContent>
+                    {dialogMode === 'view' && selectedUser ? (
+                        <Box sx={{ pt: 2 }}>
+                            <Grid container spacing={2}>
+                                <Grid item xs={12}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                                        <Avatar src={selectedUser.avatar} sx={{ width: 80, height: 80 }}>
+                                            {selectedUser.name?.charAt(0)}
+                                        </Avatar>
+                                        <Box>
+                                            <Typography variant="h5">{selectedUser.name}</Typography>
+                                            <Typography color="text.secondary">{selectedUser.email}</Typography>
+                                            {getUserTypeChip(selectedUser.user_type)}
+                                        </Box>
+                                    </Box>
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <Typography variant="subtitle2" color="text.secondary">Phone</Typography>
+                                    <Typography>{selectedUser.phone || 'Not provided'}</Typography>
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <Typography variant="subtitle2" color="text.secondary">Address</Typography>
+                                    <Typography>{selectedUser.address || 'Not provided'}</Typography>
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <Typography variant="subtitle2" color="text.secondary">Email Verified</Typography>
+                                    <Typography>{selectedUser.email_verified_at ? 'Yes' : 'No'}</Typography>
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <Typography variant="subtitle2" color="text.secondary">Joined</Typography>
+                                    <Typography>{format(new Date(selectedUser.created_at), 'PPP')}</Typography>
+                                </Grid>
+                            </Grid>
+                        </Box>
+                    ) : (
+                        <Box sx={{ pt: 2 }}>
+                            <Grid container spacing={2}>
+                                <Grid item xs={12}>
+                                    <TextField
+                                        fullWidth
+                                        label="Full Name"
+                                        value={formData.name}
+                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                        required
+                                    />
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <TextField
+                                        fullWidth
+                                        label="Email"
+                                        type="email"
+                                        value={formData.email}
+                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                        required
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        fullWidth
+                                        label="Password"
+                                        type="password"
+                                        value={formData.password}
+                                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                        required={dialogMode === 'create'}
+                                        helperText={dialogMode === 'edit' ? "Leave blank to keep current password" : ""}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        fullWidth
+                                        label="Confirm Password"
+                                        type="password"
+                                        value={formData.password_confirmation}
+                                        onChange={(e) => setFormData({ ...formData, password_confirmation: e.target.value })}
+                                        required={dialogMode === 'create' || formData.password}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <FormControl fullWidth>
+                                        <InputLabel>User Type</InputLabel>
+                                        <Select
+                                            value={formData.user_type}
+                                            onChange={(e) => setFormData({ ...formData, user_type: e.target.value })}
+                                            label="User Type"
+                                        >
+                                            <MenuItem value="patient">Patient</MenuItem>
+                                            <MenuItem value="doctor">Doctor</MenuItem>
+                                            <MenuItem value="healthcare">Healthcare Provider</MenuItem>
+                                            <MenuItem value="admin">Admin</MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        fullWidth
+                                        label="Phone"
+                                        value={formData.phone}
+                                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                    />
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <TextField
+                                        fullWidth
+                                        label="Address"
+                                        multiline
+                                        rows={2}
+                                        value={formData.address}
+                                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                                    />
+                                </Grid>
+                            </Grid>
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setOpenDialog(false)}>
+                        {dialogMode === 'view' ? 'Close' : 'Cancel'}
+                    </Button>
+                    {dialogMode !== 'view' && (
+                        <Button onClick={handleSubmit} variant="contained">
+                            {dialogMode === 'create' ? 'Create' : 'Save Changes'}
+                        </Button>
+                    )}
+                </DialogActions>
+            </Dialog>
+        </Box>
+    );
+};
+
+export default AdminUserManagement;
+```
+
+**resources/js/components/admin/AdminHealthcareManagement.jsx**
+
+```jsx
+import React, { useState, useEffect } from 'react';
+import {
+    Box,
+    Typography,
+    Paper,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    Chip,
+    IconButton,
+    TextField,
+    InputAdornment,
+    Button,
+    Avatar,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Alert,
+    Grid,
+    Card,
+    CardContent,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    Tabs,
+    Tab,
+    Badge,
+    Tooltip,
+    Divider,
+    Stack,
+    Rating,
+    List,
+    ListItem,
+    ListItemText,
+    ListItemIcon
+} from '@mui/material';
+import {
+    Search,
+    Visibility,
+    VerifiedUser,
+    Block,
+    CheckCircle,
+    Cancel,
+    Business,
+    LocalHospital,
+    Phone,
+    Email,
+    LocationOn,
+    Star,
+    Schedule,
+    Edit,
+    Delete,
+    FileDownload,
+    Info,
+    Warning,
+    Domain,
+    MedicalServices,
+    Approval
+} from '@mui/icons-material';
+import { format, parseISO } from 'date-fns';
+
+const AdminHealthcareManagement = () => {
+    const [healthcareProviders, setHealthcareProviders] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [typeFilter, setTypeFilter] = useState('all');
+    const [verificationFilter, setVerificationFilter] = useState('all');
+    const [selectedProvider, setSelectedProvider] = useState(null);
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const [dialogType, setDialogType] = useState('');
+    const [tabValue, setTabValue] = useState(0);
+    const [verificationNotes, setVerificationNotes] = useState('');
+
+    // Mock data - replace with actual API calls
+    useEffect(() => {
+        const mockProviders = [
+            {
+                id: 1,
+                owner: {
+                    id: 1,
+                    name: 'City Medical Group',
+                    email: 'admin@citymedical.com',
+                    phone: '+1-555-0200',
+                    created_at: '2024-01-10T08:30:00Z'
+                },
+                name: 'City Medical Center',
+                registration_number: 'REG001234',
+                license_number: 'LIC567890',
+                organization_type: 'hospital',
+                description: 'Full-service hospital with emergency care, surgery, and specialized departments...',
+                address: '123 Healthcare Ave, Medical District, NY 10001',
+                phone: '+1-555-0201',
+                email: 'info@citymedical.com',
+                website: 'https://citymedical.com',
+                established_date: '1995-05-15',
+                bed_count: 250,
+                specialties: ['Emergency Medicine', 'Cardiology', 'Orthopedics', 'Oncology'],
+                facilities: ['Emergency Room', 'ICU', 'Operating Theater', 'Radiology', 'Laboratory'],
+                certifications: ['Joint Commission', 'NABH', 'ISO 9001'],
+                rating: 4.6,
+                total_reviews: 892,
+                is_verified: true,
+                is_active: true,
+                verification_date: '2024-01-15T14:20:00Z',
+                doctors_count: 45,
+                appointments_count: 12450,
+                image: null,
+                logo: null
+            },
+            {
+                id: 2,
+                owner: {
+                    id: 2,
+                    name: 'Green Valley Healthcare',
+                    email: 'admin@greenvalley.com',
+                    phone: '+1-555-0300',
+                    created_at: '2024-02-05T09:15:00Z'
+                },
+                name: 'Green Valley Clinic',
+                registration_number: 'REG002345',
+                license_number: 'LIC678901',
+                organization_type: 'clinic',
+                description: 'Modern outpatient clinic specializing in family medicine and preventive care...',
+                address: '456 Wellness Street, Suburb, NY 10002',
+                phone: '+1-555-0301',
+                email: 'contact@greenvalley.com',
+                website: 'https://greenvalley.com',
+                established_date: '2010-03-20',
+                bed_count: 0,
+                specialties: ['General Medicine', 'Pediatrics', 'Dermatology'],
+                facilities: ['Consultation Rooms', 'Pharmacy', 'Laboratory', 'X-Ray'],
+                certifications: ['NABH', 'ISO 9001'],
+                rating: 4.3,
+                total_reviews: 234,
+                is_verified: false,
+                is_active: true,
+                verification_date: null,
+                doctors_count: 8,
+                appointments_count: 1890,
+                image: null,
+                logo: null
+            },
+            {
+                id: 3,
+                owner: {
+                    id: 3,
+                    name: 'Metro Diagnostics',
+                    email: 'admin@metrodiag.com',
+                    phone: '+1-555-0400',
+                    created_at: '2024-03-01T10:45:00Z'
+                },
+                name: 'Metro Diagnostic Center',
+                registration_number: 'REG003456',
+                license_number: 'LIC789012',
+                organization_type: 'diagnostic_center',
+                description: 'Advanced diagnostic center with state-of-the-art imaging and laboratory services...',
+                address: '789 Tech Boulevard, Innovation District, NY 10003',
+                phone: '+1-555-0401',
+                email: 'info@metrodiag.com',
+                website: 'https://metrodiagnostics.com',
+                established_date: '2018-08-10',
+                bed_count: 0,
+                specialties: ['Radiology', 'Pathology', 'Nuclear Medicine'],
+                facilities: ['MRI', 'CT Scan', 'Ultrasound', 'Laboratory', 'X-Ray'],
+                certifications: ['NABL', 'ISO 15189'],
+                rating: 4.8,
+                total_reviews: 156,
+                is_verified: true,
+                is_active: true,
+                verification_date: '2024-03-05T16:30:00Z',
+                doctors_count: 12,
+                appointments_count: 3240,
+                image: null,
+                logo: null
+            }
+        ];
+        setHealthcareProviders(mockProviders);
+        setLoading(false);
+    }, []);
+
+    // Stats calculations
+    const stats = {
+        total: healthcareProviders.length,
+        verified: healthcareProviders.filter(p => p.is_verified).length,
+        pending: healthcareProviders.filter(p => !p.is_verified).length,
+        hospitals: healthcareProviders.filter(p => p.organization_type === 'hospital').length,
+        clinics: healthcareProviders.filter(p => p.organization_type === 'clinic').length,
+        active: healthcareProviders.filter(p => p.is_active).length
+    };
+
+    const getOrganizationTypeColor = (type) => {
+        switch (type) {
+            case 'hospital': return 'error';
+            case 'clinic': return 'primary';
+            case 'diagnostic_center': return 'info';
+            case 'pharmacy': return 'success';
+            case 'nursing_home': return 'warning';
+            default: return 'default';
+        }
+    };
+
+    const getVerificationStatusColor = (isVerified) => {
+        return isVerified ? 'success' : 'warning';
+    };
+
+    // Filter functions
+    const filteredProviders = healthcareProviders.filter(provider => {
+        const matchesSearch = 
+            provider.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            provider.owner.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            provider.registration_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            provider.address.toLowerCase().includes(searchTerm.toLowerCase());
+
+        const matchesType = typeFilter === 'all' || provider.organization_type === typeFilter;
+        const matchesVerification = verificationFilter === 'all' || 
+            (verificationFilter === 'verified' && provider.is_verified) ||
+            (verificationFilter === 'pending' && !provider.is_verified);
+
+        return matchesSearch && matchesType && matchesVerification;
+    });
+
+    const handleProviderAction = (action, provider) => {
+        setSelectedProvider(provider);
+        setDialogType(action);
+        setDialogOpen(true);
+    };
+
+    const handleVerificationAction = async (action) => {
+        // Implement API call here
+        console.log(`${action} healthcare provider:`, selectedProvider.id, verificationNotes);
+        setDialogOpen(false);
+        setVerificationNotes('');
+        // Reload data after action
+    };
+
+    const renderStatsCards = () => (
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+            <Grid item xs={12} sm={6} md={2}>
+                <Card elevation={2}>
+                    <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                        <Avatar sx={{ mx: 'auto', mb: 1, bgcolor: 'primary.main' }}>
+                            <Domain />
+                        </Avatar>
+                        <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                            {stats.total}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            Total Providers
+                        </Typography>
+                    </CardContent>
+                </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={2}>
+                <Card elevation={2}>
+                    <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                        <Avatar sx={{ mx: 'auto', mb: 1, bgcolor: 'success.main' }}>
+                            <VerifiedUser />
+                        </Avatar>
+                        <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'success.main' }}>
+                            {stats.verified}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            Verified
+                        </Typography>
+                    </CardContent>
+                </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={2}>
+                <Card elevation={2}>
+                    <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                        <Avatar sx={{ mx: 'auto', mb: 1, bgcolor: 'warning.main' }}>
+                            <Schedule />
+                        </Avatar>
+                        <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'warning.main' }}>
+                            {stats.pending}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            Pending
+                        </Typography>
+                    </CardContent>
+                </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={2}>
+                <Card elevation={2}>
+                    <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                        <Avatar sx={{ mx: 'auto', mb: 1, bgcolor: 'error.main' }}>
+                            <LocalHospital />
+                        </Avatar>
+                        <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'error.main' }}>
+                            {stats.hospitals}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            Hospitals
+                        </Typography>
+                    </CardContent>
+                </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={2}>
+                <Card elevation={2}>
+                    <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                        <Avatar sx={{ mx: 'auto', mb: 1, bgcolor: 'info.main' }}>
+                            <Business />
+                        </Avatar>
+                        <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'info.main' }}>
+                            {stats.clinics}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            Clinics
+                        </Typography>
+                    </CardContent>
+                </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={2}>
+                <Card elevation={2}>
+                    <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                        <Avatar sx={{ mx: 'auto', mb: 1, bgcolor: 'secondary.main' }}>
+                            <CheckCircle />
+                        </Avatar>
+                        <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'secondary.main' }}>
+                            {stats.active}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            Active
+                        </Typography>
+                    </CardContent>
+                </Card>
+            </Grid>
+        </Grid>
+    );
+
+    const renderProvidersList = () => (
+        <Paper elevation={2}>
+            <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+                <Grid container spacing={2} alignItems="center">
+                    <Grid item xs={12} md={4}>
+                        <TextField
+                            size="small"
+                            fullWidth
+                            placeholder="Search healthcare providers..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            InputProps={{
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <Search />
+                                    </InputAdornment>
+                                ),
+                            }}
+                        />
+                    </Grid>
+                    <Grid item xs={12} md={3}>
+                        <FormControl size="small" fullWidth>
+                            <InputLabel>Organization Type</InputLabel>
+                            <Select
+                                value={typeFilter}
+                                onChange={(e) => setTypeFilter(e.target.value)}
+                            >
+                                <MenuItem value="all">All Types</MenuItem>
+                                <MenuItem value="hospital">Hospital</MenuItem>
+                                <MenuItem value="clinic">Clinic</MenuItem>
+                                <MenuItem value="diagnostic_center">Diagnostic Center</MenuItem>
+                                <MenuItem value="pharmacy">Pharmacy</MenuItem>
+                                <MenuItem value="nursing_home">Nursing Home</MenuItem>
+                            </Select>
+                        </FormControl>
+                    </Grid>
+                    <Grid item xs={12} md={3}>
+                        <FormControl size="small" fullWidth>
+                            <InputLabel>Verification</InputLabel>
+                            <Select
+                                value={verificationFilter}
+                                onChange={(e) => setVerificationFilter(e.target.value)}
+                            >
+                                <MenuItem value="all">All Status</MenuItem>
+                                <MenuItem value="verified">Verified</MenuItem>
+                                <MenuItem value="pending">Pending</MenuItem>
+                            </Select>
+                        </FormControl>
+                    </Grid>
+                    <Grid item xs={12} md={2}>
+                        <Button
+                            variant="outlined"
+                            startIcon={<FileDownload />}
+                            fullWidth
+                            size="small"
+                        >
+                            Export
+                        </Button>
+                    </Grid>
+                </Grid>
+            </Box>
+            
+            <TableContainer>
+                <Table>
+                    <TableHead>
+                        <TableRow>
+                            <TableCell>Healthcare Provider</TableCell>
+                            <TableCell>Type</TableCell>
+                            <TableCell>Registration</TableCell>
+                            <TableCell>Location</TableCell>
+                            <TableCell>Rating</TableCell>
+                            <TableCell>Doctors</TableCell>
+                            <TableCell>Status</TableCell>
+                            <TableCell>Actions</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {filteredProviders.map((provider) => (
+                            <TableRow key={provider.id} hover>
+                                <TableCell>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                        <Avatar 
+                                            src={provider.logo}
+                                            sx={{ width: 40, height: 40 }}
+                                        >
+                                            <LocalHospital />
+                                        </Avatar>
+                                        <Box>
+                                            <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+                                                {provider.name}
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                Owner: {provider.owner.name}
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </TableCell>
+                                <TableCell>
+                                    <Chip 
+                                        label={provider.organization_type.replace('_', ' ')}
+                                        color={getOrganizationTypeColor(provider.organization_type)}
+                                        size="small"
+                                        sx={{ textTransform: 'capitalize' }}
+                                    />
+                                </TableCell>
+                                <TableCell>
+                                    <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                                        {provider.registration_number}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                        Lic: {provider.license_number}
+                                    </Typography>
+                                </TableCell>
+                                <TableCell>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <LocationOn fontSize="small" />
+                                        <Box>
+                                            <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>
+                                                {provider.address}
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </TableCell>
+                                <TableCell>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <Rating value={provider.rating} precision={0.1} size="small" readOnly />
+                                        <Typography variant="body2">
+                                            {provider.rating} ({provider.total_reviews})
+                                        </Typography>
+                                    </Box>
+                                </TableCell>
+                                <TableCell>
+                                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                                        {provider.doctors_count}
+                                    </Typography>
+                                </TableCell>
+                                <TableCell>
+                                    <Chip 
+                                        label={provider.is_verified ? 'Verified' : 'Pending'}
+                                        color={getVerificationStatusColor(provider.is_verified)}
+                                        size="small"
+                                        icon={provider.is_verified ? <VerifiedUser /> : <Schedule />}
+                                    />
+                                </TableCell>
+                                <TableCell>
+                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                        <Tooltip title="View Details">
+                                            <IconButton 
+                                                size="small" 
+                                                color="info"
+                                                onClick={() => handleProviderAction('view', provider)}
+                                            >
+                                                <Visibility />
+                                            </IconButton>
+                                        </Tooltip>
+                                        {!provider.is_verified && (
+                                            <Tooltip title="Verify Provider">
+                                                <IconButton 
+                                                    size="small" 
+                                                    color="success"
+                                                    onClick={() => handleProviderAction('verify', provider)}
+                                                >
+                                                    <Approval />
+                                                </IconButton>
+                                            </Tooltip>
+                                        )}
+                                        <Tooltip title="Block/Unblock">
+                                            <IconButton 
+                                                size="small" 
+                                                color="warning"
+                                                onClick={() => handleProviderAction('block', provider)}
+                                            >
+                                                <Block />
+                                            </IconButton>
+                                        </Tooltip>
+                                        <Tooltip title="Edit">
+                                            <IconButton 
+                                                size="small" 
+                                                color="primary"
+                                                onClick={() => handleProviderAction('edit', provider)}
+                                            >
+                                                <Edit />
+                                            </IconButton>
+                                        </Tooltip>
+                                    </Box>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </TableContainer>
+        </Paper>
+    );
+
+    const renderProviderDetails = () => {
+        if (!selectedProvider) return null;
+
+        return (
+            <Box sx={{ maxHeight: '70vh', overflow: 'auto' }}>
+                <Grid container spacing={3}>
+                    {/* Provider Info */}
+                    <Grid item xs={12} md={6}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+                            <Avatar 
+                                src={selectedProvider.logo}
+                                sx={{ width: 80, height: 80 }}
+                            >
+                                <LocalHospital sx={{ fontSize: 40 }} />
+                            </Avatar>
+                            <Box>
+                                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                                    {selectedProvider.name}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    {selectedProvider.organization_type.replace('_', ' ').toUpperCase()}
+                                </Typography>
+                                <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                                    <Chip 
+                                        label={selectedProvider.is_verified ? 'Verified' : 'Pending'}
+                                        color={getVerificationStatusColor(selectedProvider.is_verified)}
+                                        size="small"
+                                    />
+                                    <Chip 
+                                        label={selectedProvider.is_active ? 'Active' : 'Inactive'}
+                                        color={selectedProvider.is_active ? 'success' : 'error'}
+                                        size="small"
+                                        variant="outlined"
+                                    />
+                                </Box>
+                            </Box>
+                        </Box>
+
+                        <Divider sx={{ mb: 2 }} />
+
+                        <Stack spacing={2}>
+                            <Box>
+                                <Typography variant="subtitle2" color="text.secondary">
+                                    Owner Information
+                                </Typography>
+                                <Typography variant="body2" sx={{ mt: 0.5 }}>
+                                    <strong>Name:</strong> {selectedProvider.owner.name}
+                                </Typography>
+                                <Typography variant="body2">
+                                    <strong>Email:</strong> {selectedProvider.owner.email}
+                                </Typography>
+                                <Typography variant="body2">
+                                    <strong>Phone:</strong> {selectedProvider.owner.phone}
+                                </Typography>
+                            </Box>
+
+                            <Box>
+                                <Typography variant="subtitle2" color="text.secondary">
+                                    Registration Details
+                                </Typography>
+                                <Typography variant="body2" sx={{ mt: 0.5 }}>
+                                    <strong>Registration:</strong> {selectedProvider.registration_number}
+                                </Typography>
+                                <Typography variant="body2">
+                                    <strong>License:</strong> {selectedProvider.license_number}
+                                </Typography>
+                                <Typography variant="body2">
+                                    <strong>Established:</strong> {format(parseISO(selectedProvider.established_date), 'MMM dd, yyyy')}
+                                </Typography>
+                                {selectedProvider.bed_count > 0 && (
+                                    <Typography variant="body2">
+                                        <strong>Bed Count:</strong> {selectedProvider.bed_count}
+                                    </Typography>
+                                )}
+                            </Box>
+
+                            <Box>
+                                <Typography variant="subtitle2" color="text.secondary">
+                                    Contact Information
+                                </Typography>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                                    <Phone fontSize="small" />
+                                    <Typography variant="body2">{selectedProvider.phone}</Typography>
+                                </Box>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                                    <Email fontSize="small" />
+                                    <Typography variant="body2">{selectedProvider.email}</Typography>
+                                </Box>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                                    <LocationOn fontSize="small" />
+                                    <Typography variant="body2">{selectedProvider.address}</Typography>
+                                </Box>
+                            </Box>
+
+                            <Box>
+                                <Typography variant="subtitle2" color="text.secondary">
+                                    Rating & Reviews
+                                </Typography>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                                    <Rating value={selectedProvider.rating} precision={0.1} readOnly />
+                                    <Typography variant="body2">
+                                        {selectedProvider.rating} ({selectedProvider.total_reviews} reviews)
+                                    </Typography>
+                                </Box>
+                            </Box>
+                        </Stack>
+                    </Grid>
+
+                    {/* Additional Details */}
+                    <Grid item xs={12} md={6}>
+                        <Stack spacing={2}>
+                            <Box>
+                                <Typography variant="subtitle2" color="text.secondary">
+                                    Specialties
+                                </Typography>
+                                <Box sx={{ display: 'flex', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
+                                    {selectedProvider.specialties?.map((specialty, index) => (
+                                        <Chip key={index} label={specialty} size="small" variant="outlined" />
+                                    ))}
+                                </Box>
+                            </Box>
+
+                            <Box>
+                                <Typography variant="subtitle2" color="text.secondary">
+                                    Facilities
+                                </Typography>
+                                <Box sx={{ display: 'flex', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
+                                    {selectedProvider.facilities?.map((facility, index) => (
+                                        <Chip key={index} label={facility} size="small" variant="outlined" color="primary" />
+                                    ))}
+                                </Box>
+                            </Box>
+
+                            <Box>
+                                <Typography variant="subtitle2" color="text.secondary">
+                                    Certifications
+                                </Typography>
+                                <Box sx={{ display: 'flex', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
+                                    {selectedProvider.certifications?.map((cert, index) => (
+                                        <Chip key={index} label={cert} size="small" variant="outlined" color="success" />
+                                    ))}
+                                </Box>
+                            </Box>
+
+                            <Box>
+                                <Typography variant="subtitle2" color="text.secondary">
+                                    Platform Statistics
+                                </Typography>
+                                <Typography variant="body2" sx={{ mt: 0.5 }}>
+                                    <strong>Connected Doctors:</strong> {selectedProvider.doctors_count}
+                                </Typography>
+                                <Typography variant="body2">
+                                    <strong>Total Appointments:</strong> {selectedProvider.appointments_count}
+                                </Typography>
+                                <Typography variant="body2">
+                                    <strong>Joined:</strong> {format(parseISO(selectedProvider.owner.created_at), 'MMM dd, yyyy')}
+                                </Typography>
+                                {selectedProvider.verification_date && (
+                                    <Typography variant="body2">
+                                        <strong>Verified:</strong> {format(parseISO(selectedProvider.verification_date), 'MMM dd, yyyy')}
+                                    </Typography>
+                                )}
+                            </Box>
+                        </Stack>
+                    </Grid>
+
+                    {/* Description */}
+                    <Grid item xs={12}>
+                        <Box>
+                            <Typography variant="subtitle2" color="text.secondary">
+                                Description
+                            </Typography>
+                            <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: 'grey.50' }}>
+                                <Typography variant="body2">
+                                    {selectedProvider.description}
+                                </Typography>
+                            </Paper>
+                        </Box>
+                    </Grid>
+                </Grid>
+            </Box>
+        );
+    };
+
+    const renderVerificationDialog = () => (
+        <Dialog open={dialogOpen && dialogType === 'verify'} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
+            <DialogTitle>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Approval color="success" />
+                    Verify Healthcare Provider
+                </Box>
+            </DialogTitle>
+            <DialogContent>
+                <Alert severity="info" sx={{ mb: 2 }}>
+                    You are about to verify <strong>{selectedProvider?.name}</strong>. 
+                    Please review all documentation and credentials before proceeding.
+                </Alert>
+                
+                <TextField
+                    fullWidth
+                    label="Verification Notes"
+                    multiline
+                    rows={4}
+                    value={verificationNotes}
+                    onChange={(e) => setVerificationNotes(e.target.value)}
+                    placeholder="Add any notes about the verification process..."
+                    sx={{ mt: 2 }}
+                />
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
+                <Button 
+                    variant="contained" 
+                    color="error"
+                    onClick={() => handleVerificationAction('reject')}
+                    sx={{ mr: 1 }}
+                >
+                    Reject
+                </Button>
+                <Button 
+                    variant="contained" 
+                    color="success"
+                    onClick={() => handleVerificationAction('approve')}
+                >
+                    Verify Provider
+                </Button>
+            </DialogActions>
+        </Dialog>
+    );
+
+    return (
+        <Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+                    🏥 Healthcare Management
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                    <Badge badgeContent={stats.pending} color="warning">
+                        <Button variant="outlined" startIcon={<Schedule />}>
+                            Pending Verifications
+                        </Button>
+                    </Badge>
+                </Box>
+            </Box>
+
+            {/* Stats Cards */}
+            {renderStatsCards()}
+
+            {/* Main Content */}
+            <Paper elevation={2}>
+                <Tabs
+                    value={tabValue}
+                    onChange={(e, newValue) => setTabValue(newValue)}
+                    sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}
+                >
+                    <Tab label="All Providers" />
+                    <Tab 
+                        label={
+                            <Badge badgeContent={stats.pending} color="warning" sx={{ '& .MuiBadge-badge': { right: -3, top: 13 } }}>
+                                Pending Verification
+                            </Badge>
+                        } 
+                    />
+                    <Tab label="Verified Providers" />
+                    <Tab label="Hospitals" />
+                    <Tab label="Clinics" />
+                </Tabs>
+
+                <Box sx={{ p: 2 }}>
+                    {tabValue === 0 && renderProvidersList()}
+                    {tabValue === 1 && (
+                        <Box>
+                            <Alert severity="warning" sx={{ mb: 2 }}>
+                                <strong>{stats.pending}</strong> healthcare providers are waiting for verification.
+                            </Alert>
+                            {renderProvidersList()}
+                        </Box>
+                    )}
+                    {tabValue === 2 && (
+                        <Box>
+                            <Alert severity="success" sx={{ mb: 2 }}>
+                                <strong>{stats.verified}</strong> healthcare providers are currently verified.
+                            </Alert>
+                            {renderProvidersList()}
+                        </Box>
+                    )}
+                    {(tabValue === 3 || tabValue === 4) && (
+                        <Box>
+                            <Alert severity="info" sx={{ mb: 2 }}>
+                                Showing {tabValue === 3 ? 'hospitals' : 'clinics'} only.
+                            </Alert>
+                            {renderProvidersList()}
+                        </Box>
+                    )}
+                </Box>
+            </Paper>
+
+            {/* Provider Details Dialog */}
+            <Dialog 
+                open={dialogOpen && dialogType === 'view'} 
+                onClose={() => setDialogOpen(false)} 
+                maxWidth="lg" 
+                fullWidth
+            >
+                <DialogTitle>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <LocalHospital />
+                        Healthcare Provider Details
+                    </Box>
+                </DialogTitle>
+                <DialogContent>
+                    {renderProviderDetails()}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setDialogOpen(false)}>Close</Button>
+                    {!selectedProvider?.is_verified && (
+                        <Button 
+                            variant="contained" 
+                            color="success"
+                            startIcon={<Approval />}
+                            onClick={() => {
+                                setDialogOpen(false);
+                                setTimeout(() => handleProviderAction('verify', selectedProvider), 100);
+                            }}
+                        >
+                            Verify Provider
+                        </Button>
+                    )}
+                </DialogActions>
+            </Dialog>
+
+            {/* Verification Dialog */}
+            {renderVerificationDialog()}
+        </Box>
+    );
+};
+
+export default AdminHealthcareManagement;
+```
+
+**resources/js/components/admin/AdminDoctorManagement.jsx**
+
+```jsx
+import React, { useState, useEffect } from 'react';
+import {
+    Box,
+    Typography,
+    Paper,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    Chip,
+    IconButton,
+    TextField,
+    InputAdornment,
+    Button,
+    Avatar,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Alert,
+    Grid,
+    Card,
+    CardContent,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    Tabs,
+    Tab,
+    Badge,
+    Tooltip,
+    Divider,
+    List,
+    ListItem,
+    ListItemText,
+    ListItemIcon,
+    Rating,
+    Stack
+} from '@mui/material';
+import {
+    Search,
+    Visibility,
+    VerifiedUser,
+    Block,
+    CheckCircle,
+    Cancel,
+    Person,
+    MedicalServices,
+    School,
+    Work,
+    Phone,
+    Email,
+    LocationOn,
+    Star,
+    Assignment,
+    Warning,
+    Info,
+    Schedule,
+    Business,
+    Edit,
+    Delete,
+    FileDownload
+} from '@mui/icons-material';
+import { format, parseISO } from 'date-fns';
+
+const AdminDoctorManagement = () => {
+    const [doctors, setDoctors] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [verificationFilter, setVerificationFilter] = useState('all');
+    const [selectedDoctor, setSelectedDoctor] = useState(null);
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const [dialogType, setDialogType] = useState('');
+    const [tabValue, setTabValue] = useState(0);
+    const [verificationNotes, setVerificationNotes] = useState('');
+
+    // Mock data - replace with actual API calls
+    useEffect(() => {
+        const mockDoctors = [
+            {
+                id: 1,
+                user: {
+                    id: 1,
+                    name: 'Dr. Sarah Johnson',
+                    email: 'sarah.johnson@email.com',
+                    phone: '+1-555-0123',
+                    created_at: '2024-01-15T10:30:00Z'
+                },
+                specialization: 'Cardiology',
+                license_number: 'MD12345678',
+                experience_years: 12,
+                consultation_fee: 200,
+                qualification: 'MBBS, MD (Cardiology)',
+                education: 'Harvard Medical School, Johns Hopkins Hospital',
+                bio: 'Experienced cardiologist with expertise in interventional cardiology...',
+                rating: 4.8,
+                total_reviews: 245,
+                is_verified: true,
+                is_available: true,
+                profile_image: null,
+                verification_status: 'verified',
+                verification_date: '2024-01-20T14:20:00Z',
+                clinics_count: 3,
+                appointments_count: 890,
+                languages: ['English', 'Spanish'],
+                services: ['Consultation', 'ECG', 'Stress Test']
+            },
+            {
+                id: 2,
+                user: {
+                    id: 2,
+                    name: 'Dr. Michael Chen',
+                    email: 'michael.chen@email.com',
+                    phone: '+1-555-0124',
+                    created_at: '2024-02-10T09:15:00Z'
+                },
+                specialization: 'Dermatology',
+                license_number: 'MD23456789',
+                experience_years: 8,
+                consultation_fee: 150,
+                qualification: 'MBBS, MD (Dermatology)',
+                education: 'Stanford Medical School',
+                bio: 'Specialized in cosmetic and medical dermatology...',
+                rating: 4.6,
+                total_reviews: 134,
+                is_verified: false,
+                is_available: true,
+                profile_image: null,
+                verification_status: 'pending',
+                verification_date: null,
+                clinics_count: 2,
+                appointments_count: 312,
+                languages: ['English', 'Mandarin'],
+                services: ['Skin Treatment', 'Acne Treatment', 'Cosmetic Procedures']
+            },
+            {
+                id: 3,
+                user: {
+                    id: 3,
+                    name: 'Dr. Emily Rodriguez',
+                    email: 'emily.rodriguez@email.com',
+                    phone: '+1-555-0125',
+                    created_at: '2024-03-05T11:45:00Z'
+                },
+                specialization: 'Pediatrics',
+                license_number: 'MD34567890',
+                experience_years: 15,
+                consultation_fee: 120,
+                qualification: 'MBBS, MD (Pediatrics)',
+                education: 'Mayo Clinic College of Medicine',
+                bio: 'Compassionate pediatrician focusing on child development...',
+                rating: 4.9,
+                total_reviews: 456,
+                is_verified: true,
+                is_available: false,
+                profile_image: null,
+                verification_status: 'verified',
+                verification_date: '2024-03-10T16:30:00Z',
+                clinics_count: 1,
+                appointments_count: 1240,
+                languages: ['English', 'Spanish'],
+                services: ['Child Care', 'Vaccinations', 'Growth Monitoring']
+            }
+        ];
+        setDoctors(mockDoctors);
+        setLoading(false);
+    }, []);
+
+    // Stats calculations
+    const stats = {
+        total: doctors.length,
+        verified: doctors.filter(d => d.is_verified).length,
+        pending: doctors.filter(d => d.verification_status === 'pending').length,
+        rejected: doctors.filter(d => d.verification_status === 'rejected').length,
+        active: doctors.filter(d => d.is_available).length
+    };
+
+    const getVerificationStatusColor = (status) => {
+        switch (status) {
+            case 'verified': return 'success';
+            case 'pending': return 'warning';
+            case 'rejected': return 'error';
+            default: return 'default';
+        }
+    };
+
+    const getAvailabilityColor = (available) => {
+        return available ? 'success' : 'error';
+    };
+
+    // Filter functions
+    const filteredDoctors = doctors.filter(doctor => {
+        const matchesSearch = 
+            doctor.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            doctor.user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            doctor.specialization.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            doctor.license_number.toLowerCase().includes(searchTerm.toLowerCase());
+
+        const matchesStatus = statusFilter === 'all' || 
+            (statusFilter === 'active' && doctor.is_available) ||
+            (statusFilter === 'inactive' && !doctor.is_available);
+
+        const matchesVerification = verificationFilter === 'all' || 
+            doctor.verification_status === verificationFilter;
+
+        return matchesSearch && matchesStatus && matchesVerification;
+    });
+
+    const handleDoctorAction = (action, doctor) => {
+        setSelectedDoctor(doctor);
+        setDialogType(action);
+        setDialogOpen(true);
+    };
+
+    const handleVerificationAction = async (action) => {
+        // Implement API call here
+        console.log(`${action} doctor:`, selectedDoctor.id, verificationNotes);
+        setDialogOpen(false);
+        setVerificationNotes('');
+        // Reload data after action
+    };
+
+    const renderStatsCards = () => (
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+            <Grid item xs={12} sm={6} md={2.4}>
+                <Card elevation={2}>
+                    <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                        <Avatar sx={{ mx: 'auto', mb: 1, bgcolor: 'primary.main' }}>
+                            <Person />
+                        </Avatar>
+                        <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                            {stats.total}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            Total Doctors
+                        </Typography>
+                    </CardContent>
+                </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={2.4}>
+                <Card elevation={2}>
+                    <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                        <Avatar sx={{ mx: 'auto', mb: 1, bgcolor: 'success.main' }}>
+                            <VerifiedUser />
+                        </Avatar>
+                        <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'success.main' }}>
+                            {stats.verified}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            Verified
+                        </Typography>
+                    </CardContent>
+                </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={2.4}>
+                <Card elevation={2}>
+                    <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                        <Avatar sx={{ mx: 'auto', mb: 1, bgcolor: 'warning.main' }}>
+                            <Schedule />
+                        </Avatar>
+                        <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'warning.main' }}>
+                            {stats.pending}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            Pending Verification
+                        </Typography>
+                    </CardContent>
+                </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={2.4}>
+                <Card elevation={2}>
+                    <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                        <Avatar sx={{ mx: 'auto', mb: 1, bgcolor: 'error.main' }}>
+                            <Block />
+                        </Avatar>
+                        <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'error.main' }}>
+                            {stats.rejected}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            Rejected
+                        </Typography>
+                    </CardContent>
+                </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={2.4}>
+                <Card elevation={2}>
+                    <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                        <Avatar sx={{ mx: 'auto', mb: 1, bgcolor: 'info.main' }}>
+                            <CheckCircle />
+                        </Avatar>
+                        <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'info.main' }}>
+                            {stats.active}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            Active
+                        </Typography>
+                    </CardContent>
+                </Card>
+            </Grid>
+        </Grid>
+    );
+
+    const renderDoctorsList = () => (
+        <Paper elevation={2}>
+            <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+                <Grid container spacing={2} alignItems="center">
+                    <Grid item xs={12} md={4}>
+                        <TextField
+                            size="small"
+                            fullWidth
+                            placeholder="Search doctors..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            InputProps={{
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <Search />
+                                    </InputAdornment>
+                                ),
+                            }}
+                        />
+                    </Grid>
+                    <Grid item xs={12} md={3}>
+                        <FormControl size="small" fullWidth>
+                            <InputLabel>Verification Status</InputLabel>
+                            <Select
+                                value={verificationFilter}
+                                onChange={(e) => setVerificationFilter(e.target.value)}
+                            >
+                                <MenuItem value="all">All Status</MenuItem>
+                                <MenuItem value="verified">Verified</MenuItem>
+                                <MenuItem value="pending">Pending</MenuItem>
+                                <MenuItem value="rejected">Rejected</MenuItem>
+                            </Select>
+                        </FormControl>
+                    </Grid>
+                    <Grid item xs={12} md={3}>
+                        <FormControl size="small" fullWidth>
+                            <InputLabel>Availability</InputLabel>
+                            <Select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                            >
+                                <MenuItem value="all">All</MenuItem>
+                                <MenuItem value="active">Active</MenuItem>
+                                <MenuItem value="inactive">Inactive</MenuItem>
+                            </Select>
+                        </FormControl>
+                    </Grid>
+                    <Grid item xs={12} md={2}>
+                        <Button
+                            variant="outlined"
+                            startIcon={<FileDownload />}
+                            fullWidth
+                            size="small"
+                        >
+                            Export
+                        </Button>
+                    </Grid>
+                </Grid>
+            </Box>
+            
+            <TableContainer>
+                <Table>
+                    <TableHead>
+                        <TableRow>
+                            <TableCell>Doctor</TableCell>
+                            <TableCell>Specialization</TableCell>
+                            <TableCell>License</TableCell>
+                            <TableCell>Experience</TableCell>
+                            <TableCell>Rating</TableCell>
+                            <TableCell>Verification</TableCell>
+                            <TableCell>Status</TableCell>
+                            <TableCell>Actions</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {filteredDoctors.map((doctor) => (
+                            <TableRow key={doctor.id} hover>
+                                <TableCell>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                        <Avatar 
+                                            src={doctor.profile_image}
+                                            sx={{ width: 40, height: 40 }}
+                                        >
+                                            <Person />
+                                        </Avatar>
+                                        <Box>
+                                            <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+                                                {doctor.user.name}
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                {doctor.user.email}
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </TableCell>
+                                <TableCell>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <MedicalServices fontSize="small" />
+                                        {doctor.specialization}
+                                    </Box>
+                                </TableCell>
+                                <TableCell>
+                                    <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                                        {doctor.license_number}
+                                    </Typography>
+                                </TableCell>
+                                <TableCell>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <Work fontSize="small" />
+                                        {doctor.experience_years} years
+                                    </Box>
+                                </TableCell>
+                                <TableCell>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <Rating value={doctor.rating} precision={0.1} size="small" readOnly />
+                                        <Typography variant="body2">
+                                            {doctor.rating} ({doctor.total_reviews})
+                                        </Typography>
+                                    </Box>
+                                </TableCell>
+                                <TableCell>
+                                    <Chip 
+                                        label={doctor.verification_status}
+                                        color={getVerificationStatusColor(doctor.verification_status)}
+                                        size="small"
+                                        icon={doctor.is_verified ? <VerifiedUser /> : <Schedule />}
+                                    />
+                                </TableCell>
+                                <TableCell>
+                                    <Chip 
+                                        label={doctor.is_available ? 'Active' : 'Inactive'}
+                                        color={getAvailabilityColor(doctor.is_available)}
+                                        size="small"
+                                        variant="outlined"
+                                    />
+                                </TableCell>
+                                <TableCell>
+                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                        <Tooltip title="View Details">
+                                            <IconButton 
+                                                size="small" 
+                                                color="info"
+                                                onClick={() => handleDoctorAction('view', doctor)}
+                                            >
+                                                <Visibility />
+                                            </IconButton>
+                                        </Tooltip>
+                                        {!doctor.is_verified && (
+                                            <Tooltip title="Verify Doctor">
+                                                <IconButton 
+                                                    size="small" 
+                                                    color="success"
+                                                    onClick={() => handleDoctorAction('verify', doctor)}
+                                                >
+                                                    <VerifiedUser />
+                                                </IconButton>
+                                            </Tooltip>
+                                        )}
+                                        <Tooltip title="Block/Unblock">
+                                            <IconButton 
+                                                size="small" 
+                                                color="warning"
+                                                onClick={() => handleDoctorAction('block', doctor)}
+                                            >
+                                                <Block />
+                                            </IconButton>
+                                        </Tooltip>
+                                        <Tooltip title="Edit">
+                                            <IconButton 
+                                                size="small" 
+                                                color="primary"
+                                                onClick={() => handleDoctorAction('edit', doctor)}
+                                            >
+                                                <Edit />
+                                            </IconButton>
+                                        </Tooltip>
+                                    </Box>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </TableContainer>
+        </Paper>
+    );
+
+    const renderDoctorDetails = () => {
+        if (!selectedDoctor) return null;
+
+        return (
+            <Box sx={{ maxHeight: '70vh', overflow: 'auto' }}>
+                <Grid container spacing={3}>
+                    {/* Doctor Info */}
+                    <Grid item xs={12} md={6}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+                            <Avatar 
+                                src={selectedDoctor.profile_image}
+                                sx={{ width: 80, height: 80 }}
+                            >
+                                <Person sx={{ fontSize: 40 }} />
+                            </Avatar>
+                            <Box>
+                                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                                    {selectedDoctor.user.name}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    {selectedDoctor.specialization}
+                                </Typography>
+                                <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                                    <Chip 
+                                        label={selectedDoctor.verification_status}
+                                        color={getVerificationStatusColor(selectedDoctor.verification_status)}
+                                        size="small"
+                                    />
+                                    <Chip 
+                                        label={selectedDoctor.is_available ? 'Active' : 'Inactive'}
+                                        color={getAvailabilityColor(selectedDoctor.is_available)}
+                                        size="small"
+                                        variant="outlined"
+                                    />
+                                </Box>
+                            </Box>
+                        </Box>
+
+                        <Divider sx={{ mb: 2 }} />
+
+                        <Stack spacing={2}>
+                            <Box>
+                                <Typography variant="subtitle2" color="text.secondary">
+                                    Contact Information
+                                </Typography>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                                    <Email fontSize="small" />
+                                    <Typography variant="body2">{selectedDoctor.user.email}</Typography>
+                                </Box>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                                    <Phone fontSize="small" />
+                                    <Typography variant="body2">{selectedDoctor.user.phone}</Typography>
+                                </Box>
+                            </Box>
+
+                            <Box>
+                                <Typography variant="subtitle2" color="text.secondary">
+                                    Professional Details
+                                </Typography>
+                                <Typography variant="body2" sx={{ mt: 0.5 }}>
+                                    <strong>License:</strong> {selectedDoctor.license_number}
+                                </Typography>
+                                <Typography variant="body2">
+                                    <strong>Experience:</strong> {selectedDoctor.experience_years} years
+                                </Typography>
+                                <Typography variant="body2">
+                                    <strong>Consultation Fee:</strong> ₹{selectedDoctor.consultation_fee}
+                                </Typography>
+                            </Box>
+
+                            <Box>
+                                <Typography variant="subtitle2" color="text.secondary">
+                                    Rating & Reviews
+                                </Typography>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                                    <Rating value={selectedDoctor.rating} precision={0.1} readOnly />
+                                    <Typography variant="body2">
+                                        {selectedDoctor.rating} ({selectedDoctor.total_reviews} reviews)
+                                    </Typography>
+                                </Box>
+                            </Box>
+                        </Stack>
+                    </Grid>
+
+                    {/* Education & Qualifications */}
+                    <Grid item xs={12} md={6}>
+                        <Stack spacing={2}>
+                            <Box>
+                                <Typography variant="subtitle2" color="text.secondary">
+                                    Qualifications
+                                </Typography>
+                                <Typography variant="body2" sx={{ mt: 0.5 }}>
+                                    {selectedDoctor.qualification}
+                                </Typography>
+                            </Box>
+
+                            <Box>
+                                <Typography variant="subtitle2" color="text.secondary">
+                                    Education
+                                </Typography>
+                                <Typography variant="body2" sx={{ mt: 0.5 }}>
+                                    {selectedDoctor.education}
+                                </Typography>
+                            </Box>
+
+                            <Box>
+                                <Typography variant="subtitle2" color="text.secondary">
+                                    Languages
+                                </Typography>
+                                <Box sx={{ display: 'flex', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
+                                    {selectedDoctor.languages?.map((lang, index) => (
+                                        <Chip key={index} label={lang} size="small" variant="outlined" />
+                                    ))}
+                                </Box>
+                            </Box>
+
+                            <Box>
+                                <Typography variant="subtitle2" color="text.secondary">
+                                    Services
+                                </Typography>
+                                <Box sx={{ display: 'flex', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
+                                    {selectedDoctor.services?.map((service, index) => (
+                                        <Chip key={index} label={service} size="small" variant="outlined" color="primary" />
+                                    ))}
+                                </Box>
+                            </Box>
+
+                            <Box>
+                                <Typography variant="subtitle2" color="text.secondary">
+                                    Platform Statistics
+                                </Typography>
+                                <Typography variant="body2" sx={{ mt: 0.5 }}>
+                                    <strong>Connected Clinics:</strong> {selectedDoctor.clinics_count}
+                                </Typography>
+                                <Typography variant="body2">
+                                    <strong>Total Appointments:</strong> {selectedDoctor.appointments_count}
+                                </Typography>
+                                <Typography variant="body2">
+                                    <strong>Joined:</strong> {format(parseISO(selectedDoctor.user.created_at), 'MMM dd, yyyy')}
+                                </Typography>
+                                {selectedDoctor.verification_date && (
+                                    <Typography variant="body2">
+                                        <strong>Verified:</strong> {format(parseISO(selectedDoctor.verification_date), 'MMM dd, yyyy')}
+                                    </Typography>
+                                )}
+                            </Box>
+                        </Stack>
+                    </Grid>
+
+                    {/* Bio */}
+                    <Grid item xs={12}>
+                        <Box>
+                            <Typography variant="subtitle2" color="text.secondary">
+                                Bio
+                            </Typography>
+                            <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: 'grey.50' }}>
+                                <Typography variant="body2">
+                                    {selectedDoctor.bio}
+                                </Typography>
+                            </Paper>
+                        </Box>
+                    </Grid>
+                </Grid>
+            </Box>
+        );
+    };
+
+    const renderVerificationDialog = () => (
+        <Dialog open={dialogOpen && dialogType === 'verify'} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
+            <DialogTitle>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <VerifiedUser color="success" />
+                    Verify Doctor
+                </Box>
+            </DialogTitle>
+            <DialogContent>
+                <Alert severity="info" sx={{ mb: 2 }}>
+                    You are about to verify <strong>{selectedDoctor?.user.name}</strong>. 
+                    Please review all credentials carefully before proceeding.
+                </Alert>
+                
+                <TextField
+                    fullWidth
+                    label="Verification Notes"
+                    multiline
+                    rows={4}
+                    value={verificationNotes}
+                    onChange={(e) => setVerificationNotes(e.target.value)}
+                    placeholder="Add any notes about the verification process..."
+                    sx={{ mt: 2 }}
+                />
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
+                <Button 
+                    variant="contained" 
+                    color="error"
+                    onClick={() => handleVerificationAction('reject')}
+                    sx={{ mr: 1 }}
+                >
+                    Reject
+                </Button>
+                <Button 
+                    variant="contained" 
+                    color="success"
+                    onClick={() => handleVerificationAction('approve')}
+                >
+                    Verify Doctor
+                </Button>
+            </DialogActions>
+        </Dialog>
+    );
+
+    return (
+        <Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+                    👨‍⚕️ Doctor Management
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                    <Badge badgeContent={stats.pending} color="warning">
+                        <Button variant="outlined" startIcon={<Schedule />}>
+                            Pending Verifications
+                        </Button>
+                    </Badge>
+                </Box>
+            </Box>
+
+            {/* Stats Cards */}
+            {renderStatsCards()}
+
+            {/* Main Content */}
+            <Paper elevation={2}>
+                <Tabs
+                    value={tabValue}
+                    onChange={(e, newValue) => setTabValue(newValue)}
+                    sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}
+                >
+                    <Tab label="All Doctors" />
+                    <Tab 
+                        label={
+                            <Badge badgeContent={stats.pending} color="warning" sx={{ '& .MuiBadge-badge': { right: -3, top: 13 } }}>
+                                Pending Verification
+                            </Badge>
+                        } 
+                    />
+                    <Tab label="Verified Doctors" />
+                </Tabs>
+
+                <Box sx={{ p: 2 }}>
+                    {tabValue === 0 && renderDoctorsList()}
+                    {tabValue === 1 && (
+                        <Box>
+                            {/* Filter to show only pending doctors */}
+                            <Alert severity="warning" sx={{ mb: 2 }}>
+                                <strong>{stats.pending}</strong> doctors are waiting for verification.
+                            </Alert>
+                            {renderDoctorsList()}
+                        </Box>
+                    )}
+                    {tabValue === 2 && (
+                        <Box>
+                            <Alert severity="success" sx={{ mb: 2 }}>
+                                <strong>{stats.verified}</strong> doctors are currently verified.
+                            </Alert>
+                            {renderDoctorsList()}
+                        </Box>
+                    )}
+                </Box>
+            </Paper>
+
+            {/* Doctor Details Dialog */}
+            <Dialog 
+                open={dialogOpen && dialogType === 'view'} 
+                onClose={() => setDialogOpen(false)} 
+                maxWidth="lg" 
+                fullWidth
+            >
+                <DialogTitle>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Person />
+                        Doctor Details
+                    </Box>
+                </DialogTitle>
+                <DialogContent>
+                    {renderDoctorDetails()}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setDialogOpen(false)}>Close</Button>
+                    {!selectedDoctor?.is_verified && (
+                        <Button 
+                            variant="contained" 
+                            color="success"
+                            startIcon={<VerifiedUser />}
+                            onClick={() => {
+                                setDialogOpen(false);
+                                setTimeout(() => handleDoctorAction('verify', selectedDoctor), 100);
+                            }}
+                        >
+                            Verify Doctor
+                        </Button>
+                    )}
+                </DialogActions>
+            </Dialog>
+
+            {/* Verification Dialog */}
+            {renderVerificationDialog()}
+        </Box>
+    );
+};
+
+export default AdminDoctorManagement;
+```
+
+**resources/js/components/admin/AdminAppointmentManagement.jsx**
+
+```jsx
+import React, { useState, useEffect } from 'react';
+import {
+    Box,
+    Typography,
+    Paper,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    Chip,
+    IconButton,
+    TextField,
+    InputAdornment,
+    Button,
+    Avatar,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Alert,
+    Grid,
+    Card,
+    CardContent,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    Tabs,
+    Tab,
+    Badge,
+    Tooltip,
+    Divider,
+    Stack,
+    List,
+    ListItem,
+    ListItemText,
+    ListItemIcon,
+    DialogContentText,
+    TablePagination
+} from '@mui/material';
+import {
+    Search,
+    Visibility,
+    Cancel,
+    CheckCircle,
+    Schedule,
+    CalendarToday,
+    Person,
+    LocalHospital,
+    Phone,
+    Email,
+    Warning,
+    Info,
+    TrendingUp,
+    Assignment,
+    FileDownload,
+    Edit,
+    MedicalServices,
+    AccessTime,
+    LocationOn,
+    AttachMoney,
+    Refresh,
+    FilterList,
+    PendingActions,
+    EventAvailable,
+    EventBusy,
+    Payment,
+    History,
+    Delete
+} from '@mui/icons-material';
+import { format, parseISO, isToday, isTomorrow, isYesterday, startOfDay, endOfDay } from 'date-fns';
+
+const AdminAppointmentManagement = () => {
+    const [appointments, setAppointments] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [dateFilter, setDateFilter] = useState('all');
+    const [selectedAppointment, setSelectedAppointment] = useState(null);
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const [dialogType, setDialogType] = useState('');
+    const [tabValue, setTabValue] = useState(0);
+    const [actionNotes, setActionNotes] = useState('');
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
+
+    // Mock data - replace with actual API calls
+    useEffect(() => {
+        const mockAppointments = [
+            {
+                id: 1,
+                appointment_number: 'APT001234',
+                patient: {
+                    id: 1,
+                    name: 'John Smith',
+                    email: 'john.smith@email.com',
+                    phone: '+1-555-0123',
+                    age: 45
+                },
+                doctor: {
+                    id: 1,
+                    user: { name: 'Dr. Sarah Johnson' },
+                    specialization: 'Cardiology',
+                    license_number: 'MD12345'
+                },
+                clinic: {
+                    id: 1,
+                    name: 'City Medical Center',
+                    address: '123 Healthcare Ave, Medical District, NY 10001',
+                    phone: '+1-555-0201'
+                },
+                appointment_date: '2025-08-28',
+                appointment_time: '10:30',
+                status: 'confirmed',
+                symptoms: 'Chest pain and shortness of breath during physical activity',
+                notes: 'Patient reports symptoms for 2 days. No prior cardiac history.',
+                amount: 200,
+                payment_status: 'paid',
+                payment_method: 'card',
+                created_at: '2025-08-25T09:15:00Z',
+                updated_at: '2025-08-25T14:20:00Z',
+                booking_type: 'online',
+                consultation_type: 'in_person'
+            },
+            {
+                id: 2,
+                appointment_number: 'APT001235',
+                patient: {
+                    id: 2,
+                    name: 'Mary Johnson',
+                    email: 'mary.johnson@email.com',
+                    phone: '+1-555-0124',
+                    age: 32
+                },
+                doctor: {
+                    id: 2,
+                    user: { name: 'Dr. Michael Chen' },
+                    specialization: 'Dermatology',
+                    license_number: 'MD23456'
+                },
+                clinic: {
+                    id: 2,
+                    name: 'Green Valley Clinic',
+                    address: '456 Wellness Street, Suburb, NY 10002',
+                    phone: '+1-555-0301'
+                },
+                appointment_date: '2025-08-27',
+                appointment_time: '14:00',
+                status: 'completed',
+                symptoms: 'Persistent skin rash and itching on arms and legs',
+                notes: 'Follow-up appointment needed in 2 weeks. Prescribed topical treatment.',
+                amount: 150,
+                payment_status: 'paid',
+                payment_method: 'cash',
+                created_at: '2025-08-20T11:30:00Z',
+                updated_at: '2025-08-27T15:45:00Z',
+                booking_type: 'phone',
+                consultation_type: 'in_person'
+            },
+            {
+                id: 3,
+                appointment_number: 'APT001236',
+                patient: {
+                    id: 3,
+                    name: 'Robert Wilson',
+                    email: 'robert.wilson@email.com',
+                    phone: '+1-555-0125',
+                    age: 8
+                },
+                doctor: {
+                    id: 3,
+                    user: { name: 'Dr. Emily Rodriguez' },
+                    specialization: 'Pediatrics',
+                    license_number: 'MD34567'
+                },
+                clinic: {
+                    id: 1,
+                    name: 'City Medical Center',
+                    address: '123 Healthcare Ave, Medical District, NY 10001',
+                    phone: '+1-555-0201'
+                },
+                appointment_date: '2025-08-29',
+                appointment_time: '09:00',
+                status: 'pending',
+                symptoms: 'Child fever (102°F) and persistent cough for 3 days',
+                notes: 'Vaccination due next month. Parents concerned about recurring fever.',
+                amount: 120,
+                payment_status: 'pending',
+                payment_method: null,
+                created_at: '2025-08-26T16:45:00Z',
+                updated_at: '2025-08-26T16:45:00Z',
+                booking_type: 'online',
+                consultation_type: 'in_person'
+            },
+            {
+                id: 4,
+                appointment_number: 'APT001237',
+                patient: {
+                    id: 4,
+                    name: 'Lisa Anderson',
+                    email: 'lisa.anderson@email.com',
+                    phone: '+1-555-0126',
+                    age: 38
+                },
+                doctor: {
+                    id: 1,
+                    user: { name: 'Dr. Sarah Johnson' },
+                    specialization: 'Cardiology',
+                    license_number: 'MD12345'
+                },
+                clinic: {
+                    id: 3,
+                    name: 'Metro Diagnostic Center',
+                    address: '789 Tech Boulevard, Innovation District, NY 10003',
+                    phone: '+1-555-0401'
+                },
+                appointment_date: '2025-08-26',
+                appointment_time: '11:15',
+                status: 'cancelled',
+                symptoms: 'Regular cardiac check-up and ECG',
+                notes: 'Patient cancelled due to emergency travel. Rescheduling requested.',
+                amount: 200,
+                payment_status: 'refunded',
+                payment_method: 'card',
+                created_at: '2025-08-22T10:20:00Z',
+                updated_at: '2025-08-25T09:30:00Z',
+                booking_type: 'online',
+                consultation_type: 'teleconsultation'
+            },
+            {
+                id: 5,
+                appointment_number: 'APT001238',
+                patient: {
+                    id: 5,
+                    name: 'David Brown',
+                    email: 'david.brown@email.com',
+                    phone: '+1-555-0127',
+                    age: 55
+                },
+                doctor: {
+                    id: 4,
+                    user: { name: 'Dr. Amanda White' },
+                    specialization: 'Orthopedics',
+                    license_number: 'MD45678'
+                },
+                clinic: {
+                    id: 4,
+                    name: 'Advanced Orthopedic Clinic',
+                    address: '321 Bone Care Street, NY 10004',
+                    phone: '+1-555-0501'
+                },
+                appointment_date: '2025-08-28',
+                appointment_time: '15:30',
+                status: 'confirmed',
+                symptoms: 'Severe knee pain and difficulty walking after sports injury',
+                notes: 'MRI scan required. Patient plays tennis regularly.',
+                amount: 180,
+                payment_status: 'paid',
+                payment_method: 'insurance',
+                created_at: '2025-08-24T14:30:00Z',
+                updated_at: '2025-08-26T10:15:00Z',
+                booking_type: 'online',
+                consultation_type: 'in_person'
+            },
+            {
+                id: 6,
+                appointment_number: 'APT001239',
+                patient: {
+                    id: 6,
+                    name: 'Jennifer Davis',
+                    email: 'jennifer.davis@email.com',
+                    phone: '+1-555-0128',
+                    age: 29
+                },
+                doctor: {
+                    id: 5,
+                    user: { name: 'Dr. James Wilson' },
+                    specialization: 'Psychiatry',
+                    license_number: 'MD56789'
+                },
+                clinic: {
+                    id: 5,
+                    name: 'Mental Health Center',
+                    address: '654 Wellness Avenue, NY 10005',
+                    phone: '+1-555-0601'
+                },
+                appointment_date: '2025-08-30',
+                appointment_time: '16:00',
+                status: 'confirmed',
+                symptoms: 'Anxiety and panic attacks, difficulty sleeping',
+                notes: 'First consultation. Patient referred by primary care physician.',
+                amount: 160,
+                payment_status: 'paid',
+                payment_method: 'card',
+                created_at: '2025-08-27T13:20:00Z',
+                updated_at: '2025-08-27T13:20:00Z',
+                booking_type: 'phone',
+                consultation_type: 'teleconsultation'
+            }
+        ];
+        setAppointments(mockAppointments);
+        setLoading(false);
+    }, []);
+
+    // Stats calculations
+    const today = new Date();
+    const stats = {
+        total: appointments.length,
+        today: appointments.filter(a => isToday(parseISO(a.appointment_date))).length,
+        tomorrow: appointments.filter(a => isTomorrow(parseISO(a.appointment_date))).length,
+        pending: appointments.filter(a => a.status === 'pending').length,
+        confirmed: appointments.filter(a => a.status === 'confirmed').length,
+        completed: appointments.filter(a => a.status === 'completed').length,
+        cancelled: appointments.filter(a => a.status === 'cancelled').length,
+        revenue: appointments
+            .filter(a => a.payment_status === 'paid')
+            .reduce((sum, a) => sum + a.amount, 0),
+        pendingPayments: appointments
+            .filter(a => a.payment_status === 'pending')
+            .reduce((sum, a) => sum + a.amount, 0)
+    };
+
+    const getStatusColor = (status) => {
+        switch (status) {
+            case 'confirmed': return 'success';
+            case 'pending': return 'warning';
+            case 'completed': return 'info';
+            case 'cancelled': return 'error';
+            default: return 'default';
+        }
+    };
+
+    const getPaymentStatusColor = (status) => {
+        switch (status) {
+            case 'paid': return 'success';
+            case 'pending': return 'warning';
+            case 'refunded': return 'info';
+            default: return 'default';
+        }
+    };
+
+    const formatAppointmentDate = (dateStr) => {
+        const date = parseISO(dateStr);
+        if (isToday(date)) return 'Today';
+        if (isTomorrow(date)) return 'Tomorrow';
+        if (isYesterday(date)) return 'Yesterday';
+        return format(date, 'MMM dd, yyyy');
+    };
+
+    // Filter functions
+    const filteredAppointments = appointments.filter(appointment => {
+        const matchesSearch = 
+            appointment.appointment_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            appointment.patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            appointment.doctor.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            appointment.clinic.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            appointment.symptoms.toLowerCase().includes(searchTerm.toLowerCase());
+
+        const matchesStatus = statusFilter === 'all' || appointment.status === statusFilter;
+
+        let matchesDate = true;
+        const appointmentDate = parseISO(appointment.appointment_date);
+        if (dateFilter === 'today') {
+            matchesDate = isToday(appointmentDate);
+        } else if (dateFilter === 'tomorrow') {
+            matchesDate = isTomorrow(appointmentDate);
+        } else if (dateFilter === 'past') {
+            matchesDate = appointmentDate < startOfDay(today);
+        } else if (dateFilter === 'upcoming') {
+            matchesDate = appointmentDate >= startOfDay(today);
+        }
+
+        return matchesSearch && matchesStatus && matchesDate;
+    });
+
+    // Pagination
+    const paginatedAppointments = filteredAppointments.slice(
+        page * rowsPerPage,
+        page * rowsPerPage + rowsPerPage
+    );
+
+    const handleAppointmentAction = (action, appointment) => {
+        setSelectedAppointment(appointment);
+        setDialogType(action);
+        setDialogOpen(true);
+    };
+
+    const handleStatusUpdate = async (newStatus) => {
+        // Implement API call here
+        console.log(`Update appointment ${selectedAppointment.id} to ${newStatus}:`, actionNotes);
+        
+        // Update local state (replace with actual API call)
+        setAppointments(prev => prev.map(apt => 
+            apt.id === selectedAppointment.id 
+                ? { ...apt, status: newStatus, updated_at: new Date().toISOString() }
+                : apt
+        ));
+        
+        setDialogOpen(false);
+        setActionNotes('');
+    };
+
+    const handleChangePage = (event, newPage) => {
+        setPage(newPage);
+    };
+
+    const handleChangeRowsPerPage = (event) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0);
+    };
+
+    const renderStatsCards = () => (
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+            <Grid item xs={12} sm={6} md={3}>
+                <Card elevation={2}>
+                    <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                        <Avatar sx={{ mx: 'auto', mb: 1, bgcolor: 'primary.main' }}>
+                            <Assignment />
+                        </Avatar>
+                        <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                            {stats.total}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            Total Appointments
+                        </Typography>
+                    </CardContent>
+                </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+                <Card elevation={2}>
+                    <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                        <Avatar sx={{ mx: 'auto', mb: 1, bgcolor: 'info.main' }}>
+                            <CalendarToday />
+                        </Avatar>
+                        <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'info.main' }}>
+                            {stats.today}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            Today's Appointments
+                        </Typography>
+                    </CardContent>
+                </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+                <Card elevation={2}>
+                    <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                        <Avatar sx={{ mx: 'auto', mb: 1, bgcolor: 'warning.main' }}>
+                            <PendingActions />
+                        </Avatar>
+                        <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'warning.main' }}>
+                            {stats.pending}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            Pending Approval
+                        </Typography>
+                    </CardContent>
+                </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+                <Card elevation={2}>
+                    <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                        <Avatar sx={{ mx: 'auto', mb: 1, bgcolor: 'success.main' }}>
+                            <AttachMoney />
+                        </Avatar>
+                        <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'success.main' }}>
+                            ₹{stats.revenue.toLocaleString()}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            Total Revenue
+                        </Typography>
+                    </CardContent>
+                </Card>
+            </Grid>
+        </Grid>
+    );
+
+    const renderAppointmentsList = () => (
+        <Paper elevation={2}>
+            <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+                <Grid container spacing={2} alignItems="center">
+                    <Grid item xs={12} md={4}>
+                        <TextField
+                            size="small"
+                            fullWidth
+                            placeholder="Search appointments, patients, doctors..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            InputProps={{
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <Search />
+                                    </InputAdornment>
+                                ),
+                            }}
+                        />
+                    </Grid>
+                    <Grid item xs={12} md={2.5}>
+                        <FormControl size="small" fullWidth>
+                            <InputLabel>Status</InputLabel>
+                            <Select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                            >
+                                <MenuItem value="all">All Status</MenuItem>
+                                <MenuItem value="pending">Pending</MenuItem>
+                                <MenuItem value="confirmed">Confirmed</MenuItem>
+                                <MenuItem value="completed">Completed</MenuItem>
+                                <MenuItem value="cancelled">Cancelled</MenuItem>
+                            </Select>
+                        </FormControl>
+                    </Grid>
+                    <Grid item xs={12} md={2.5}>
+                        <FormControl size="small" fullWidth>
+                            <InputLabel>Date Filter</InputLabel>
+                            <Select
+                                value={dateFilter}
+                                onChange={(e) => setDateFilter(e.target.value)}
+                            >
+                                <MenuItem value="all">All Dates</MenuItem>
+                                <MenuItem value="today">Today</MenuItem>
+                                <MenuItem value="tomorrow">Tomorrow</MenuItem>
+                                <MenuItem value="upcoming">Upcoming</MenuItem>
+                                <MenuItem value="past">Past</MenuItem>
+                            </Select>
+                        </FormControl>
+                    </Grid>
+                    <Grid item xs={6} md={1.5}>
+                        <Button
+                            variant="outlined"
+                            startIcon={<Refresh />}
+                            fullWidth
+                            size="small"
+                            onClick={() => {
+                                setSearchTerm('');
+                                setStatusFilter('all');
+                                setDateFilter('all');
+                                setPage(0);
+                            }}
+                        >
+                            Reset
+                        </Button>
+                    </Grid>
+                    <Grid item xs={6} md={1.5}>
+                        <Button
+                            variant="outlined"
+                            startIcon={<FileDownload />}
+                            fullWidth
+                            size="small"
+                        >
+                            Export
+                        </Button>
+                    </Grid>
+                </Grid>
+            </Box>
+            
+            <TableContainer>
+                <Table>
+                    <TableHead>
+                        <TableRow>
+                            <TableCell>Appointment ID</TableCell>
+                            <TableCell>Patient</TableCell>
+                            <TableCell>Doctor</TableCell>
+                            <TableCell>Clinic</TableCell>
+                            <TableCell>Date & Time</TableCell>
+                            <TableCell>Status</TableCell>
+                            <TableCell>Payment</TableCell>
+                            <TableCell>Actions</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {paginatedAppointments.map((appointment) => (
+                            <TableRow key={appointment.id} hover>
+                                <TableCell>
+                                    <Box>
+                                        <Typography variant="body1" sx={{ fontWeight: 'bold', fontFamily: 'monospace' }}>
+                                            {appointment.appointment_number}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                            Created: {format(parseISO(appointment.created_at), 'MMM dd, HH:mm')}
+                                        </Typography>
+                                    </Box>
+                                </TableCell>
+                                <TableCell>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <Avatar sx={{ width: 32, height: 32 }}>
+                                            <Person />
+                                        </Avatar>
+                                        <Box>
+                                            <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                                                {appointment.patient.name}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary">
+                                                Age: {appointment.patient.age} | {appointment.patient.phone}
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </TableCell>
+                                <TableCell>
+                                    <Box>
+                                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                                            {appointment.doctor.user.name}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                            {appointment.doctor.specialization}
+                                        </Typography>
+                                    </Box>
+                                </TableCell>
+                                <TableCell>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <LocalHospital fontSize="small" />
+                                        <Box>
+                                            <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                                                {appointment.clinic.name}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary">
+                                                {appointment.consultation_type === 'teleconsultation' ? 'Online' : 'In-Person'}
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </TableCell>
+                                <TableCell>
+                                    <Box>
+                                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                                            {formatAppointmentDate(appointment.appointment_date)}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                            {appointment.appointment_time}
+                                        </Typography>
+                                    </Box>
+                                </TableCell>
+                                <TableCell>
+                                    <Chip 
+                                        label={appointment.status}
+                                        color={getStatusColor(appointment.status)}
+                                        size="small"
+                                        sx={{ textTransform: 'capitalize' }}
+                                    />
+                                </TableCell>
+                                <TableCell>
+                                    <Stack spacing={0.5}>
+                                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                                            ₹{appointment.amount}
+                                        </Typography>
+                                        <Chip 
+                                            label={appointment.payment_status}
+                                            color={getPaymentStatusColor(appointment.payment_status)}
+                                            size="small"
+                                            variant="outlined"
+                                            sx={{ textTransform: 'capitalize', fontSize: '0.7rem' }}
+                                        />
+                                    </Stack>
+                                </TableCell>
+                                <TableCell>
+                                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                        <Tooltip title="View Details">
+                                            <IconButton 
+                                                size="small" 
+                                                color="info"
+                                                onClick={() => handleAppointmentAction('view', appointment)}
+                                            >
+                                                <Visibility />
+                                            </IconButton>
+                                        </Tooltip>
+                                        {appointment.status === 'pending' && (
+                                            <Tooltip title="Confirm">
+                                                <IconButton 
+                                                    size="small" 
+                                                    color="success"
+                                                    onClick={() => handleAppointmentAction('confirm', appointment)}
+                                                >
+                                                    <CheckCircle />
+                                                </IconButton>
+                                            </Tooltip>
+                                        )}
+                                        {(appointment.status === 'pending' || appointment.status === 'confirmed') && (
+                                            <Tooltip title="Cancel">
+                                                <IconButton 
+                                                    size="small" 
+                                                    color="error"
+                                                    onClick={() => handleAppointmentAction('cancel', appointment)}
+                                                >
+                                                    <Cancel />
+                                                </IconButton>
+                                            </Tooltip>
+                                        )}
+                                    </Box>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </TableContainer>
+
+            <TablePagination
+                component="div"
+                count={filteredAppointments.length}
+                page={page}
+                onPageChange={handleChangePage}
+                rowsPerPage={rowsPerPage}
+                onRowsPerPageChange={handleChangeRowsPerPage}
+                rowsPerPageOptions={[5, 10, 25, 50]}
+            />
+        </Paper>
+    );
+
+    const renderAppointmentDetails = () => {
+        if (!selectedAppointment) return null;
+
+        return (
+            <Box sx={{ maxHeight: '75vh', overflow: 'auto' }}>
+                <Grid container spacing={3}>
+                    {/* Appointment Header */}
+                    <Grid item xs={12}>
+                        <Card elevation={1} sx={{ bgcolor: 'primary.50', borderLeft: '4px solid', borderColor: 'primary.main' }}>
+                            <CardContent sx={{ py: 2 }}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                                        {selectedAppointment.appointment_number}
+                                    </Typography>
+                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                        <Chip 
+                                            label={selectedAppointment.status}
+                                            color={getStatusColor(selectedAppointment.status)}
+                                            size="small"
+                                        />
+                                        <Chip 
+                                            label={selectedAppointment.payment_status}
+                                            color={getPaymentStatusColor(selectedAppointment.payment_status)}
+                                            size="small"
+                                            variant="outlined"
+                                        />
+                                    </Box>
+                                </Box>
+                                <Typography variant="body2" color="text.secondary">
+                                    {formatAppointmentDate(selectedAppointment.appointment_date)} at {selectedAppointment.appointment_time}
+                                </Typography>
+                            </CardContent>
+                        </Card>
+                    </Grid>
+
+                    {/* Patient Information */}
+                    <Grid item xs={12} md={6}>
+                        <Paper elevation={1} sx={{ p: 2, height: '100%' }}>
+                            <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Person color="primary" />
+                                Patient Information
+                            </Typography>
+                            <Stack spacing={1.5}>
+                                <Box>
+                                    <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+                                        {selectedAppointment.patient.name}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        Age: {selectedAppointment.patient.age} years
+                                    </Typography>
+                                </Box>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Email fontSize="small" color="action" />
+                                    <Typography variant="body2">{selectedAppointment.patient.email}</Typography>
+                                </Box>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Phone fontSize="small" color="action" />
+                                    <Typography variant="body2">{selectedAppointment.patient.phone}</Typography>
+                                </Box>
+                            </Stack>
+                        </Paper>
+                    </Grid>
+
+                    {/* Doctor Information */}
+                    <Grid item xs={12} md={6}>
+                        <Paper elevation={1} sx={{ p: 2, height: '100%' }}>
+                            <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <MedicalServices color="primary" />
+                                Doctor Information
+                            </Typography>
+                            <Stack spacing={1.5}>
+                                <Box>
+                                    <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+                                        {selectedAppointment.doctor.user.name}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        {selectedAppointment.doctor.specialization}
+                                    </Typography>
+                                </Box>
+                                <Typography variant="body2">
+                                    <strong>License:</strong> {selectedAppointment.doctor.license_number}
+                                </Typography>
+                                <Chip 
+                                    label={`${selectedAppointment.consultation_type.replace('_', ' ').toUpperCase()} Consultation`}
+                                    size="small"
+                                    variant="outlined"
+                                    sx={{ alignSelf: 'flex-start' }}
+                                />
+                            </Stack>
+                        </Paper>
+                    </Grid>
+
+                    {/* Clinic Information */}
+                    <Grid item xs={12}>
+                        <Paper elevation={1} sx={{ p: 2 }}>
+                            <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <LocalHospital color="primary" />
+                                Clinic Information
+                            </Typography>
+                            <Grid container spacing={2}>
+                                <Grid item xs={12} md={8}>
+                                    <Typography variant="body1" sx={{ fontWeight: 'bold', mb: 1 }}>
+                                        {selectedAppointment.clinic.name}
+                                    </Typography>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                        <LocationOn fontSize="small" color="action" />
+                                        <Typography variant="body2">{selectedAppointment.clinic.address}</Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <Phone fontSize="small" color="action" />
+                                        <Typography variant="body2">{selectedAppointment.clinic.phone}</Typography>
+                                    </Box>
+                                </Grid>
+                                <Grid item xs={12} md={4}>
+                                    <Stack spacing={1}>
+                                        <Typography variant="body2">
+                                            <strong>Booking Type:</strong> {selectedAppointment.booking_type.toUpperCase()}
+                                        </Typography>
+                                        <Typography variant="body2">
+                                            <strong>Consultation Fee:</strong> ₹{selectedAppointment.amount}
+                                        </Typography>
+                                        {selectedAppointment.payment_method && (
+                                            <Typography variant="body2">
+                                                <strong>Payment Method:</strong> {selectedAppointment.payment_method.toUpperCase()}
+                                            </Typography>
+                                        )}
+                                    </Stack>
+                                </Grid>
+                            </Grid>
+                        </Paper>
+                    </Grid>
+
+                    {/* Symptoms & Medical Information */}
+                    <Grid item xs={12}>
+                        <Paper elevation={1} sx={{ p: 2 }}>
+                            <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Assignment color="primary" />
+                                Medical Information
+                            </Typography>
+                            <Grid container spacing={2}>
+                                <Grid item xs={12} md={6}>
+                                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
+                                        Symptoms
+                                    </Typography>
+                                    <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
+                                        <Typography variant="body2">
+                                            {selectedAppointment.symptoms}
+                                        </Typography>
+                                    </Paper>
+                                </Grid>
+                                <Grid item xs={12} md={6}>
+                                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
+                                        Notes
+                                    </Typography>
+                                    <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
+                                        <Typography variant="body2">
+                                            {selectedAppointment.notes || 'No additional notes provided.'}
+                                        </Typography>
+                                    </Paper>
+                                </Grid>
+                            </Grid>
+                        </Paper>
+                    </Grid>
+
+                    {/* Timeline */}
+                    <Grid item xs={12}>
+                        <Paper elevation={1} sx={{ p: 2 }}>
+                            <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <History color="primary" />
+                                Appointment Timeline
+                            </Typography>
+                            <List dense>
+                                <ListItem>
+                                    <ListItemIcon>
+                                        <CalendarToday color="success" />
+                                    </ListItemIcon>
+                                    <ListItemText 
+                                        primary="Appointment Booked"
+                                        secondary={`${format(parseISO(selectedAppointment.created_at), 'EEEE, MMM dd, yyyy HH:mm')} via ${selectedAppointment.booking_type}`}
+                                    />
+                                </ListItem>
+                                <ListItem>
+                                    <ListItemIcon>
+                                        <AccessTime color="info" />
+                                    </ListItemIcon>
+                                    <ListItemText 
+                                        primary="Last Updated"
+                                        secondary={format(parseISO(selectedAppointment.updated_at), 'EEEE, MMM dd, yyyy HH:mm')}
+                                    />
+                                </ListItem>
+                                <ListItem>
+                                    <ListItemIcon>
+                                        <EventAvailable color="primary" />
+                                    </ListItemIcon>
+                                    <ListItemText 
+                                        primary="Scheduled Appointment"
+                                        secondary={`${formatAppointmentDate(selectedAppointment.appointment_date)} at ${selectedAppointment.appointment_time}`}
+                                    />
+                                </ListItem>
+                            </List>
+                        </Paper>
+                    </Grid>
+                </Grid>
+            </Box>
+        );
+    };
+
+    const renderStatusUpdateDialog = () => (
+        <Dialog 
+            open={dialogOpen && (dialogType === 'confirm' || dialogType === 'cancel')} 
+            onClose={() => setDialogOpen(false)} 
+            maxWidth="sm" 
+            fullWidth
+        >
+            <DialogTitle>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    {dialogType === 'confirm' ? 
+                        <CheckCircle color="success" /> : 
+                        <Cancel color="error" />
+                    }
+                    {dialogType === 'confirm' ? 'Confirm Appointment' : 'Cancel Appointment'}
+                </Box>
+            </DialogTitle>
+            <DialogContent>
+                <DialogContentText>
+                    Are you sure you want to <strong>{dialogType}</strong> appointment{' '}
+                    <strong>{selectedAppointment?.appointment_number}</strong> for{' '}
+                    <strong>{selectedAppointment?.patient.name}</strong>?
+                </DialogContentText>
+
+                {dialogType === 'cancel' && (
+                    <Alert severity="warning" sx={{ mt: 2, mb: 2 }}>
+                        Cancelling this appointment may require processing a refund if payment was already made.
+                    </Alert>
+                )}
+                
+                <TextField
+                    fullWidth
+                    label={`${dialogType === 'confirm' ? 'Confirmation' : 'Cancellation'} Notes (Optional)`}
+                    multiline
+                    rows={3}
+                    value={actionNotes}
+                    onChange={(e) => setActionNotes(e.target.value)}
+                    placeholder={`Add any notes about this ${dialogType} action...`}
+                    sx={{ mt: 2 }}
+                />
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
+                <Button 
+                    variant="contained" 
+                    color={dialogType === 'confirm' ? 'success' : 'error'}
+                    onClick={() => handleStatusUpdate(dialogType === 'confirm' ? 'confirmed' : 'cancelled')}
+                    sx={{ minWidth: 140 }}
+                >
+                    {dialogType === 'confirm' ? 'Confirm Appointment' : 'Cancel Appointment'}
+                </Button>
+            </DialogActions>
+        </Dialog>
+    );
+
+    const getTabContent = () => {
+        switch(tabValue) {
+            case 0:
+                return renderAppointmentsList();
+            case 1:
+                // Filter for today's appointments
+                React.useEffect(() => setDateFilter('today'), [tabValue]);
+                return (
+                    <Box>
+                        <Alert severity="info" sx={{ mb: 2 }}>
+                            Showing <strong>{stats.today}</strong> appointment(s) scheduled for today.
+                        </Alert>
+                        {renderAppointmentsList()}
+                    </Box>
+                );
+            case 2:
+                // Filter for pending appointments
+                React.useEffect(() => setStatusFilter('pending'), [tabValue]);
+                return (
+                    <Box>
+                        <Alert severity="warning" sx={{ mb: 2 }}>
+                            <strong>{stats.pending}</strong> appointment(s) are waiting for confirmation.
+                        </Alert>
+                        {renderAppointmentsList()}
+                    </Box>
+                );
+            case 3:
+                // Filter for completed appointments
+                React.useEffect(() => setStatusFilter('completed'), [tabValue]);
+                return (
+                    <Box>
+                        <Alert severity="success" sx={{ mb: 2 }}>
+                            <strong>{stats.completed}</strong> appointment(s) have been completed.
+                        </Alert>
+                        {renderAppointmentsList()}
+                    </Box>
+                );
+            default:
+                return renderAppointmentsList();
+        }
+    };
+
+    return (
+        <Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+                    📅 Appointment Management
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                    <Badge badgeContent={stats.pending} color="warning">
+                        <Button variant="outlined" startIcon={<PendingActions />} size="small">
+                            Pending ({stats.pending})
+                        </Button>
+                    </Badge>
+                    <Badge badgeContent={stats.today} color="info">
+                        <Button variant="outlined" startIcon={<CalendarToday />} size="small">
+                            Today ({stats.today})
+                        </Button>
+                    </Badge>
+                    <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', px: 2, py: 1, bgcolor: 'success.50', borderRadius: 1 }}>
+                        💰 Revenue: ₹{stats.revenue.toLocaleString()}
+                    </Typography>
+                </Box>
+            </Box>
+
+            {/* Stats Cards */}
+            {renderStatsCards()}
+
+            {/* Main Content */}
+            <Paper elevation={2}>
+                <Tabs
+                    value={tabValue}
+                    onChange={(e, newValue) => setTabValue(newValue)}
+                    sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}
+                >
+                    <Tab label="All Appointments" />
+                    <Tab 
+                        label={
+                            <Badge badgeContent={stats.today} color="info" sx={{ '& .MuiBadge-badge': { right: -3, top: 13 } }}>
+                                Today's Schedule
+                            </Badge>
+                        } 
+                    />
+                    <Tab 
+                        label={
+                            <Badge badgeContent={stats.pending} color="warning" sx={{ '& .MuiBadge-badge': { right: -3, top: 13 } }}>
+                                Pending Approval
+                            </Badge>
+                        } 
+                    />
+                    <Tab label="Completed" />
+                </Tabs>
+
+                <Box sx={{ p: 2 }}>
+                    {getTabContent()}
+                </Box>
+            </Paper>
+
+            {/* Appointment Details Dialog */}
+            <Dialog 
+                open={dialogOpen && dialogType === 'view'} 
+                onClose={() => setDialogOpen(false)} 
+                maxWidth="lg" 
+                fullWidth
+            >
+                <DialogTitle>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Assignment />
+                        Appointment Details
+                    </Box>
+                </DialogTitle>
+                <DialogContent>
+                    {renderAppointmentDetails()}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setDialogOpen(false)}>Close</Button>
+                    {selectedAppointment?.status === 'pending' && (
+                        <>
+                            <Button 
+                                variant="outlined" 
+                                color="error"
+                                startIcon={<Cancel />}
+                                onClick={() => {
+                                    setDialogOpen(false);
+                                    setTimeout(() => handleAppointmentAction('cancel', selectedAppointment), 100);
+                                }}
+                            >
+                                Cancel
+                            </Button>
+                            <Button 
+                                variant="contained" 
+                                color="success"
+                                startIcon={<CheckCircle />}
+                                onClick={() => {
+                                    setDialogOpen(false);
+                                    setTimeout(() => handleAppointmentAction('confirm', selectedAppointment), 100);
+                                }}
+                            >
+                                Confirm
+                            </Button>
+                        </>
+                    )}
+                </DialogActions>
+            </Dialog>
+
+            {/* Status Update Dialog */}
+            {renderStatusUpdateDialog()}
+        </Box>
+    );
+};
+
+export default AdminAppointmentManagement;
 ```
 
 **resources/js/components/doctor/ProfileSetupModal.jsx**
