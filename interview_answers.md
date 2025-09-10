@@ -219,6 +219,11 @@ GROUP BY salary
 HAVING COUNT(*) > 1
 ORDER BY duplicate_count DESC;
 
+SELECT salary, COUNT(*) as duplicate_count
+FROM employees 
+GROUP BY salary 
+HAVING COUNT(*) > 1;
+
 -- Find employees with duplicate salaries
 SELECT e1.employee_id, e1.name, e1.salary 
 FROM employees e1
