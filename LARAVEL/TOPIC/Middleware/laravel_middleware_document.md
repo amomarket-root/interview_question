@@ -44,7 +44,7 @@ Middleware operates on a pipeline pattern where each piece of middleware is like
 
 ![Laravel Middleware Flow](middleware-flow.svg)
 
-> Save your SVG diagram above as `middleware-flow.svg` in the same folder as this markdown file.
+*The diagram above shows the complete middleware flow of execution in Laravel.*
 
 ## Request and Response Handling
 
