@@ -45,19 +45,100 @@ Middleware operates on a pipeline pattern where each piece of middleware is like
 The following diagram illustrates how requests flow through Laravel's middleware system:
 
 ```
-Client Browser → HTTP Request → Laravel Application
-                                      ↓
-                              Middleware Stack
-                                      ↓
-                    [Auth] → [CSRF] → [Rate Limit] → [CORS] → [Custom] → [Logging]
-                                      ↓
-                              Route/Controller
-                                      ↓
-                              Business Logic
-                                      ↓
-                    [Logging] ← [Custom] ← [CORS] ← [Rate Limit] ← [CSRF] ← [Auth]
-                                      ↓
-                              HTTP Response → Client Browser
+<svg viewBox="0 0 900 700" xmlns="http://www.w3.org/2000/svg">
+  <!-- Define arrow marker -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#34495e"/>
+    </marker>
+  </defs>
+  
+  <!-- Title -->
+  <text x="450" y="30" text-anchor="middle" font-size="24" font-weight="bold" fill="#e74c3c">Laravel Middleware Flow</text>
+  
+  <!-- Client Browser -->
+  <rect x="50" y="80" width="120" height="60" rx="10" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+  <text x="110" y="105" text-anchor="middle" font-size="14" font-weight="bold" fill="white">Client</text>
+  <text x="110" y="120" text-anchor="middle" font-size="12" fill="white">Browser</text>
+  
+  <!-- Request Arrow -->
+  <path d="M 170 110 L 230 110" fill="none" stroke="#e74c3c" stroke-width="3" marker-end="url(#arrowhead)"/>
+  <text x="200" y="100" text-anchor="middle" font-size="12" fill="#e74c3c" font-weight="bold">HTTP Request</text>
+  
+  <!-- Laravel Application Box -->
+  <rect x="250" y="60" width="500" height="480" rx="15" fill="#ecf0f1" stroke="#95a5a6" stroke-width="2"/>
+  <text x="500" y="85" text-anchor="middle" font-size="18" font-weight="bold" fill="#2c3e50">Laravel Application</text>
+  
+  <!-- Middleware Stack -->
+  <rect x="280" y="120" width="440" height="300" rx="10" fill="#f8f9fa" stroke="#dee2e6" stroke-width="2"/>
+  <text x="500" y="145" text-anchor="middle" font-size="16" font-weight="bold" fill="#495057">Middleware Stack</text>
+  
+  <!-- Individual Middleware Boxes -->
+  <!-- Auth Middleware -->
+  <rect x="300" y="160" width="150" height="50" rx="8" fill="#28a745" stroke="#20c997" stroke-width="2"/>
+  <text x="375" y="180" text-anchor="middle" font-size="12" font-weight="bold" fill="white">Auth Middleware</text>
+  <text x="375" y="195" text-anchor="middle" font-size="10" fill="white">Check Authentication</text>
+  
+  <!-- CSRF Middleware -->
+  <rect x="470" y="160" width="150" height="50" rx="8" fill="#fd7e14" stroke="#fd7e14" stroke-width="2"/>
+  <text x="545" y="180" text-anchor="middle" font-size="12" font-weight="bold" fill="white">CSRF Middleware</text>
+  <text x="545" y="195" text-anchor="middle" font-size="10" fill="white">Token Verification</text>
+  
+  <!-- Rate Limiting -->
+  <rect x="300" y="230" width="150" height="50" rx="8" fill="#6f42c1" stroke="#6f42c1" stroke-width="2"/>
+  <text x="375" y="250" text-anchor="middle" font-size="12" font-weight="bold" fill="white">Rate Limiting</text>
+  <text x="375" y="265" text-anchor="middle" font-size="10" fill="white">Throttle Requests</text>
+  
+  <!-- CORS Middleware -->
+  <rect x="470" y="230" width="150" height="50" rx="8" fill="#dc3545" stroke="#dc3545" stroke-width="2"/>
+  <text x="545" y="250" text-anchor="middle" font-size="12" font-weight="bold" fill="white">CORS Middleware</text>
+  <text x="545" y="265" text-anchor="middle" font-size="10" fill="white">Cross-Origin</text>
+  
+  <!-- Custom Middleware -->
+  <rect x="300" y="300" width="150" height="50" rx="8" fill="#17a2b8" stroke="#17a2b8" stroke-width="2"/>
+  <text x="375" y="320" text-anchor="middle" font-size="12" font-weight="bold" fill="white">Custom Middleware</text>
+  <text x="375" y="335" text-anchor="middle" font-size="10" fill="white">Business Logic</text>
+  
+  <!-- Logging Middleware -->
+  <rect x="470" y="300" width="150" height="50" rx="8" fill="#6c757d" stroke="#6c757d" stroke-width="2"/>
+  <text x="545" y="320" text-anchor="middle" font-size="12" font-weight="bold" fill="white">Logging</text>
+  <text x="545" y="335" text-anchor="middle" font-size="10" fill="white">Request/Response</text>
+  
+  <!-- Request Flow Arrows through middleware -->
+  <path d="M 270 185 L 290 185" fill="none" stroke="#e74c3c" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M 450 185 L 460 185" fill="none" stroke="#e74c3c" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M 620 185 L 650 185 L 650 255 L 290 255" fill="none" stroke="#e74c3c" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M 450 255 L 460 255" fill="none" stroke="#e74c3c" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M 620 255 L 650 255 L 650 325 L 290 325" fill="none" stroke="#e74c3c" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M 450 325 L 460 325" fill="none" stroke="#e74c3c" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- Route/Controller -->
+  <rect x="350" y="450" width="200" height="60" rx="10" fill="#f39c12" stroke="#e67e22" stroke-width="2"/>
+  <text x="450" y="475" text-anchor="middle" font-size="14" font-weight="bold" fill="white">Route/Controller</text>
+  <text x="450" y="490" text-anchor="middle" font-size="12" fill="white">Business Logic</text>
+  
+  <!-- Arrow from middleware to controller -->
+  <path d="M 500 370 L 500 440" fill="none" stroke="#e74c3c" stroke-width="3" marker-end="url(#arrowhead)"/>
+  
+  <!-- Response Flow -->
+  <path d="M 400 450 L 400 380" fill="none" stroke="#27ae60" stroke-width="3" marker-end="url(#arrowhead)"/>
+  <text x="360" y="415" text-anchor="middle" font-size="12" fill="#27ae60" font-weight="bold">Response</text>
+  
+  <!-- Response back to client -->
+  <path d="M 270 320 L 200 320 L 200 140" fill="none" stroke="#27ae60" stroke-width="3" marker-end="url(#arrowhead)"/>
+  <text x="230" y="230" text-anchor="middle" font-size="12" fill="#27ae60" font-weight="bold" transform="rotate(-90 230 230)">HTTP Response</text>
+  
+  <!-- Legend -->
+  <rect x="50" y="580" width="800" height="80" rx="10" fill="#f8f9fa" stroke="#dee2e6" stroke-width="2"/>
+  <text x="60" y="600" font-size="14" font-weight="bold" fill="#2c3e50">Middleware Functions:</text>
+  <text x="60" y="620" font-size="12" fill="#495057">• Authentication: Verify user login status</text>
+  <text x="60" y="635" font-size="12" fill="#495057">• CSRF: Protect against cross-site request forgery</text>
+  <text x="60" y="650" font-size="12" fill="#495057">• Rate Limiting: Control request frequency</text>
+  
+  <text x="450" y="620" font-size="12" fill="#495057">• CORS: Handle cross-origin requests</text>
+  <text x="450" y="635" font-size="12" fill="#495057">• Logging: Record request/response data</text>
+  <text x="450" y="650" font-size="12" fill="#495057">• Custom: Your specific business logic</text>
+</svg>
 ```
 
 ## Request and Response Handling
