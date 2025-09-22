@@ -1,4 +1,4 @@
-# Complete React Native Healthcare App Documentation
+   # Complete React Native Healthcare App Documentation
 
 ## Table of Contents
 1. [Project Overview](#project-overview)
@@ -63,8 +63,8 @@ VisitCareHealthcare/
 │   │   ├── api.ts
 │   │   ├── authService.ts
 │   │   └── healthcareService.ts
+│   ├── store/
 │   └── types/
-│       └── index.ts
 ├── App.tsx
 ├── package.json
 └── README.md
@@ -116,6 +116,45 @@ VisitCareHealthcare/
 ---
 
 ## Complete Source Code
+
+### 0. package.json (`src/services/api.ts`)
+
+```json
+{
+  "name": "visitcarehealthcare",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "^2.2.0",
+    "@react-navigation/bottom-tabs": "^7.4.7",
+    "@react-navigation/native": "^7.1.17",
+    "@react-navigation/stack": "^7.4.8",
+    "axios": "^1.12.2",
+    "date-fns": "^4.1.0",
+    "expo": "~54.0.9",
+    "expo-status-bar": "~3.0.8",
+    "react": "19.1.0",
+    "react-hook-form": "^7.63.0",
+    "react-native": "0.81.4",
+    "react-native-paper": "^5.14.5",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-screens": "~4.16.0",
+    "react-native-vector-icons": "^10.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.0",
+    "@types/react-native-vector-icons": "^6.4.18",
+    "typescript": "~5.9.2"
+  },
+  "private": true
+}
+```
 
 ### 1. API Configuration (`src/services/api.ts`)
 
