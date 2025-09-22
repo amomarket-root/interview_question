@@ -117,7 +117,7 @@ VisitCareHealthcare/
 
 ## Complete Source Code
 
-### 0. package.json (`src/services/api.ts`)
+### 0. package.json
 
 ```json
 {
@@ -2097,4 +2097,31 @@ const styles = StyleSheet.create({
     marginBottom: 4
   }
 });
+```
+
+### 10. App.tsx 
+
+```typescript
+iimport React from 'react';
+import { PaperProvider, DefaultTheme } from 'react-native-paper';
+import { StatusBar } from 'expo-status-bar';
+import AppNavigator from './src/navigation/AppNavigator';
+
+const theme = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    primary: '#2E7D32',
+    accent: '#4CAF50',
+  },
+};
+
+export default function App() {
+  return (
+    <PaperProvider theme={theme}>
+      <StatusBar style="auto" />
+      <AppNavigator />
+    </PaperProvider>
+  );
+}
 ```
