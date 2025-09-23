@@ -60,6 +60,10 @@ VisitCareHealthcare/
 │   │   │   └── DashboardScreen.tsx
 │   │   ├── appointments/
 │   │   │   └── AppointmentsScreen.tsx
+│   │   ├── doctor/
+│   │   │   └── DoctorManagementScreen.tsx
+│   │   ├── organization/
+│   │   │   └── OrganizationInfoScreen.tsx
 │   │   └── profile/
 │   │       └── ProfileScreen.tsx
 │   ├── navigation/
@@ -1475,6 +1479,8 @@ const LoginScreen = React.lazy(() => import('../screens/auth/LoginScreen'));
 const RegisterScreen = React.lazy(() => import('../screens/auth/RegisterScreen'));
 const DashboardScreen = React.lazy(() => import('../screens/dashboard/DashboardScreen'));
 const AppointmentsScreen = React.lazy(() => import('../screens/appointments/AppointmentsScreen'));
+const DoctorManagementScreen = React.lazy(() => import('../screens/doctor/DoctorManagementScreen'));
+const OrganizationInfoScreen = React.lazy(() => import('../screens/organization/OrganizationInfoScreen'));
 const ProfileScreen = React.lazy(() => import('../screens/profile/ProfileScreen'));
 
 const Stack = createStackNavigator();
@@ -1484,6 +1490,7 @@ const Tab = createBottomTabNavigator();
 type TabParamList = {
   Dashboard: undefined;
   Appointments: undefined;
+  DoctorManagement: undefined;
   Profile: undefined;
 };
 
@@ -1491,6 +1498,8 @@ type StackParamList = {
   Login: undefined;
   Register: undefined;
   Main: undefined;
+  DoctorManagement: undefined;
+  OrganizationInfo: undefined;
 };
 
 // Font weight type definition
@@ -1498,6 +1507,15 @@ type FontWeight = "100" | "200" | "300" | "400" | "500" | "600" | "700" | "800" 
 
 // Get screen dimensions
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+
+// Safe status bar height calculation
+const getStatusBarHeight = (): number => {
+  if (Platform.OS === 'ios') {
+    return 44; // Default iOS status bar height
+  }
+  // For Android, use currentHeight if available, otherwise fallback to 24
+  return StatusBar.currentHeight || 24;
+};
 
 // Avatar Dropdown Component with Modal
 const AvatarDropdown = React.memo(({ currentUser, onLogout, navigation }: {
@@ -1717,6 +1735,76 @@ const SuspenseFallback = React.memo(() => {
       <ActivityIndicator size="large" color={theme.colors.primary} />
       <Text style={[styles.loadingText, { color: theme.colors.text }]}>Loading Screen...</Text>
     </View>
+  );
+});
+
+// Main Stack Navigator (includes both tabs and modal screens)
+const MainNavigator = React.memo(() => {
+  const { theme } = useTheme();
+  
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+        cardStyle: { backgroundColor: theme.colors.background },
+        gestureEnabled: true,
+        presentation: 'card',
+      }}
+    >
+      <Stack.Screen 
+        name="MainTabs" 
+        component={MainTabs}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="DoctorManagement" 
+        component={DoctorManagementScreen}
+        options={{
+          headerShown: true,
+          title: 'Doctor Management',
+          headerStyle: {
+            backgroundColor: theme.colors.surface,
+            elevation: Platform.OS === 'android' ? 4 : 0,
+            shadowOffset: Platform.OS === 'ios' ? {
+              width: 0,
+              height: 2,
+            } : { width: 0, height: 0 },
+            shadowRadius: Platform.OS === 'ios' ? 3.84 : 0,
+            shadowOpacity: Platform.OS === 'ios' ? 0.25 : 0,
+            shadowColor: Platform.OS === 'ios' ? '#000' : 'transparent',
+          },
+          headerTintColor: theme.colors.text,
+          headerTitleStyle: {
+            fontSize: 18,
+            fontWeight: '600' as FontWeight,
+          },
+        }}
+      />
+      <Stack.Screen 
+        name="OrganizationInfo" 
+        component={OrganizationInfoScreen}
+        options={{
+          headerShown: true,
+          title: 'Organization Information',
+          headerStyle: {
+            backgroundColor: theme.colors.surface,
+            elevation: Platform.OS === 'android' ? 4 : 0,
+            shadowOffset: Platform.OS === 'ios' ? {
+              width: 0,
+              height: 2,
+            } : { width: 0, height: 0 },
+            shadowRadius: Platform.OS === 'ios' ? 3.84 : 0,
+            shadowOpacity: Platform.OS === 'ios' ? 0.25 : 0,
+            shadowColor: Platform.OS === 'ios' ? '#000' : 'transparent',
+          },
+          headerTintColor: theme.colors.text,
+          headerTitleStyle: {
+            fontSize: 18,
+            fontWeight: '600' as FontWeight,
+          },
+        }}
+      />
+    </Stack.Navigator>
   );
 });
 
@@ -1968,7 +2056,7 @@ export default function AppNavigator() {
         {isAuthenticated ? (
           <Stack.Screen 
             name="Main" 
-            component={MainTabs} 
+            component={MainNavigator} 
             options={{
               headerShown: false,
             }}
@@ -2070,7 +2158,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   modalContainer: {
-    marginTop: Platform.OS === 'android' ? StatusBar.currentHeight + 60 : 100,
+    marginTop: getStatusBarHeight() + 60,
     marginRight: 12,
   },
   dropdownCard: {
@@ -2451,17 +2539,17 @@ export default function DashboardScreen({ navigation }: any) {
   const loadDashboardData = useCallback(async () => {
     try {
       setError(null);
-      
+
       const [user, dashboardStats, profileData] = await Promise.allSettled([
         Promise.resolve(authService.getCurrentUser()),
         healthcareService.getDashboardStats(),
         healthcareService.getProfile(),
       ]);
-      
+
       if (user.status === 'fulfilled') {
         setCurrentUser(user.value);
       }
-      
+
       if (dashboardStats.status === 'fulfilled') {
         setStats(dashboardStats.value);
       } else {
@@ -2560,11 +2648,11 @@ export default function DashboardScreen({ navigation }: any) {
   }
 
   return (
-    <ScrollView 
+    <ScrollView
       style={styles.container}
       refreshControl={
-        <RefreshControl 
-          refreshing={refreshing} 
+        <RefreshControl
+          refreshing={refreshing}
           onRefresh={onRefresh}
           colors={[isDark ? '#4de352' : '#10d915']}
           progressBackgroundColor={isDark ? '#1e1e1e' : '#ffffff'}
@@ -2649,7 +2737,7 @@ export default function DashboardScreen({ navigation }: any) {
 
       {/* Overview Section */}
       <Text style={styles.sectionTitle}>Overview</Text>
-      
+
       <View style={styles.statsGrid}>
         {statsConfig.map((stat, index) => (
           <StatCard
@@ -2664,14 +2752,14 @@ export default function DashboardScreen({ navigation }: any) {
 
       {/* Quick Actions */}
       <Text style={styles.sectionTitle}>Quick Actions</Text>
-      
+
       <View style={styles.actionsGrid}>
         <Card style={styles.actionCard}>
           <Card.Content style={styles.actionContent}>
-            <MaterialCommunityIcons 
-              name="calendar-plus" 
-              size={32} 
-              color={isDark ? '#4de352' : '#2E7D32'} 
+            <MaterialCommunityIcons
+              name="calendar-plus"
+              size={32}
+              color={isDark ? '#4de352' : '#2E7D32'}
             />
             <Button
               mode="outlined"
@@ -2685,10 +2773,30 @@ export default function DashboardScreen({ navigation }: any) {
 
         <Card style={styles.actionCard}>
           <Card.Content style={styles.actionContent}>
-            <MaterialCommunityIcons 
-              name="account-cog" 
-              size={32} 
-              color={isDark ? '#4de352' : '#2E7D32'} 
+            <MaterialCommunityIcons
+              name="doctor"
+              size={32}
+              color={isDark ? '#4de352' : '#2E7D32'}
+            />
+            <Button
+              mode="outlined"
+              onPress={() => navigation.navigate('DoctorManagement')}
+              style={styles.actionButton}
+            >
+              Manage Doctors
+            </Button>
+          </Card.Content>
+        </Card>
+      </View>
+
+      {/* Second row for Profile action and Organization Info */}
+      <View style={styles.actionsGrid}>
+        <Card style={styles.actionCard}>
+          <Card.Content style={styles.actionContent}>
+            <MaterialCommunityIcons
+              name="account-cog"
+              size={32}
+              color={isDark ? '#4de352' : '#2E7D32'}
             />
             <Button
               mode="outlined"
@@ -2699,11 +2807,29 @@ export default function DashboardScreen({ navigation }: any) {
             </Button>
           </Card.Content>
         </Card>
+
+        {/* Updated Organization Info Card */}
+        <Card style={styles.actionCard}>
+          <Card.Content style={styles.actionContent}>
+            <MaterialCommunityIcons
+              name="domain"
+              size={32}
+              color={isDark ? '#4de352' : '#2E7D32'}
+            />
+            <Button
+              mode="outlined"
+              onPress={() => navigation.navigate('OrganizationInfo')}
+              style={styles.actionButton}
+            >
+              Organization Info
+            </Button>
+          </Card.Content>
+        </Card>
       </View>
 
       {/* Recent Activity */}
       <Text style={styles.sectionTitle}>Recent Activity</Text>
-      
+
       <Card style={styles.activityCard}>
         <Card.Content>
           <View style={styles.activityItem}>
@@ -4456,5 +4582,1159 @@ export const usePerformance = () => {
 
   return { measureRender };
 };
+```
+
+### 13. Doctor Management (`src/screens/doctor/DoctorManagementScreen.tsx`)
+
+```typescript
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, ScrollView, RefreshControl, Alert, Image, TouchableOpacity } from 'react-native';
+import { Card, Title, Text, Button, ActivityIndicator, Chip, IconButton, Divider } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTheme } from '../../contexts/ThemeContext';
+import { useStyles } from '../../hooks/useStyles';
+import healthcareService from '../../services/healthcareService';
+
+interface Doctor {
+  id: string;
+  user_id: string;
+  specialization: string;
+  license_number: string;
+  experience_years: number;
+  bio: string;
+  education: string;
+  consultation_fee: string;
+  qualification: string;
+  languages: string[];
+  services: string[];
+  rating: string;
+  total_reviews: number;
+  is_verified: boolean;
+  is_available: boolean;
+  profile_image: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    user_type: string;
+  };
+  clinic_info?: {
+    clinic_id: string;
+    clinic_name: string;
+    schedule: {
+      start_time: string;
+      end_time: string;
+      slot_duration: number;
+      available_days: string;
+      is_active: boolean;
+    };
+  };
+}
+
+interface ConnectionRequest {
+  id: string;
+  doctor_id: string;
+  clinic_id: string;
+  status: string;
+  message: string;
+  rejection_reason?: string;
+  proposed_schedule: {
+    start_time: string;
+    end_time: string;
+    slot_duration: number;
+    available_days: string[];
+  };
+  doctor: Doctor;
+}
+
+export default function DoctorManagementScreen({ navigation }: any) {
+  const [connectedDoctors, setConnectedDoctors] = useState<Doctor[]>([]);
+  const [connectionRequests, setConnectionRequests] = useState<ConnectionRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<'requests' | 'connected'>('requests');
+  const { theme } = useTheme();
+
+  const styles = useStyles((theme) => ({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    header: {
+      backgroundColor: theme.colors.surface,
+      paddingVertical: 16,
+      paddingHorizontal: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.mode === 'dark' ? '#333' : '#E0E0E0',
+    },
+    title: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: theme.colors.text,
+      textAlign: 'center',
+      fontFamily: theme.typography.fontFamily,
+    },
+    tabContainer: {
+      flexDirection: 'row',
+      backgroundColor: theme.colors.surface,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+    },
+    tabButton: {
+      flex: 1,
+      paddingVertical: 12,
+      alignItems: 'center',
+      borderRadius: 8,
+      marginHorizontal: 4,
+    },
+    activeTab: {
+      backgroundColor: theme.colors.primary,
+    },
+    inactiveTab: {
+      backgroundColor: 'transparent',
+    },
+    tabText: {
+      fontSize: 14,
+      fontWeight: '500',
+      fontFamily: theme.typography.fontFamily,
+    },
+    activeTabText: {
+      color: 'white',
+    },
+    inactiveTabText: {
+      color: theme.colors.text,
+    },
+    content: {
+      flex: 1,
+      padding: 16,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    loadingText: {
+      marginTop: 16,
+      fontSize: 16,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+    },
+    emptyContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingVertical: 40,
+    },
+    emptyText: {
+      fontSize: 16,
+      color: theme.colors.textSecondary,
+      textAlign: 'center',
+      marginTop: 16,
+      fontFamily: theme.typography.fontFamily,
+    },
+    // Doctor Card Styles
+    doctorCard: {
+      marginBottom: 16,
+      backgroundColor: theme.colors.surface,
+      borderRadius: 12,
+      elevation: 2,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+    },
+    cardContent: {
+      padding: 16,
+    },
+    doctorHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    avatar: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      marginRight: 12,
+    },
+    fallbackAvatar: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      backgroundColor: theme.colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+    },
+    doctorInfo: {
+      flex: 1,
+    },
+    doctorName: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      color: theme.colors.text,
+      fontFamily: theme.typography.fontFamily,
+    },
+    doctorSpecialty: {
+      fontSize: 14,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+    },
+    doctorExperience: {
+      fontSize: 12,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+    },
+    statusChip: {
+      alignSelf: 'flex-start',
+    },
+    chipText: {
+      fontSize: 12,
+      fontWeight: 'bold',
+      fontFamily: theme.typography.fontFamily,
+    },
+    doctorDetails: {
+      marginBottom: 12,
+    },
+    detailRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 4,
+    },
+    detailText: {
+      marginLeft: 8,
+      fontSize: 14,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+    },
+    availableDaysSection: {
+      backgroundColor: theme.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#F8F9FA',
+      padding: 12,
+      borderRadius: 8,
+      marginBottom: 12,
+    },
+    availableDaysLabel: {
+      fontSize: 12,
+      fontWeight: 'bold',
+      color: theme.colors.text,
+      marginBottom: 8,
+      fontFamily: theme.typography.fontFamily,
+    },
+    daysContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 6,
+    },
+    dayChip: {
+      backgroundColor: theme.colors.primary,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 12,
+      marginRight: 4,
+      marginBottom: 4,
+    },
+    dayText: {
+      fontSize: 11,
+      color: 'white',
+      fontWeight: '500',
+      fontFamily: theme.typography.fontFamily,
+    },
+    messageSection: {
+      backgroundColor: theme.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#F8F9FA',
+      padding: 12,
+      borderRadius: 8,
+      marginBottom: 12,
+    },
+    messageLabel: {
+      fontSize: 12,
+      fontWeight: 'bold',
+      color: theme.colors.text,
+      marginBottom: 4,
+      fontFamily: theme.typography.fontFamily,
+    },
+    messageText: {
+      fontSize: 14,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+    },
+    actionButtons: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 8,
+    },
+    actionButton: {
+      flex: 1,
+      marginHorizontal: 4,
+    },
+    viewButton: {
+      backgroundColor: 'transparent',
+      borderColor: theme.colors.primary,
+      borderWidth: 1,
+    },
+    manageButton: {
+      backgroundColor: theme.colors.primary,
+    },
+    disconnectButton: {
+      backgroundColor: '#F44336',
+    },
+  }));
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const [requestsResponse, doctorsResponse] = await Promise.allSettled([
+        healthcareService.getConnectionRequests(),
+        healthcareService.getConnectedDoctors(),
+      ]);
+
+      if (requestsResponse.status === 'fulfilled') {
+        setConnectionRequests(requestsResponse.value.data || []);
+      }
+
+      if (doctorsResponse.status === 'fulfilled') {
+        setConnectedDoctors(doctorsResponse.value || []);
+      }
+    } catch (error) {
+      console.error('Failed to load doctor data:', error);
+      Alert.alert('Error', 'Failed to load doctor data');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadData();
+  }, []);
+
+  const handleViewDetails = (doctor: Doctor) => {
+    Alert.alert('Doctor Details', `View details for ${doctor.user.name}`);
+  };
+
+  const handleManageSchedule = (doctor: Doctor) => {
+    Alert.alert('Manage Schedule', `Manage schedule for ${doctor.user.name}`);
+  };
+
+  const handleDisconnect = (doctor: Doctor) => {
+    Alert.alert(
+      'Disconnect Doctor',
+      `Are you sure you want to disconnect ${doctor.user.name}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Disconnect', style: 'destructive', onPress: () => {
+          Alert.alert('Success', 'Doctor disconnected successfully');
+          loadData();
+        }}
+      ]
+    );
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'approved':
+        return '#4CAF50';
+      case 'pending':
+        return '#FF9800';
+      case 'rejected':
+        return '#F44336';
+      default:
+        return '#757575';
+    }
+  };
+
+  // Helper function to parse and format available days
+  const parseAvailableDays = (availableDaysString: string): string[] => {
+    try {
+      if (!availableDaysString) return [];
+      
+      // Parse the JSON string
+      const days = JSON.parse(availableDaysString);
+      
+      // Return array of days or empty array
+      return Array.isArray(days) ? days : [];
+    } catch (error) {
+      console.error('Error parsing available days:', error);
+      return [];
+    }
+  };
+
+  // Helper function to format day name for display
+  const formatDayName = (day: string): string => {
+    if (!day) return '';
+    return day.charAt(0).toUpperCase() + day.slice(1, 3);
+  };
+
+  // Helper function to render available days chips
+  const renderAvailableDays = (availableDaysString: string) => {
+    const days = parseAvailableDays(availableDaysString);
+    
+    if (days.length === 0) {
+      return (
+        <Text style={styles.dayText}>No days specified</Text>
+      );
+    }
+
+    return (
+      <View style={styles.daysContainer}>
+        {days.map((day, index) => (
+          <View key={index} style={styles.dayChip}>
+            <Text style={styles.dayText}>{formatDayName(day)}</Text>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  const renderConnectionRequests = () => {
+    if (connectionRequests.length === 0) {
+      return (
+        <View style={styles.emptyContainer}>
+          <MaterialCommunityIcons name="doctor" size={64} color="#CCC" />
+          <Text style={styles.emptyText}>No connection requests found</Text>
+        </View>
+      );
+    }
+
+    return connectionRequests.map((request) => (
+      <Card key={request.id} style={styles.doctorCard}>
+        <View style={styles.cardContent}>
+          {/* Header */}
+          <View style={styles.doctorHeader}>
+            {request.doctor.profile_image ? (
+              <Image
+                source={{ uri: request.doctor.profile_image }}
+                style={styles.avatar}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.fallbackAvatar}>
+                <MaterialCommunityIcons name="doctor" size={24} color="white" />
+              </View>
+            )}
+            
+            <View style={styles.doctorInfo}>
+              <Text style={styles.doctorName}>
+                Dr. {request.doctor.user.name}
+              </Text>
+              <Text style={styles.doctorSpecialty}>
+                {request.doctor.specialization} • {request.doctor.experience_years} years
+              </Text>
+            </View>
+
+            <Chip
+              style={[styles.statusChip, { backgroundColor: getStatusColor(request.status) }]}
+              textStyle={[styles.chipText, { color: 'white' }]}
+            >
+              {request.status}
+            </Chip>
+          </View>
+
+          {/* Details */}
+          <View style={styles.doctorDetails}>
+            <View style={styles.detailRow}>
+              <MaterialCommunityIcons name="hospital-building" size={16} color="#666" />
+              <Text style={styles.detailText}>Clinic: sunshine clinic</Text>
+            </View>
+          </View>
+
+          {/* Message */}
+          {request.message && (
+            <View style={styles.messageSection}>
+              <Text style={styles.messageLabel}>Message:</Text>
+              <Text style={styles.messageText}>{request.message}</Text>
+            </View>
+          )}
+
+          <Divider style={{ marginVertical: 8 }} />
+
+          {/* Action Buttons */}
+          <View style={styles.actionButtons}>
+            <Button
+              mode="outlined"
+              onPress={() => handleViewDetails(request.doctor)}
+              style={[styles.actionButton, styles.viewButton]}
+              icon="eye"
+            >
+              View Details
+            </Button>
+          </View>
+        </View>
+      </Card>
+    ));
+  };
+
+  const renderConnectedDoctors = () => {
+    if (connectedDoctors.length === 0) {
+      return (
+        <View style={styles.emptyContainer}>
+          <MaterialCommunityIcons name="doctor" size={64} color="#CCC" />
+          <Text style={styles.emptyText}>No connected doctors found</Text>
+        </View>
+      );
+    }
+
+    return connectedDoctors.map((doctor) => (
+      <Card key={doctor.id} style={styles.doctorCard}>
+        <View style={styles.cardContent}>
+          {/* Header */}
+          <View style={styles.doctorHeader}>
+            {doctor.profile_image ? (
+              <Image
+                source={{ uri: doctor.profile_image }}
+                style={styles.avatar}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.fallbackAvatar}>
+                <MaterialCommunityIcons name="doctor" size={24} color="white" />
+              </View>
+            )}
+            
+            <View style={styles.doctorInfo}>
+              <Text style={styles.doctorName}>
+                Dr. {doctor.user.name}
+              </Text>
+              <Text style={styles.doctorSpecialty}>
+                {doctor.specialization}
+              </Text>
+              <Text style={styles.doctorExperience}>
+                ₹{doctor.consultation_fee}
+              </Text>
+            </View>
+
+            <Chip
+              style={[styles.statusChip, { backgroundColor: '#4CAF50' }]}
+              textStyle={[styles.chipText, { color: 'white' }]}
+            >
+              Connected
+            </Chip>
+          </View>
+
+          {/* Schedule Details */}
+          <View style={styles.doctorDetails}>
+            <View style={styles.detailRow}>
+              <MaterialCommunityIcons name="hospital-building" size={16} color="#666" />
+              <Text style={styles.detailText}>
+                Schedule at {doctor.clinic_info?.clinic_name || 'sunshine clinic'}
+              </Text>
+            </View>
+            {doctor.clinic_info?.schedule && (
+              <View style={styles.detailRow}>
+                <MaterialCommunityIcons name="clock" size={16} color="#666" />
+                <Text style={styles.detailText}>
+                  {doctor.clinic_info.schedule.start_time} - {doctor.clinic_info.schedule.end_time}
+                </Text>
+              </View>
+            )}
+            <View style={styles.detailRow}>
+              <MaterialCommunityIcons name="email" size={16} color="#666" />
+              <Text style={styles.detailText}>{doctor.user.email}</Text>
+            </View>
+          </View>
+
+          {/* Available Days Section */}
+          {doctor.clinic_info?.schedule?.available_days && (
+            <View style={styles.availableDaysSection}>
+              <Text style={styles.availableDaysLabel}>Available Days:</Text>
+              {renderAvailableDays(doctor.clinic_info.schedule.available_days)}
+            </View>
+          )}
+
+          <Divider style={{ marginVertical: 8 }} />
+
+          {/* Action Buttons */}
+          <View style={styles.actionButtons}>
+            <Button
+              mode="outlined"
+              onPress={() => handleViewDetails(doctor)}
+              style={[styles.actionButton, styles.viewButton]}
+              icon="eye"
+            >
+              View Profile
+            </Button>
+            
+            <Button
+              mode="contained"
+              onPress={() => handleManageSchedule(doctor)}
+              style={[styles.actionButton, styles.manageButton]}
+              icon="calendar-edit"
+            >
+              Manage Schedule
+            </Button>
+
+            <Button
+              mode="contained"
+              onPress={() => handleDisconnect(doctor)}
+              style={[styles.actionButton, styles.disconnectButton]}
+              icon="account-remove"
+            >
+              Disconnect
+            </Button>
+          </View>
+        </View>
+      </Card>
+    ));
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#2E7D32" />
+        <Text style={styles.loadingText}>Loading doctors...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>Doctor Management</Text>
+      </View>
+
+      {/* Tab Navigation */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === 'requests' ? styles.activeTab : styles.inactiveTab
+          ]}
+          onPress={() => setActiveTab('requests')}
+        >
+          <Text style={[
+            styles.tabText,
+            activeTab === 'requests' ? styles.activeTabText : styles.inactiveTabText
+          ]}>
+            Connection Requests ({connectionRequests.length})
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === 'connected' ? styles.activeTab : styles.inactiveTab
+          ]}
+          onPress={() => setActiveTab('connected')}
+        >
+          <Text style={[
+            styles.tabText,
+            activeTab === 'connected' ? styles.activeTabText : styles.inactiveTabText
+          ]}>
+            Connected Doctors ({connectedDoctors.length})
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Content */}
+      <ScrollView
+        style={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        showsVerticalScrollIndicator={false}
+      >
+        {activeTab === 'requests' ? renderConnectionRequests() : renderConnectedDoctors()}
+      </ScrollView>
+    </View>
+  );
+}
+```
+
+### 13. Organization Info (`src/screens/organization/OrganizationInfoScreen.tsx`)
+
+```typescript
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, ScrollView, RefreshControl, Image, TouchableOpacity } from 'react-native';
+import { Card, Text, Button, ActivityIndicator, Chip } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTheme } from '../../contexts/ThemeContext';
+import { useStyles } from '../../hooks/useStyles';
+import healthcareService from '../../services/healthcareService';
+
+interface HealthcareProfile {
+  id: string;
+  name: string;
+  description: string;
+  address: string;
+  phone: string;
+  email: string;
+  website: string;
+  facilities: string[];
+  specialties: string[];
+  image: string;
+  images: string[];
+  opening_time: string;
+  closing_time: string;
+  working_days: string[];
+  rating: string;
+  total_reviews: number;
+  is_active: boolean;
+  is_featured: boolean;
+  is_verified: boolean;
+  logo: string;
+  organization_type: string;
+  established_date: string;
+  bed_count: number;
+  certifications: any;
+}
+
+export default function OrganizationInfoScreen({ navigation }: any) {
+  const [profile, setProfile] = useState<HealthcareProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const { theme } = useTheme();
+
+  const styles = useStyles((theme) => ({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    loadingText: {
+      marginTop: 16,
+      fontSize: 16,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+    },
+    // Organization Header Card
+    headerCard: {
+      margin: 16,
+      marginBottom: 0,
+      borderRadius: 12,
+      overflow: 'hidden',
+      elevation: 4,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 4,
+    },
+    gradientHeader: {
+      background: 'linear-gradient(135deg, #FF6B6B, #4ECDC4)',
+      backgroundColor: theme.colors.primary,
+      padding: 20,
+      alignItems: 'center',
+    },
+    headerLogo: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      marginBottom: 12,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    fallbackHeaderLogo: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: 'rgba(255, 255, 255, 0.3)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    headerClinicName: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: 'white',
+      textAlign: 'center',
+      fontFamily: theme.typography.fontFamily,
+      textTransform: 'capitalize',
+      marginBottom: 4,
+    },
+    headerClinicType: {
+      fontSize: 14,
+      color: 'rgba(255, 255, 255, 0.9)',
+      textAlign: 'center',
+      fontFamily: theme.typography.fontFamily,
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+      marginBottom: 8,
+    },
+    headerProviderType: {
+      fontSize: 12,
+      color: 'rgba(255, 255, 255, 0.8)',
+      textAlign: 'center',
+      fontFamily: theme.typography.fontFamily,
+    },
+    verifiedHeaderBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    verifiedHeaderText: {
+      fontSize: 14,
+      color: 'white',
+      marginLeft: 4,
+      fontFamily: theme.typography.fontFamily,
+    },
+    // Section Cards
+    sectionCard: {
+      margin: 16,
+      marginBottom: 12,
+      backgroundColor: theme.colors.surface,
+      borderRadius: 12,
+      elevation: 2,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: theme.colors.primary,
+      marginBottom: 16,
+      fontFamily: theme.typography.fontFamily,
+    },
+    infoRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      marginBottom: 16,
+    },
+    infoIcon: {
+      marginRight: 12,
+      marginTop: 2,
+    },
+    infoContent: {
+      flex: 1,
+    },
+    infoLabel: {
+      fontSize: 12,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      marginBottom: 4,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    infoText: {
+      fontSize: 14,
+      color: theme.colors.text,
+      fontFamily: theme.typography.fontFamily,
+      lineHeight: 20,
+    },
+    // Chips containers
+    chipsContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginTop: 8,
+    },
+    facilityChip: {
+      backgroundColor: theme.colors.primary,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      marginRight: 8,
+      marginBottom: 8,
+    },
+    facilityText: {
+      fontSize: 12,
+      color: 'white',
+      fontWeight: '500',
+      fontFamily: theme.typography.fontFamily,
+    },
+    specialtyChip: {
+      backgroundColor: '#FF9800',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      marginRight: 8,
+      marginBottom: 8,
+    },
+    specialtyText: {
+      fontSize: 12,
+      color: 'white',
+      fontWeight: '500',
+      fontFamily: theme.typography.fontFamily,
+    },
+    workingDayChip: {
+      backgroundColor: '#4CAF50',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      marginRight: 8,
+      marginBottom: 8,
+    },
+    workingDayText: {
+      fontSize: 12,
+      color: 'white',
+      fontWeight: '500',
+      fontFamily: theme.typography.fontFamily,
+    },
+    // Edit button
+    editButton: {
+      margin: 16,
+      marginTop: 8,
+      borderRadius: 8,
+    },
+  }));
+
+  const loadProfile = async () => {
+    try {
+      const response = await healthcareService.getProfile();
+      setProfile(response.profile);
+    } catch (error) {
+      console.error('Failed to load profile:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadProfile();
+  }, []);
+
+  const formatWorkingDay = (day: string) => {
+    return day.charAt(0).toUpperCase() + day.slice(1, 3);
+  };
+
+  const formatDate = (dateString: string) => {
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={styles.loadingText}>Loading organization info...</Text>
+      </View>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <View style={styles.loadingContainer}>
+        <MaterialCommunityIcons name="alert-circle" size={64} color="#F44336" />
+        <Text style={styles.loadingText}>Failed to load organization information</Text>
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Organization Header */}
+      <Card style={styles.headerCard}>
+        <View style={styles.gradientHeader}>
+          {profile.logo ? (
+            <Image
+              source={{ uri: profile.logo }}
+              style={styles.headerLogo}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={styles.fallbackHeaderLogo}>
+              <MaterialCommunityIcons name="hospital-building" size={40} color="white" />
+            </View>
+          )}
+          
+          <Text style={styles.headerClinicName}>{profile.name}</Text>
+          <Text style={styles.headerClinicType}>{profile.organization_type}</Text>
+          <Text style={styles.headerProviderType}>Healthcare Provider</Text>
+          
+          {profile.is_verified && (
+            <View style={styles.verifiedHeaderBadge}>
+              <MaterialCommunityIcons name="check-decagram" size={20} color="white" />
+              <Text style={styles.verifiedHeaderText}>Verified</Text>
+            </View>
+          )}
+        </View>
+      </Card>
+
+      {/* Basic Information */}
+      <Card style={styles.sectionCard}>
+        <Card.Content>
+          <Text style={styles.sectionTitle}>Basic Information</Text>
+          
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons name="domain" size={20} color="#666" style={styles.infoIcon} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Organization Name</Text>
+              <Text style={styles.infoText}>{profile.name}</Text>
+            </View>
+          </View>
+
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons name="hospital-building" size={20} color="#666" style={styles.infoIcon} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Organization Type</Text>
+              <Text style={styles.infoText}>{profile.organization_type.toUpperCase()}</Text>
+            </View>
+          </View>
+
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons name="certificate" size={20} color="#666" style={styles.infoIcon} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Registration Number</Text>
+              <Text style={styles.infoText}>APHL0012345</Text>
+            </View>
+          </View>
+
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons name="card-account-details" size={20} color="#666" style={styles.infoIcon} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>License Number</Text>
+              <Text style={styles.infoText}>KAR/HOSP/2024/0013456</Text>
+            </View>
+          </View>
+
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons name="calendar" size={20} color="#666" style={styles.infoIcon} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Established Date</Text>
+              <Text style={styles.infoText}>{formatDate(profile.established_date)}</Text>
+            </View>
+          </View>
+        </Card.Content>
+      </Card>
+
+      {/* Contact Information */}
+      <Card style={styles.sectionCard}>
+        <Card.Content>
+          <Text style={styles.sectionTitle}>Contact Information</Text>
+          
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons name="map-marker" size={20} color="#666" style={styles.infoIcon} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Address</Text>
+              <Text style={styles.infoText}>{profile.address}</Text>
+            </View>
+          </View>
+
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons name="phone" size={20} color="#666" style={styles.infoIcon} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Phone Number</Text>
+              <Text style={styles.infoText}>{profile.phone}</Text>
+            </View>
+          </View>
+
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons name="email" size={20} color="#666" style={styles.infoIcon} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Email</Text>
+              <Text style={styles.infoText}>{profile.email}</Text>
+            </View>
+          </View>
+
+          {profile.website && (
+            <View style={styles.infoRow}>
+              <MaterialCommunityIcons name="web" size={20} color="#666" style={styles.infoIcon} />
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>Website</Text>
+                <Text style={styles.infoText}>{profile.website}</Text>
+              </View>
+            </View>
+          )}
+
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons name="clock" size={20} color="#666" style={styles.infoIcon} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Operating Hours</Text>
+              <Text style={styles.infoText}>
+                {profile.opening_time} - {profile.closing_time}
+              </Text>
+            </View>
+          </View>
+        </Card.Content>
+      </Card>
+
+      {/* Additional Information */}
+      <Card style={styles.sectionCard}>
+        <Card.Content>
+          <Text style={styles.sectionTitle}>Additional Information</Text>
+          
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons name="information" size={20} color="#666" style={styles.infoIcon} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Description</Text>
+              <Text style={styles.infoText}>{profile.description}</Text>
+            </View>
+          </View>
+
+          {/* Facilities */}
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons name="medical-bag" size={20} color="#666" style={styles.infoIcon} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Facilities</Text>
+              <View style={styles.chipsContainer}>
+                {profile.facilities.map((facility, index) => (
+                  <View key={index} style={styles.facilityChip}>
+                    <Text style={styles.facilityText}>{facility}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+
+          {/* Specialties */}
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons name="stethoscope" size={20} color="#666" style={styles.infoIcon} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Specialties</Text>
+              <View style={styles.chipsContainer}>
+                {profile.specialties.map((specialty, index) => (
+                  <View key={index} style={styles.specialtyChip}>
+                    <Text style={styles.specialtyText}>{specialty}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+
+          {/* Working Days */}
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons name="calendar-week" size={20} color="#666" style={styles.infoIcon} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Working Days</Text>
+              <View style={styles.chipsContainer}>
+                {profile.working_days.map((day, index) => (
+                  <View key={index} style={styles.workingDayChip}>
+                    <Text style={styles.workingDayText}>{formatWorkingDay(day)}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+        </Card.Content>
+      </Card>
+
+      {/* Edit Organization Profile Button */}
+      <Button
+        mode="contained"
+        style={styles.editButton}
+        icon="pencil"
+        onPress={() => navigation.navigate('Profile')}
+      >
+        Edit Organization Profile
+      </Button>
+    </ScrollView>
+  );
+}
 ```
 
