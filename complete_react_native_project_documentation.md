@@ -1168,15 +1168,14 @@ export default function RegisterScreen({ navigation }: RegisterScreenProps) {
 
 ```typescript
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { Button } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Avatar, Menu, Divider, List, Portal, Modal } from 'react-native-paper';
 
 import { useTheme } from '../contexts/ThemeContext';
-import { useLanguage } from '../contexts/LanguageContext';
 import authService from '../services/authService';
 
 import LoginScreen from '../screens/auth/LoginScreen';
@@ -1188,157 +1187,6 @@ import ProfileScreen from '../screens/profile/ProfileScreen';
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
-type ThemeMode = 'light' | 'dark' | 'system';
-type LangType = 'en' | 'od';
-interface ProfileMenuProps {
-  themeMode: ThemeMode;
-  setTheme: (mode: ThemeMode) => void;
-  language: LangType;
-  setLanguage: (lang: LangType) => void;
-  onLogout: () => void;
-  navigation: any;
-}
-
-const HeaderProfileMenu: React.FC<ProfileMenuProps> = ({
-  themeMode,
-  setTheme,
-  language,
-  setLanguage,
-  onLogout,
-  navigation,
-}) => {
-  const [visible, setVisible] = useState<boolean>(false);
-  const [modalType, setModalType] = useState<'theme' | 'language' | null>(null);
-
-  return (
-    <>
-      <Menu
-        visible={visible}
-        onDismiss={() => setVisible(false)}
-        anchor={
-          <TouchableOpacity onPress={() => setVisible(true)} style={{ marginRight: 10 }}>
-            <Avatar.Icon
-              size={36}
-              icon="account"
-              color="white"
-              style={{ backgroundColor: '#4081ec' }}
-            />
-          </TouchableOpacity>
-        }
-      >
-        <Menu.Item
-          onPress={() => {
-            setModalType('theme');
-            setVisible(false);
-          }}
-          title="Theme Change"
-          leadingIcon="theme-light-dark"
-        />
-        <Menu.Item
-          onPress={() => {
-            setModalType('language');
-            setVisible(false);
-          }}
-          title="Language Change"
-          leadingIcon="translate"
-        />
-        <Menu.Item
-          onPress={() => {
-            setVisible(false);
-            navigation.navigate('Profile');
-          }}
-          title="Profile Setting"
-          leadingIcon="cog"
-        />
-        <Divider />
-        <Menu.Item
-          onPress={onLogout}
-          title="Logout"
-          leadingIcon="logout"
-        />
-      </Menu>
-      <Portal>
-        <Modal
-          visible={modalType !== null}
-          onDismiss={() => setModalType(null)}
-          contentContainerStyle={styles.modalContainer}
-        >
-          {modalType === 'theme' && (
-            <>
-              <Text style={styles.modalTitle}>Choose Theme</Text>
-              <List.Item
-                title="Light"
-                left={() => <List.Icon icon="white-balance-sunny" />}
-                onPress={() => {
-                  setTheme('light');
-                  setModalType(null);
-                }}
-                right={() =>
-                  themeMode === 'light' ?
-                    <MaterialCommunityIcons name="check" size={24} color="#2E7D32" /> : null
-                }
-              />
-              <List.Item
-                title="Dark"
-                left={() => <List.Icon icon="weather-night" />}
-                onPress={() => {
-                  setTheme('dark');
-                  setModalType(null);
-                }}
-                right={() =>
-                  themeMode === 'dark' ?
-                    <MaterialCommunityIcons name="check" size={24} color="#2E7D32" /> : null
-                }
-              />
-              <List.Item
-                title="System"
-                left={() => <List.Icon icon="monitor" />}
-                onPress={() => {
-                  setTheme('system');
-                  setModalType(null);
-                }}
-                right={() =>
-                  themeMode === 'system' ?
-                    <MaterialCommunityIcons name="check" size={24} color="#2E7D32" /> : null
-                }
-              />
-            </>
-          )}
-          {modalType === 'language' && (
-            <>
-              <Text style={styles.modalTitle}>Choose Language</Text>
-              <List.Item
-                title="English"
-                left={() => <List.Icon icon="alphabetical" />}
-                onPress={() => {
-                  setLanguage('en');
-                  setModalType(null);
-                }}
-                right={() =>
-                  language === 'en' ?
-                    <MaterialCommunityIcons name="check" size={24} color="#2E7D32" /> : null
-                }
-              />
-              <List.Item
-                title="Odia"
-                left={() => <List.Icon icon="alphabetical-variant" />}
-                onPress={() => {
-                  setLanguage('od');
-                  setModalType(null);
-                }}
-                right={() =>
-                  language === 'od' ?
-                    <MaterialCommunityIcons name="check" size={24} color="#2E7D32" /> : null
-                }
-              />
-            </>
-          )}
-        </Modal>
-      </Portal>
-    </>
-  );
-};
-
 function LoadingScreen() {
   return (
     <View style={styles.loadingContainer}>
@@ -1348,7 +1196,7 @@ function LoadingScreen() {
   );
 }
 
-function MainTabs({ navigation }: { navigation: any }) {
+function MainTabs() {
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
@@ -1364,8 +1212,7 @@ function MainTabs({ navigation }: { navigation: any }) {
     // Auth state auto-updates, navigation will change via AppNavigator
   };
 
-  const { theme, isDark, themeMode, setTheme } = useTheme();
-  const { language, setLanguage } = useLanguage();
+  const { theme, isDark } = useTheme();
 
   return (
     <Tab.Navigator
@@ -1388,16 +1235,12 @@ function MainTabs({ navigation }: { navigation: any }) {
         },
         tabBarActiveTintColor: '#2E7D32',
         tabBarInactiveTintColor: 'gray',
-        headerRight: () => (
-          <HeaderProfileMenu
-            themeMode={themeMode}
-            setTheme={setTheme}
-            language={language}
-            setLanguage={setLanguage}
-            onLogout={handleLogout}
-            navigation={navigation}
-          />
-        ),
+        headerRight: () =>
+          route.name === 'Profile' ? null : (
+            <Button mode="text" onPress={handleLogout} style={{ marginRight: 10 }}>
+              Logout
+            </Button>
+          ),
         headerTitle: route.name + (currentUser ? ` - ${currentUser.name}` : ''),
         tabBarStyle: { backgroundColor: theme.colors.surface },
       })}
@@ -1415,6 +1258,7 @@ export default function AppNavigator() {
   const { theme, isDark } = useTheme();
 
   useEffect(() => {
+    // Listen for auth state changes
     let unmounted = false;
     const checkAuthState = async () => {
       try {
@@ -1437,7 +1281,7 @@ export default function AppNavigator() {
   if (isLoading) return <LoadingScreen />;
 
   return (
-    <NavigationContainer
+    <NavigationContainer 
       theme={{
         ...((isDark ? DarkTheme : DefaultTheme) as any),
         colors: {
@@ -1471,17 +1315,6 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     color: '#666',
-  },
-  modalContainer: {
-    margin: 24,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 24,
-  },
-  modalTitle: {
-    fontWeight: 'bold',
-    fontSize: 18,
-    marginBottom: 12,
   },
 });
 ```
