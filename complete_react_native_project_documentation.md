@@ -47,6 +47,11 @@ VisitCareHealthcare/
 ├── src/
 │   ├── components/
 │   ├── constants/
+│   │   │   └── theme.ts
+│   ├── contexts/
+│   │   │   └── ThemeContext.tsx
+│   ├── hooks/
+│   │   │   └── useStyles.ts
 │   ├── screens/
 │   │   ├── auth/
 │   │   │   ├── LoginScreen.tsx
