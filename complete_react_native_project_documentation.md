@@ -2154,7 +2154,7 @@ const styles = StyleSheet.create({
 
 ```typescript
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, ScrollView, RefreshControl, Alert } from 'react-native';
+import { View, ScrollView, RefreshControl, Alert, Image } from 'react-native';
 import { Card, Title, Paragraph, Button, Text, ActivityIndicator, IconButton } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -2215,9 +2215,37 @@ const StatCard = React.memo(({ icon, title, value, color = '#2E7D32' }: {
   );
 });
 
+interface HealthcareProfile {
+  id: string;
+  name: string;
+  description: string;
+  address: string;
+  phone: string;
+  email: string;
+  website: string;
+  facilities: string[];
+  specialties: string[];
+  image: string;
+  images: string[];
+  opening_time: string;
+  closing_time: string;
+  working_days: string[];
+  rating: string;
+  total_reviews: number;
+  is_active: boolean;
+  is_featured: boolean;
+  is_verified: boolean;
+  logo: string;
+  organization_type: string;
+  established_date: string;
+  bed_count: number;
+  certifications: any;
+}
+
 export default function DashboardScreen({ navigation }: any) {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [profile, setProfile] = useState<HealthcareProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -2254,40 +2282,93 @@ export default function DashboardScreen({ navigation }: any) {
       marginBottom: theme.spacing.md,
       fontFamily: theme.typography.fontFamily,
     },
+    // Updated Welcome Card Styles (Profile-like design)
     welcomeCard: {
       marginBottom: theme.spacing.lg,
       ...theme.shadows.medium,
       backgroundColor: theme.colors.surface,
       borderRadius: theme.borderRadius.md,
+      overflow: 'hidden',
     },
     welcomeHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
+      position: 'relative',
       alignItems: 'center',
-      marginBottom: theme.spacing.sm,
-    },
-    welcomeTitle: {
-      fontSize: theme.typography.sizes.xl,
-      fontWeight: theme.typography.weights.bold,
-      color: theme.colors.primary,
-      marginBottom: 4,
-      fontFamily: theme.typography.fontFamily,
-      flex: 1,
+      padding: theme.spacing.lg,
+      backgroundColor: theme.mode === 'dark' ? '#1e3a2e' : '#e8f5e8',
     },
     themeToggle: {
+      position: 'absolute',
+      top: theme.spacing.sm,
+      right: theme.spacing.sm,
       margin: 0,
     },
-    welcomeSubtitle: {
-      fontSize: theme.typography.sizes.md,
-      color: theme.colors.textSecondary,
+    logoContainer: {
+      alignItems: 'center',
+      marginBottom: theme.spacing.md,
+    },
+    logo: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: theme.colors.surface,
+    },
+    fallbackLogo: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: theme.colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    verifiedBadge: {
+      position: 'absolute',
+      bottom: -5,
+      right: -5,
+      backgroundColor: '#4CAF50',
+      borderRadius: 12,
+      padding: 2,
+    },
+    clinicName: {
+      fontSize: theme.typography.sizes.xl,
+      fontWeight: theme.typography.weights.bold,
+      color: theme.colors.text,
+      textAlign: 'center',
       marginBottom: theme.spacing.xs,
       fontFamily: theme.typography.fontFamily,
+      textTransform: 'capitalize',
     },
-    welcomeDate: {
+    verifiedRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: theme.spacing.sm,
+    },
+    verifiedText: {
       fontSize: theme.typography.sizes.sm,
-      color: theme.colors.textSecondary,
+      color: '#4CAF50',
+      fontWeight: theme.typography.weights.medium,
+      marginLeft: theme.spacing.xs,
       fontFamily: theme.typography.fontFamily,
     },
+    description: {
+      fontSize: theme.typography.sizes.sm,
+      color: theme.colors.textSecondary,
+      textAlign: 'center',
+      lineHeight: 20,
+      marginBottom: theme.spacing.md,
+      fontFamily: theme.typography.fontFamily,
+    },
+    profileActions: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+    },
+    editButton: {
+      backgroundColor: 'transparent',
+      borderColor: theme.colors.primary,
+      borderWidth: 1,
+      paddingHorizontal: theme.spacing.lg,
+    },
+    // Existing styles remain the same
     sectionTitle: {
       fontSize: theme.typography.sizes.lg,
       fontWeight: theme.typography.weights.semibold,
@@ -2371,9 +2452,10 @@ export default function DashboardScreen({ navigation }: any) {
     try {
       setError(null);
       
-      const [user, dashboardStats] = await Promise.allSettled([
+      const [user, dashboardStats, profileData] = await Promise.allSettled([
         Promise.resolve(authService.getCurrentUser()),
-        healthcareService.getDashboardStats()
+        healthcareService.getDashboardStats(),
+        healthcareService.getProfile(),
       ]);
       
       if (user.status === 'fulfilled') {
@@ -2385,6 +2467,12 @@ export default function DashboardScreen({ navigation }: any) {
       } else {
         console.warn('Failed to load dashboard stats:', dashboardStats.reason);
         setError('Failed to load dashboard statistics');
+      }
+
+      if (profileData.status === 'fulfilled') {
+        setProfile(profileData.value.profile);
+      } else {
+        console.warn('Failed to load profile:', profileData.reason);
       }
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
@@ -2484,28 +2572,79 @@ export default function DashboardScreen({ navigation }: any) {
       }
       showsVerticalScrollIndicator={false}
     >
-      {/* Welcome Card */}
+      {/* Updated Welcome Card - Profile Style */}
       <Card style={styles.welcomeCard}>
-        <Card.Content>
-          <View style={styles.welcomeHeader}>
-            <Title style={styles.welcomeTitle}>
-              Welcome, {currentUser?.name || 'User'}!
-            </Title>
-            <IconButton
-              icon={isDark ? 'weather-sunny' : 'weather-night'}
-              iconColor={isDark ? '#FFA726' : '#2196F3'}
-              size={24}
-              onPress={toggleTheme}
-              style={styles.themeToggle}
-            />
+        <View style={styles.welcomeHeader}>
+          {/* Theme Toggle Button */}
+          <IconButton
+            icon={isDark ? 'weather-sunny' : 'weather-night'}
+            iconColor={isDark ? '#FFA726' : '#2196F3'}
+            size={24}
+            onPress={toggleTheme}
+            style={styles.themeToggle}
+          />
+
+          {/* Logo/Avatar */}
+          <View style={styles.logoContainer}>
+            {profile?.logo ? (
+              <View>
+                <Image
+                  source={{ uri: `${profile.logo}` }}
+                  style={styles.logo}
+                  resizeMode="cover"
+                  onError={() => {
+                    console.warn('Failed to load clinic logo');
+                  }}
+                />
+                {profile.is_verified && (
+                  <View style={styles.verifiedBadge}>
+                    <MaterialCommunityIcons name="check" size={16} color="white" />
+                  </View>
+                )}
+              </View>
+            ) : (
+              <View style={styles.fallbackLogo}>
+                <MaterialCommunityIcons name="hospital-building" size={40} color="white" />
+                {profile?.is_verified && (
+                  <View style={styles.verifiedBadge}>
+                    <MaterialCommunityIcons name="check" size={16} color="white" />
+                  </View>
+                )}
+              </View>
+            )}
           </View>
-          <Paragraph style={styles.welcomeSubtitle}>
-            {getUserTypeDisplay(currentUser?.user_type)} Dashboard
-          </Paragraph>
-          <Text style={styles.welcomeDate}>
-            {currentDateString}
+
+          {/* Clinic Name */}
+          <Text style={styles.clinicName}>
+            {profile?.name || currentUser?.name || 'sunshine clinic'}
           </Text>
-        </Card.Content>
+
+          {/* Verified Badge */}
+          {(profile?.is_verified !== false) && (
+            <View style={styles.verifiedRow}>
+              <MaterialCommunityIcons name="check-decagram" size={16} color="#4CAF50" />
+              <Text style={styles.verifiedText}>Verified</Text>
+            </View>
+          )}
+
+          {/* Description */}
+          <Text style={styles.description}>
+            {profile?.description || 'Multi-specialty tertiary care hospital with state-of-the-art facilities and world-class medical services across all major specialties.'}
+          </Text>
+
+          {/* Edit Profile Button */}
+          <View style={styles.profileActions}>
+            <Button
+              mode="outlined"
+              onPress={() => navigation.navigate('Profile')}
+              style={styles.editButton}
+              icon="account-edit"
+              compact
+            >
+              Edit Profile
+            </Button>
+          </View>
+        </View>
       </Card>
 
       {/* Overview Section */}
