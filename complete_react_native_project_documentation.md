@@ -623,6 +623,7 @@ class HealthcareService {
       this.handleServiceError(error, 'Failed to update profile');
     }
   }
+  
 
   async getAppointments(
     page: number = 1,
