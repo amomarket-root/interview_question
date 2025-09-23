@@ -431,14 +431,15 @@ export default new HealthcareService();
 ### 4. Login Screen (`src/screens/auth/LoginScreen.tsx`)
 
 ```typescript
-// SOLUTION 1: Updated LoginScreen with alternative icon implementation
-
 import React, { useState } from 'react';
-import { View, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import { View, ScrollView, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { TextInput, Button, Card, Title, Text, HelperText, IconButton } from 'react-native-paper';
 import { useForm, Controller } from 'react-hook-form';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useTheme } from '../../contexts/ThemeContext';
+import { useStyles } from '../../hooks/useStyles';
 import authService, { LoginCredentials } from '../../services/authService';
+import { Alert } from 'react-native';
 
 interface LoginScreenProps {
   navigation: any;
@@ -448,6 +449,97 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const { toggleTheme, isDark } = useTheme();
+  
+  const styles = useStyles((theme) => ({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      justifyContent: 'center',
+    },
+    content: {
+      flex: 1,
+      padding: theme.spacing.md,
+      justifyContent: 'center',
+    },
+    card: {
+      padding: theme.spacing.md,
+      ...theme.shadows.medium,
+      borderRadius: theme.borderRadius.md,
+      backgroundColor: theme.colors.surface,
+    },
+    iconContainer: {
+      alignItems: 'center',
+      marginBottom: theme.spacing.md,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    logoContainer: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    themeToggle: {
+      margin: 0,
+    },
+    logoImage: {
+      width: 100,
+      height: 80,
+      marginBottom: theme.spacing.xs,
+    },
+    title: {
+      textAlign: 'center',
+      marginBottom: theme.spacing.xs,
+      color: theme.colors.primary,
+      fontSize: theme.typography.sizes.xl,
+      fontWeight: theme.typography.weights.bold,
+      fontFamily: theme.typography.fontFamily,
+    },
+    subtitle: {
+      textAlign: 'center',
+      marginBottom: theme.spacing.xxl,
+      color: theme.colors.textSecondary,
+      fontSize: theme.typography.sizes.md,
+      fontFamily: theme.typography.fontFamily,
+    },
+    input: {
+      marginBottom: theme.spacing.xs,
+      backgroundColor: theme.colors.surface,
+    },
+    button: {
+      marginTop: theme.spacing.lg,
+      marginBottom: theme.spacing.md,
+      borderRadius: theme.borderRadius.sm,
+    },
+    buttonContent: {
+      paddingVertical: theme.spacing.xs,
+    },
+    linkButton: {
+      marginTop: theme.spacing.xs,
+    },
+    footer: {
+      alignItems: 'center',
+      marginTop: theme.spacing.xxl,
+      paddingTop: theme.spacing.md,
+    },
+    footerText: {
+      fontSize: theme.typography.sizes.sm,
+      color: theme.colors.textSecondary,
+      marginBottom: theme.spacing.xs,
+      fontFamily: theme.typography.fontFamily,
+    },
+    securityIcons: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    iconButton: {
+      margin: 0,
+      marginHorizontal: 4,
+    },
+  }));
   
   const { control, handleSubmit, formState: { errors } } = useForm<LoginCredentials>({
     defaultValues: {
@@ -496,18 +588,26 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
         <View style={styles.content}>
           <Card style={styles.card}>
             <Card.Content>
-              {/* App Logo */}
               <View style={styles.iconContainer}>
-                {!imageError ? (
-                  <Image 
-                    source={require('../../../assets/images/icon.webp')} 
-                    style={styles.logoImage}
-                    resizeMode="contain"
-                    onError={() => setImageError(true)}
-                  />
-                ) : (
-                  <Icon name="hospital-box" size={80} color="#2E7D32" />
-                )}
+                <View style={styles.logoContainer}>
+                  {!imageError ? (
+                    <Image 
+                      source={require('../../../assets/images/icon.webp')} 
+                      style={styles.logoImage}
+                      resizeMode="contain"
+                      onError={() => setImageError(true)}
+                    />
+                  ) : (
+                    <Icon name="hospital-box" size={80} color="#2E7D32" />
+                  )}
+                </View>
+                <IconButton
+                  icon={isDark ? 'weather-sunny' : 'weather-night'}
+                  iconColor={isDark ? '#FFA726' : '#2196F3'}
+                  size={24}
+                  onPress={toggleTheme}
+                  style={styles.themeToggle}
+                />
               </View>
               
               <Title style={styles.title}>Visit Care Healthcare</Title>
@@ -619,7 +719,6 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
             </Card.Content>
           </Card>
 
-          {/* Footer - Alternative implementation using React Native Paper IconButton */}
           <View style={styles.footer}>
             <Text style={styles.footerText}>
               Secure healthcare management platform
@@ -650,91 +749,17 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F7FA'
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center'
-  },
-  content: {
-    flex: 1,
-    padding: 16,
-    justifyContent: 'center'
-  },
-  card: {
-    padding: 16,
-    elevation: 4,
-    borderRadius: 12,
-    backgroundColor: 'white'
-  },
-  iconContainer: {
-    alignItems: 'center',
-    marginBottom: 16
-  },
-  logoImage: {
-    width: 100,
-    height: 80,
-    marginBottom: 8
-  },
-  title: {
-    textAlign: 'center',
-    marginBottom: 8,
-    color: '#2E7D32',
-    fontSize: 24,
-    fontWeight: 'bold'
-  },
-  subtitle: {
-    textAlign: 'center',
-    marginBottom: 32,
-    color: '#666',
-    fontSize: 16
-  },
-  input: {
-    marginBottom: 8
-  },
-  button: {
-    marginTop: 24,
-    marginBottom: 16
-  },
-  buttonContent: {
-    paddingVertical: 8
-  },
-  linkButton: {
-    marginTop: 8
-  },
-  footer: {
-    alignItems: 'center',
-    marginTop: 32,
-    paddingTop: 16
-  },
-  footerText: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8
-  },
-  securityIcons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  iconButton: {
-    margin: 0,
-    marginHorizontal: 4
-  }
-});
 ```
 ### 5. Register Screen (`src/screens/auth/RegisterScreen.tsx`)
 
 ```typescript
 import React, { useState } from 'react';
-import { View, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform, Image } from 'react-native';
-import { TextInput, Button, Card, Title, Text, HelperText, RadioButton } from 'react-native-paper';
+import { View, ScrollView, KeyboardAvoidingView, Platform, Image, Alert } from 'react-native';
+import { TextInput, Button, Card, Title, Text, HelperText, RadioButton, IconButton } from 'react-native-paper';
 import { useForm, Controller } from 'react-hook-form';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTheme } from '../../contexts/ThemeContext';
+import { useStyles } from '../../hooks/useStyles';
 import authService, { RegisterData } from '../../services/authService';
 
 interface RegisterScreenProps {
@@ -746,6 +771,99 @@ export default function RegisterScreen({ navigation }: RegisterScreenProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const { toggleTheme, isDark } = useTheme();
+  
+  const styles = useStyles((theme) => ({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      paddingVertical: theme.spacing.lg,
+    },
+    content: {
+      flex: 1,
+      padding: theme.spacing.md,
+      justifyContent: 'center',
+    },
+    card: {
+      padding: theme.spacing.md,
+      ...theme.shadows.medium,
+      borderRadius: theme.borderRadius.md,
+      backgroundColor: theme.colors.surface,
+    },
+    iconContainer: {
+      alignItems: 'center',
+      marginBottom: theme.spacing.md,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    logoContainer: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    themeToggle: {
+      margin: 0,
+    },
+    logoImage: {
+      width: 80,
+      height: 60,
+      marginBottom: theme.spacing.xs,
+    },
+    title: {
+      textAlign: 'center',
+      marginBottom: theme.spacing.xs,
+      color: theme.colors.primary,
+      fontSize: theme.typography.sizes.xl,
+      fontWeight: theme.typography.weights.bold,
+      fontFamily: theme.typography.fontFamily,
+    },
+    subtitle: {
+      textAlign: 'center',
+      marginBottom: theme.spacing.xxl,
+      color: theme.colors.textSecondary,
+      fontSize: theme.typography.sizes.md,
+      fontFamily: theme.typography.fontFamily,
+    },
+    input: {
+      marginBottom: theme.spacing.xs,
+      backgroundColor: theme.colors.surface,
+    },
+    sectionTitle: {
+      fontSize: theme.typography.sizes.md,
+      fontWeight: theme.typography.weights.semibold,
+      marginTop: theme.spacing.md,
+      marginBottom: theme.spacing.sm,
+      color: theme.colors.text,
+      fontFamily: theme.typography.fontFamily,
+    },
+    radioGroup: {
+      marginBottom: theme.spacing.md,
+    },
+    radioItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: theme.spacing.xs,
+    },
+    radioLabel: {
+      marginLeft: theme.spacing.xs,
+      fontSize: theme.typography.sizes.md,
+      color: theme.colors.text,
+      fontFamily: theme.typography.fontFamily,
+    },
+    button: {
+      marginTop: theme.spacing.lg,
+      marginBottom: theme.spacing.md,
+      borderRadius: theme.borderRadius.sm,
+    },
+    buttonContent: {
+      paddingVertical: theme.spacing.xs,
+    },
+    linkButton: {
+      marginTop: theme.spacing.xs,
+    },
+  }));
   
   const { control, handleSubmit, formState: { errors }, watch } = useForm<RegisterData>({
     defaultValues: {
@@ -777,7 +895,6 @@ export default function RegisterScreen({ navigation }: RegisterScreenProps) {
         [{ 
           text: 'OK', 
           onPress: () => {
-            // Navigation will be handled automatically by the auth state change
             console.log('Registration completed, navigation will update automatically');
           }
         }]
@@ -804,18 +921,26 @@ export default function RegisterScreen({ navigation }: RegisterScreenProps) {
         <View style={styles.content}>
           <Card style={styles.card}>
             <Card.Content>
-              {/* App Logo - Local WebP Image */}
               <View style={styles.iconContainer}>
-                {!imageError ? (
-                  <Image 
-                    source={require('../../../assets/images/icon.webp')} 
-                    style={styles.logoImage}
-                    resizeMode="contain"
-                    onError={() => setImageError(true)}
-                  />
-                ) : (
-                  <MaterialCommunityIcons name="hospital-box" size={60} color="#2E7D32" />
-                )}
+                <View style={styles.logoContainer}>
+                  {!imageError ? (
+                    <Image 
+                      source={require('../../../assets/images/icon.webp')} 
+                      style={styles.logoImage}
+                      resizeMode="contain"
+                      onError={() => setImageError(true)}
+                    />
+                  ) : (
+                    <MaterialCommunityIcons name="hospital-box" size={60} color={isDark ? '#4de352' : '#10d915'} />
+                  )}
+                </View>
+                <IconButton
+                  icon={isDark ? 'weather-sunny' : 'weather-night'}
+                  iconColor={isDark ? '#FFA726' : '#2196F3'}
+                  size={24}
+                  onPress={toggleTheme}
+                  style={styles.themeToggle}
+                />
               </View>
               
               <Title style={styles.title}>Create Account</Title>
@@ -905,7 +1030,12 @@ export default function RegisterScreen({ navigation }: RegisterScreenProps) {
                     <RadioButton.Group onValueChange={onChange} value={value}>
                       <View style={styles.radioItem}>
                         <RadioButton value="healthcare" />
-                        <MaterialCommunityIcons name="hospital-building" size={20} color="#666" style={{ marginLeft: 8 }} />
+                        <MaterialCommunityIcons 
+                          name="hospital-building" 
+                          size={20} 
+                          color={isDark ? '#FFF' : '#666'} 
+                          style={{ marginLeft: 8 }} 
+                        />
                         <Text style={styles.radioLabel}>Healthcare Provider</Text>
                       </View>
                     </RadioButton.Group>
@@ -1014,82 +1144,6 @@ export default function RegisterScreen({ navigation }: RegisterScreenProps) {
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F7FA'
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingVertical: 20
-  },
-  content: {
-    flex: 1,
-    padding: 16,
-    justifyContent: 'center'
-  },
-  card: {
-    padding: 16,
-    elevation: 4,
-    borderRadius: 12,
-    backgroundColor: 'white'
-  },
-  iconContainer: {
-    alignItems: 'center',
-    marginBottom: 16
-  },
-  logoImage: {
-    width: 80,
-    height: 60,
-    marginBottom: 8
-  },
-  title: {
-    textAlign: 'center',
-    marginBottom: 8,
-    color: '#2E7D32',
-    fontSize: 24,
-    fontWeight: 'bold'
-  },
-  subtitle: {
-    textAlign: 'center',
-    marginBottom: 32,
-    color: '#666',
-    fontSize: 16
-  },
-  input: {
-    marginBottom: 8
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginTop: 16,
-    marginBottom: 12,
-    color: '#333'
-  },
-  radioGroup: {
-    marginBottom: 16
-  },
-  radioItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8
-  },
-  radioLabel: {
-    marginLeft: 8,
-    fontSize: 16
-  },
-  button: {
-    marginTop: 24,
-    marginBottom: 16
-  },
-  buttonContent: {
-    paddingVertical: 8
-  },
-  linkButton: {
-    marginTop: 8
-  }
-});
 ```
 
 ### 6. Navigation Setup (`src/navigation/AppNavigator.tsx`)
@@ -1251,9 +1305,11 @@ const styles = StyleSheet.create({
 
 ```typescript
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, ScrollView, StyleSheet, RefreshControl, Alert } from 'react-native';
-import { Card, Title, Paragraph, Button, Text, ActivityIndicator } from 'react-native-paper';
+import { View, ScrollView, RefreshControl, Alert } from 'react-native';
+import { Card, Title, Paragraph, Button, Text, ActivityIndicator, IconButton } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTheme } from '../../contexts/ThemeContext';
+import { useStyles } from '../../hooks/useStyles';
 import healthcareService from '../../services/healthcareService';
 import authService from '../../services/authService';
 
@@ -1271,6 +1327,139 @@ export default function DashboardScreen({ navigation }: any) {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const { toggleTheme, isDark } = useTheme();
+
+  const styles = useStyles((theme) => ({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+      padding: theme.spacing.md,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: theme.colors.background,
+    },
+    loadingText: {
+      marginTop: theme.spacing.md,
+      fontSize: theme.typography.sizes.md,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+    },
+    welcomeCard: {
+      marginBottom: theme.spacing.lg,
+      ...theme.shadows.medium,
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.md,
+    },
+    welcomeHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: theme.spacing.sm,
+    },
+    welcomeTitle: {
+      fontSize: theme.typography.sizes.xl,
+      fontWeight: theme.typography.weights.bold,
+      color: theme.colors.primary,
+      marginBottom: 4,
+      fontFamily: theme.typography.fontFamily,
+      flex: 1,
+    },
+    themeToggle: {
+      margin: 0,
+    },
+    welcomeSubtitle: {
+      fontSize: theme.typography.sizes.md,
+      color: theme.colors.textSecondary,
+      marginBottom: theme.spacing.xs,
+      fontFamily: theme.typography.fontFamily,
+    },
+    welcomeDate: {
+      fontSize: theme.typography.sizes.sm,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+    },
+    sectionTitle: {
+      fontSize: theme.typography.sizes.lg,
+      fontWeight: theme.typography.weights.semibold,
+      marginBottom: theme.spacing.md,
+      marginTop: theme.spacing.xs,
+      color: theme.colors.text,
+      fontFamily: theme.typography.fontFamily,
+    },
+    statsGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'space-between',
+      marginBottom: theme.spacing.lg,
+    },
+    statCard: {
+      width: '48%',
+      marginBottom: theme.spacing.sm,
+      ...theme.shadows.medium,
+      borderLeftWidth: 4,
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.md,
+    },
+    statContent: {
+      paddingVertical: theme.spacing.sm,
+    },
+    statHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: theme.spacing.xs,
+    },
+    statValue: {
+      fontSize: theme.typography.sizes.xl,
+      fontWeight: theme.typography.weights.bold,
+      fontFamily: theme.typography.fontFamily,
+    },
+    statTitle: {
+      fontSize: theme.typography.sizes.xs,
+      color: theme.colors.textSecondary,
+      textAlign: 'center',
+      fontFamily: theme.typography.fontFamily,
+    },
+    actionsGrid: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: theme.spacing.lg,
+    },
+    actionCard: {
+      width: '48%',
+      ...theme.shadows.medium,
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.md,
+    },
+    actionContent: {
+      alignItems: 'center',
+      paddingVertical: theme.spacing.lg,
+    },
+    actionButton: {
+      marginTop: theme.spacing.sm,
+      width: '100%',
+    },
+    activityCard: {
+      ...theme.shadows.medium,
+      marginBottom: theme.spacing.lg,
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.md,
+    },
+    activityItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: theme.spacing.xs,
+    },
+    activityText: {
+      marginLeft: theme.spacing.sm,
+      fontSize: theme.typography.sizes.sm,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+    },
+  }));
 
   useEffect(() => {
     loadDashboardData();
@@ -1353,15 +1542,28 @@ export default function DashboardScreen({ navigation }: any) {
     <ScrollView 
       style={styles.container}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        <RefreshControl 
+          refreshing={refreshing} 
+          onRefresh={onRefresh}
+          colors={[isDark ? '#4de352' : '#10d915']}
+          progressBackgroundColor={isDark ? '#1e1e1e' : '#ffffff'}
+        />
       }
     >
-      {/* Welcome Header */}
       <Card style={styles.welcomeCard}>
         <Card.Content>
-          <Title style={styles.welcomeTitle}>
-            Welcome, {currentUser?.name || 'User'}!
-          </Title>
+          <View style={styles.welcomeHeader}>
+            <Title style={styles.welcomeTitle}>
+              Welcome, {currentUser?.name || 'User'}!
+            </Title>
+            <IconButton
+              icon={isDark ? 'weather-sunny' : 'weather-night'}
+              iconColor={isDark ? '#FFA726' : '#2196F3'}
+              size={24}
+              onPress={toggleTheme}
+              style={styles.themeToggle}
+            />
+          </View>
           <Paragraph style={styles.welcomeSubtitle}>
             {getUserTypeDisplay(currentUser?.user_type)} Dashboard
           </Paragraph>
@@ -1376,7 +1578,6 @@ export default function DashboardScreen({ navigation }: any) {
         </Card.Content>
       </Card>
 
-      {/* Quick Stats */}
       <Text style={styles.sectionTitle}>Overview</Text>
       
       <View style={styles.statsGrid}>
@@ -1427,13 +1628,12 @@ export default function DashboardScreen({ navigation }: any) {
         )}
       </View>
 
-      {/* Quick Actions */}
       <Text style={styles.sectionTitle}>Quick Actions</Text>
       
       <View style={styles.actionsGrid}>
         <Card style={styles.actionCard}>
           <Card.Content style={styles.actionContent}>
-            <MaterialCommunityIcons name="calendar-plus" size={32} color="#2E7D32" />
+            <MaterialCommunityIcons name="calendar-plus" size={32} color={isDark ? '#4de352' : '#2E7D32'} />
             <Button
               mode="outlined"
               onPress={() => navigation.navigate('Appointments')}
@@ -1446,7 +1646,7 @@ export default function DashboardScreen({ navigation }: any) {
 
         <Card style={styles.actionCard}>
           <Card.Content style={styles.actionContent}>
-            <MaterialCommunityIcons name="account-cog" size={32} color="#2E7D32" />
+            <MaterialCommunityIcons name="account-cog" size={32} color={isDark ? '#4de352' : '#2E7D32'} />
             <Button
               mode="outlined"
               onPress={() => navigation.navigate('Profile')}
@@ -1458,7 +1658,6 @@ export default function DashboardScreen({ navigation }: any) {
         </Card>
       </View>
 
-      {/* Recent Activity */}
       <Text style={styles.sectionTitle}>Recent Activity</Text>
       
       <Card style={styles.activityCard}>
@@ -1476,121 +1675,17 @@ export default function DashboardScreen({ navigation }: any) {
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F7FA',
-    padding: 16
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5F7FA'
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666'
-  },
-  welcomeCard: {
-    marginBottom: 20,
-    elevation: 2
-  },
-  welcomeTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2E7D32',
-    marginBottom: 4
-  },
-  welcomeSubtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 8
-  },
-  welcomeDate: {
-    fontSize: 14,
-    color: '#999'
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    marginTop: 8,
-    color: '#333'
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 24
-  },
-  statCard: {
-    width: '48%',
-    marginBottom: 12,
-    elevation: 2,
-    borderLeftWidth: 4
-  },
-  statContent: {
-    paddingVertical: 12
-  },
-  statHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold'
-  },
-  statTitle: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center'
-  },
-  actionsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 24
-  },
-  actionCard: {
-    width: '48%',
-    elevation: 2
-  },
-  actionContent: {
-    alignItems: 'center',
-    paddingVertical: 20
-  },
-  actionButton: {
-    marginTop: 12,
-    width: '100%'
-  },
-  activityCard: {
-    elevation: 2,
-    marginBottom: 20
-  },
-  activityItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8
-  },
-  activityText: {
-    marginLeft: 12,
-    fontSize: 14,
-    color: '#666'
-  }
-});
 ```
 
 ### 8. Appointments Screen (`src/screens/appointments/AppointmentsScreen.tsx`)
 
 ```typescript
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, ScrollView, StyleSheet, RefreshControl, Alert } from 'react-native';
+import { View, ScrollView, RefreshControl, Alert } from 'react-native';
 import { Card, Title, Text, Chip, Button, ActivityIndicator } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTheme } from '../../contexts/ThemeContext';
+import { useStyles } from '../../hooks/useStyles';
 import healthcareService from '../../services/healthcareService';
 
 interface Appointment {
@@ -1608,6 +1703,128 @@ export default function AppointmentsScreen() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const styles = useStyles((theme) => ({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+      padding: theme.spacing.md,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: theme.colors.background,
+    },
+    loadingText: {
+      marginTop: theme.spacing.md,
+      fontSize: theme.typography.sizes.md,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+    },
+    title: {
+      textAlign: 'center',
+      marginBottom: theme.spacing.lg,
+      color: theme.colors.primary,
+      fontSize: theme.typography.sizes.xl,
+      fontFamily: theme.typography.fontFamily,
+    },
+    emptyCard: {
+      ...theme.shadows.medium,
+      marginTop: 50,
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.md,
+    },
+    emptyContent: {
+      alignItems: 'center',
+      paddingVertical: 40,
+    },
+    emptyText: {
+      fontSize: theme.typography.sizes.lg,
+      color: theme.colors.textSecondary,
+      marginVertical: theme.spacing.lg,
+      fontFamily: theme.typography.fontFamily,
+    },
+    retryButton: {
+      marginTop: theme.spacing.sm,
+    },
+    appointmentCard: {
+      marginBottom: theme.spacing.md,
+      ...theme.shadows.medium,
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.md,
+    },
+    appointmentHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: theme.spacing.md,
+    },
+    appointmentInfo: {
+      flex: 1,
+    },
+    patientName: {
+      fontSize: theme.typography.sizes.lg,
+      fontWeight: theme.typography.weights.bold,
+      color: theme.colors.text,
+      marginBottom: 4,
+      fontFamily: theme.typography.fontFamily,
+    },
+    doctorName: {
+      fontSize: theme.typography.sizes.sm,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+    },
+    statusChip: {
+      marginLeft: theme.spacing.xs,
+    },
+    chipText: {
+      color: 'white',
+      fontSize: theme.typography.sizes.xs,
+      fontWeight: theme.typography.weights.bold,
+      fontFamily: theme.typography.fontFamily,
+    },
+    appointmentDetails: {
+      marginBottom: theme.spacing.md,
+    },
+    detailItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: theme.spacing.xs,
+    },
+    detailText: {
+      marginLeft: theme.spacing.xs,
+      fontSize: theme.typography.sizes.sm,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+    },
+    notesSection: {
+      backgroundColor: theme.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#F0F0F0',
+      padding: theme.spacing.sm,
+      borderRadius: theme.borderRadius.sm,
+      marginBottom: theme.spacing.md,
+    },
+    notesLabel: {
+      fontSize: theme.typography.sizes.xs,
+      fontWeight: theme.typography.weights.bold,
+      color: theme.colors.text,
+      marginBottom: 4,
+      fontFamily: theme.typography.fontFamily,
+    },
+    notesText: {
+      fontSize: theme.typography.sizes.sm,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+    },
+    actionButtons: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    actionButton: {
+      flex: 1,
+      marginHorizontal: 4,
+    },
+  }));
 
   useEffect(() => {
     fetchAppointments();
@@ -1775,130 +1992,192 @@ export default function AppointmentsScreen() {
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F7FA',
-    padding: 16
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5F7FA'
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666'
-  },
-  title: {
-    textAlign: 'center',
-    marginBottom: 20,
-    color: '#2E7D32',
-    fontSize: 24
-  },
-  emptyCard: {
-    elevation: 2,
-    marginTop: 50
-  },
-  emptyContent: {
-    alignItems: 'center',
-    paddingVertical: 40
-  },
-  emptyText: {
-    fontSize: 18,
-    color: '#666',
-    marginVertical: 20
-  },
-  retryButton: {
-    marginTop: 10
-  },
-  appointmentCard: {
-    marginBottom: 16,
-    elevation: 2
-  },
-  appointmentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16
-  },
-  appointmentInfo: {
-    flex: 1
-  },
-  patientName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4
-  },
-  doctorName: {
-    fontSize: 14,
-    color: '#666'
-  },
-  statusChip: {
-    marginLeft: 8
-  },
-  chipText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold'
-  },
-  appointmentDetails: {
-    marginBottom: 16
-  },
-  detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8
-  },
-  detailText: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: '#666'
-  },
-  notesSection: {
-    backgroundColor: '#F0F0F0',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16
-  },
-  notesLabel: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4
-  },
-  notesText: {
-    fontSize: 14,
-    color: '#666'
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between'
-  },
-  actionButton: {
-    flex: 1,
-    marginHorizontal: 4
-  }
-});
 ```
 
 ### 9. Profile Screen (`src/screens/profile/ProfileScreen.tsx`)
 
 ```typescript
 import React, { useEffect, useState } from 'react';
-import { View, ScrollView, StyleSheet, Alert } from 'react-native';
-import { Card, Title, Text, Button, Avatar, Divider } from 'react-native-paper';
+import { View, ScrollView, Alert } from 'react-native';
+import { Card, Title, Text, Button, Avatar, Divider, List, IconButton, Menu, Switch } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTheme } from '../../contexts/ThemeContext';
+import { useStyles } from '../../hooks/useStyles';
 import authService from '../../services/authService';
 import healthcareService from '../../services/healthcareService';
 
 export default function ProfileScreen({ navigation }: any) {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const { toggleTheme, isDark, setTheme, themeMode } = useTheme();
+
+  const styles = useStyles((theme) => ({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+      padding: theme.spacing.md,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: theme.colors.background,
+    },
+    profileCard: {
+      marginBottom: theme.spacing.md,
+      ...theme.shadows.medium,
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.md,
+    },
+    profileContent: {
+      alignItems: 'center',
+      paddingVertical: theme.spacing.lg,
+    },
+    profileHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      width: '100%',
+      marginBottom: theme.spacing.md,
+    },
+    avatarSection: {
+      alignItems: 'center',
+      flex: 1,
+    },
+    themeToggle: {
+      margin: 0,
+    },
+    avatar: {
+      backgroundColor: theme.colors.primary,
+      marginBottom: theme.spacing.md,
+    },
+    userName: {
+      fontSize: theme.typography.sizes.xl,
+      fontWeight: theme.typography.weights.bold,
+      color: theme.colors.text,
+      marginBottom: 4,
+      fontFamily: theme.typography.fontFamily,
+    },
+    userType: {
+      fontSize: theme.typography.sizes.md,
+      color: theme.colors.primary,
+      marginBottom: 4,
+      fontWeight: theme.typography.weights.medium,
+      fontFamily: theme.typography.fontFamily,
+    },
+    userEmail: {
+      fontSize: theme.typography.sizes.sm,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+    },
+    detailsCard: {
+      marginBottom: theme.spacing.md,
+      ...theme.shadows.medium,
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.md,
+    },
+    sectionTitle: {
+      fontSize: theme.typography.sizes.lg,
+      marginBottom: theme.spacing.md,
+      color: theme.colors.text,
+      fontFamily: theme.typography.fontFamily,
+      fontWeight: theme.typography.weights.semibold,
+    },
+    detailRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: theme.spacing.sm,
+    },
+    detailContent: {
+      marginLeft: theme.spacing.md,
+      flex: 1,
+    },
+    detailLabel: {
+      fontSize: theme.typography.sizes.xs,
+      color: theme.colors.textSecondary,
+      marginBottom: 2,
+      textTransform: 'uppercase',
+      fontFamily: theme.typography.fontFamily,
+      fontWeight: theme.typography.weights.medium,
+    },
+    detailValue: {
+      fontSize: theme.typography.sizes.md,
+      color: theme.colors.text,
+      fontFamily: theme.typography.fontFamily,
+    },
+    divider: {
+      marginVertical: 4,
+      backgroundColor: theme.colors.divider,
+    },
+    themeCard: {
+      marginBottom: theme.spacing.md,
+      ...theme.shadows.medium,
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.md,
+    },
+    themeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: theme.spacing.sm,
+    },
+    themeLabel: {
+      fontSize: theme.typography.sizes.md,
+      color: theme.colors.text,
+      fontFamily: theme.typography.fontFamily,
+      flex: 1,
+    },
+    themeDescription: {
+      fontSize: theme.typography.sizes.sm,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      marginTop: 2,
+    },
+    themeOptions: {
+      marginTop: theme.spacing.sm,
+    },
+    themeOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: theme.spacing.xs,
+    },
+    themeOptionText: {
+      fontSize: theme.typography.sizes.sm,
+      color: theme.colors.text,
+      fontFamily: theme.typography.fontFamily,
+      marginLeft: theme.spacing.sm,
+    },
+    actionsCard: {
+      marginBottom: theme.spacing.md,
+      ...theme.shadows.medium,
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.md,
+    },
+    actionButton: {
+      marginBottom: theme.spacing.sm,
+    },
+    logoutButton: {
+      marginTop: theme.spacing.xs,
+    },
+    infoCard: {
+      ...theme.shadows.small,
+      marginBottom: theme.spacing.lg,
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.md,
+    },
+    appInfo: {
+      textAlign: 'center',
+      fontSize: theme.typography.sizes.xs,
+      color: theme.colors.textSecondary,
+      marginBottom: 4,
+      fontFamily: theme.typography.fontFamily,
+    },
+    menuAnchor: {
+      position: 'relative',
+    },
+  }));
 
   useEffect(() => {
     loadUserProfile();
@@ -1910,9 +2189,13 @@ export default function ProfileScreen({ navigation }: any) {
       setUser(currentUser);
       
       // Try to get more detailed profile from API
-      const profileData = await healthcareService.getProfile();
-      if (profileData?.user) {
-        setUser(profileData.user);
+      try {
+        const profileData = await healthcareService.getProfile();
+        if (profileData?.user) {
+          setUser(profileData.user);
+        }
+      } catch (profileError) {
+        console.log('Could not fetch extended profile data:', profileError);
       }
     } catch (error) {
       console.error('Failed to load profile:', error);
@@ -1959,27 +2242,136 @@ export default function ProfileScreen({ navigation }: any) {
     }
   };
 
+  const getThemeModeDisplay = (mode: string) => {
+    switch (mode) {
+      case 'light':
+        return 'Light Mode';
+      case 'dark':
+        return 'Dark Mode';
+      case 'system':
+        return 'System Default';
+      default:
+        return 'System Default';
+    }
+  };
+
   if (!user) {
     return (
       <View style={styles.loadingContainer}>
-        <Text>Loading profile...</Text>
+        <Text style={styles.userName}>Loading profile...</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Profile Header */}
       <Card style={styles.profileCard}>
         <Card.Content style={styles.profileContent}>
-          <Avatar.Text 
-            size={80} 
-            label={user.name?.charAt(0)?.toUpperCase() || 'U'} 
-            style={styles.avatar}
-          />
-          <Title style={styles.userName}>{user.name || 'User'}</Title>
-          <Text style={styles.userType}>{getUserTypeDisplay(user.user_type)}</Text>
-          <Text style={styles.userEmail}>{user.email}</Text>
+          <View style={styles.profileHeader}>
+            <View style={styles.avatarSection}>
+              <Avatar.Text 
+                size={80} 
+                label={user.name?.charAt(0)?.toUpperCase() || 'U'} 
+                style={styles.avatar}
+              />
+              <Title style={styles.userName}>{user.name || 'User'}</Title>
+              <Text style={styles.userType}>{getUserTypeDisplay(user.user_type)}</Text>
+              <Text style={styles.userEmail}>{user.email}</Text>
+            </View>
+            <IconButton
+              icon={isDark ? 'weather-sunny' : 'weather-night'}
+              iconColor={isDark ? '#FFA726' : '#2196F3'}
+              size={24}
+              onPress={toggleTheme}
+              style={styles.themeToggle}
+            />
+          </View>
+        </Card.Content>
+      </Card>
+
+      {/* Theme Settings */}
+      <Card style={styles.themeCard}>
+        <Card.Content>
+          <Title style={styles.sectionTitle}>Theme Settings</Title>
+          
+          <View style={styles.themeRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.themeLabel}>Dark Mode</Text>
+              <Text style={styles.themeDescription}>
+                Toggle between light and dark themes
+              </Text>
+            </View>
+            <Switch
+              value={isDark}
+              onValueChange={toggleTheme}
+              trackColor={{ 
+                false: isDark ? '#767577' : '#767577', 
+                true: isDark ? '#4de352' : '#10d915' 
+              }}
+              thumbColor={isDark ? '#f4f3f4' : '#f4f3f4'}
+            />
+          </View>
+
+          <Divider style={styles.divider} />
+
+          <View style={styles.themeOptions}>
+            <Text style={styles.themeLabel}>Theme Mode</Text>
+            
+            <View style={styles.themeOption}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <MaterialCommunityIcons 
+                  name="weather-sunny" 
+                  size={20} 
+                  color={themeMode === 'light' ? '#FFA726' : (isDark ? '#FFF' : '#666')} 
+                />
+                <Text style={styles.themeOptionText}>Light</Text>
+              </View>
+              <Button
+                mode={themeMode === 'light' ? 'contained' : 'outlined'}
+                onPress={() => setTheme('light')}
+                compact
+              >
+                {themeMode === 'light' ? 'Active' : 'Select'}
+              </Button>
+            </View>
+
+            <View style={styles.themeOption}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <MaterialCommunityIcons 
+                  name="weather-night" 
+                  size={20} 
+                  color={themeMode === 'dark' ? '#2196F3' : (isDark ? '#FFF' : '#666')} 
+                />
+                <Text style={styles.themeOptionText}>Dark</Text>
+              </View>
+              <Button
+                mode={themeMode === 'dark' ? 'contained' : 'outlined'}
+                onPress={() => setTheme('dark')}
+                compact
+              >
+                {themeMode === 'dark' ? 'Active' : 'Select'}
+              </Button>
+            </View>
+
+            <View style={styles.themeOption}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <MaterialCommunityIcons 
+                  name="theme-light-dark" 
+                  size={20} 
+                  color={themeMode === 'system' ? '#9C27B0' : (isDark ? '#FFF' : '#666')} 
+                />
+                <Text style={styles.themeOptionText}>System</Text>
+              </View>
+              <Button
+                mode={themeMode === 'system' ? 'contained' : 'outlined'}
+                onPress={() => setTheme('system')}
+                compact
+              >
+                {themeMode === 'system' ? 'Active' : 'Select'}
+              </Button>
+            </View>
+          </View>
         </Card.Content>
       </Card>
 
@@ -1989,7 +2381,7 @@ export default function ProfileScreen({ navigation }: any) {
           <Title style={styles.sectionTitle}>Account Information</Title>
           
           <View style={styles.detailRow}>
-            <MaterialCommunityIcons name="account" size={20} color="#666" />
+            <MaterialCommunityIcons name="account" size={20} color={isDark ? '#FFF' : '#666'} />
             <View style={styles.detailContent}>
               <Text style={styles.detailLabel}>Full Name</Text>
               <Text style={styles.detailValue}>{user.name || 'Not provided'}</Text>
@@ -1999,7 +2391,7 @@ export default function ProfileScreen({ navigation }: any) {
           <Divider style={styles.divider} />
 
           <View style={styles.detailRow}>
-            <MaterialCommunityIcons name="email" size={20} color="#666" />
+            <MaterialCommunityIcons name="email" size={20} color={isDark ? '#FFF' : '#666'} />
             <View style={styles.detailContent}>
               <Text style={styles.detailLabel}>Email Address</Text>
               <Text style={styles.detailValue}>{user.email}</Text>
@@ -2009,7 +2401,7 @@ export default function ProfileScreen({ navigation }: any) {
           <Divider style={styles.divider} />
 
           <View style={styles.detailRow}>
-            <MaterialCommunityIcons name="phone" size={20} color="#666" />
+            <MaterialCommunityIcons name="phone" size={20} color={isDark ? '#FFF' : '#666'} />
             <View style={styles.detailContent}>
               <Text style={styles.detailLabel}>Phone Number</Text>
               <Text style={styles.detailValue}>{user.phone || 'Not provided'}</Text>
@@ -2019,7 +2411,7 @@ export default function ProfileScreen({ navigation }: any) {
           <Divider style={styles.divider} />
 
           <View style={styles.detailRow}>
-            <MaterialCommunityIcons name="badge-account" size={20} color="#666" />
+            <MaterialCommunityIcons name="badge-account" size={20} color={isDark ? '#FFF' : '#666'} />
             <View style={styles.detailContent}>
               <Text style={styles.detailLabel}>User Type</Text>
               <Text style={styles.detailValue}>{getUserTypeDisplay(user.user_type)}</Text>
@@ -2030,7 +2422,7 @@ export default function ProfileScreen({ navigation }: any) {
             <>
               <Divider style={styles.divider} />
               <View style={styles.detailRow}>
-                <MaterialCommunityIcons name="map-marker" size={20} color="#666" />
+                <MaterialCommunityIcons name="map-marker" size={20} color={isDark ? '#FFF' : '#666'} />
                 <View style={styles.detailContent}>
                   <Text style={styles.detailLabel}>Address</Text>
                   <Text style={styles.detailValue}>{user.address}</Text>
@@ -2038,6 +2430,16 @@ export default function ProfileScreen({ navigation }: any) {
               </View>
             </>
           )}
+
+          <Divider style={styles.divider} />
+
+          <View style={styles.detailRow}>
+            <MaterialCommunityIcons name="palette" size={20} color={isDark ? '#FFF' : '#666'} />
+            <View style={styles.detailContent}>
+              <Text style={styles.detailLabel}>Current Theme</Text>
+              <Text style={styles.detailValue}>{getThemeModeDisplay(themeMode)} ({isDark ? 'Dark' : 'Light'})</Text>
+            </View>
+          </View>
         </Card.Content>
       </Card>
 
@@ -2049,7 +2451,7 @@ export default function ProfileScreen({ navigation }: any) {
           <Button
             mode="outlined"
             icon="account-edit"
-            onPress={() => Alert.alert('Info', 'Edit profile functionality')}
+            onPress={() => Alert.alert('Info', 'Edit profile functionality will be implemented')}
             style={styles.actionButton}
           >
             Edit Profile
@@ -2058,7 +2460,7 @@ export default function ProfileScreen({ navigation }: any) {
           <Button
             mode="outlined"
             icon="lock-reset"
-            onPress={() => Alert.alert('Info', 'Change password functionality')}
+            onPress={() => Alert.alert('Info', 'Change password functionality will be implemented')}
             style={styles.actionButton}
           >
             Change Password
@@ -2067,10 +2469,22 @@ export default function ProfileScreen({ navigation }: any) {
           <Button
             mode="outlined"
             icon="bell-cog"
-            onPress={() => Alert.alert('Info', 'Notification settings functionality')}
+            onPress={() => Alert.alert('Info', 'Notification settings functionality will be implemented')}
             style={styles.actionButton}
           >
             Notification Settings
+          </Button>
+
+          <Button
+            mode="outlined"
+            icon="palette"
+            onPress={() => Alert.alert(
+              'Theme Info', 
+              `Current theme: ${getThemeModeDisplay(themeMode)}\nActive mode: ${isDark ? 'Dark' : 'Light'}\n\nUse the theme controls above to customize your experience.`
+            )}
+            style={styles.actionButton}
+          >
+            Theme Information
           </Button>
 
           <Button
@@ -2079,7 +2493,7 @@ export default function ProfileScreen({ navigation }: any) {
             onPress={handleLogout}
             loading={loading}
             style={[styles.actionButton, styles.logoutButton]}
-            buttonColor="#F44336"
+            buttonColor={isDark ? '#cf6679' : '#F44336'}
           >
             Logout
           </Button>
@@ -2091,128 +2505,391 @@ export default function ProfileScreen({ navigation }: any) {
         <Card.Content>
           <Text style={styles.appInfo}>Visit Care Healthcare v1.0.0</Text>
           <Text style={styles.appInfo}>© 2024 Visit Care. All rights reserved.</Text>
+          <Text style={styles.appInfo}>
+            Theme: {getThemeModeDisplay(themeMode)} • {isDark ? 'Dark Mode' : 'Light Mode'}
+          </Text>
         </Card.Content>
       </Card>
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F7FA',
-    padding: 16
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  profileCard: {
-    marginBottom: 16,
-    elevation: 2
-  },
-  profileContent: {
-    alignItems: 'center',
-    paddingVertical: 20
-  },
-  avatar: {
-    backgroundColor: '#2E7D32',
-    marginBottom: 16
-  },
-  userName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4
-  },
-  userType: {
-    fontSize: 16,
-    color: '#2E7D32',
-    marginBottom: 4,
-    fontWeight: '500'
-  },
-  userEmail: {
-    fontSize: 14,
-    color: '#666'
-  },
-  detailsCard: {
-    marginBottom: 16,
-    elevation: 2
-  },
-  sectionTitle: {
-    fontSize: 18,
-    marginBottom: 16,
-    color: '#333'
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12
-  },
-  detailContent: {
-    marginLeft: 16,
-    flex: 1
-  },
-  detailLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 2,
-    textTransform: 'uppercase'
-  },
-  detailValue: {
-    fontSize: 16,
-    color: '#333'
-  },
-  divider: {
-    marginVertical: 4
-  },
-  actionsCard: {
-    marginBottom: 16,
-    elevation: 2
-  },
-  actionButton: {
-    marginBottom: 12
-  },
-  logoutButton: {
-    marginTop: 8
-  },
-  infoCard: {
-    elevation: 1,
-    marginBottom: 20
-  },
-  appInfo: {
-    textAlign: 'center',
-    fontSize: 12,
-    color: '#999',
-    marginBottom: 4
-  }
-});
 ```
 
 ### 10. App.tsx 
 
 ```typescript
-iimport React from 'react';
-import { PaperProvider, DefaultTheme } from 'react-native-paper';
+import React from 'react';
+import { PaperProvider } from 'react-native-paper';
 import { StatusBar } from 'expo-status-bar';
+import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import AppNavigator from './src/navigation/AppNavigator';
 
-const theme = {
-  ...DefaultTheme,
-  colors: {
-    ...DefaultTheme.colors,
-    primary: '#2E7D32',
-    accent: '#4CAF50',
-  },
+const AppContent = () => {
+  const { theme, isDark } = useTheme();
+  
+  const paperTheme = {
+    colors: {
+      primary: theme.colors.primary,
+      secondary: theme.colors.secondary,
+      surface: theme.colors.surface,
+      background: theme.colors.background,
+      error: theme.colors.error,
+      text: theme.colors.text,
+      onPrimary: theme.colors.onPrimary,
+      onSecondary: theme.colors.onSecondary,
+      onSurface: theme.colors.onSurface,
+      onBackground: theme.colors.onBackground,
+      outline: theme.colors.border,
+    },
+  };
+
+  return (
+    <PaperProvider theme={paperTheme}>
+      <StatusBar style={isDark ? 'light' : 'dark'} backgroundColor={theme.colors.background} />
+      <AppNavigator />
+    </PaperProvider>
+  );
 };
 
 export default function App() {
   return (
-    <PaperProvider theme={theme}>
-      <StatusBar style="auto" />
-      <AppNavigator />
-    </PaperProvider>
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 }
+```
+### 11. Theme (`src/constants/theme.ts`)
+
+```typescript
+export interface ThemeColors {
+  primary: string;
+  primaryLight: string;
+  primaryDark: string;
+  secondary: string;
+  secondaryLight: string;
+  secondaryDark: string;
+  background: string;
+  surface: string;
+  error: string;
+  warning: string;
+  info: string;
+  success: string;
+  onPrimary: string;
+  onSecondary: string;
+  onBackground: string;
+  onSurface: string;
+  onError: string;
+  text: string;
+  textSecondary: string;
+  border: string;
+  divider: string;
+  disabled: string;
+  placeholder: string;
+}
+
+export interface Theme {
+  colors: ThemeColors;
+  mode: 'light' | 'dark';
+  spacing: {
+    xs: number;
+    sm: number;
+    md: number;
+    lg: number;
+    xl: number;
+    xxl: number;
+  };
+  typography: {
+    fontFamily: string;
+    sizes: {
+      xs: number;
+      sm: number;
+      md: number;
+      lg: number;
+      xl: number;
+      xxl: number;
+    };
+    weights: {
+      light: '200';
+      normal: '300';
+      regular: '400';
+      medium: '500';
+      semibold: '600';
+      bold: '700';
+    };
+  };
+  shadows: {
+    small: object;
+    medium: object;
+    large: object;
+  };
+  borderRadius: {
+    xs: number;
+    sm: number;
+    md: number;
+    lg: number;
+    xl: number;
+  };
+}
+
+const baseSpacing = {
+  xs: 4,
+  sm: 8,
+  md: 16,
+  lg: 24,
+  xl: 32,
+  xxl: 48,
+};
+
+const baseTypography = {
+  fontFamily: 'Poppins',
+  sizes: {
+    xs: 12,
+    sm: 14,
+    md: 16,
+    lg: 18,
+    xl: 24,
+    xxl: 32,
+  },
+  weights: {
+    light: '200' as const,
+    normal: '300' as const,
+    regular: '400' as const,
+    medium: '500' as const,
+    semibold: '600' as const,
+    bold: '700' as const,
+  },
+};
+
+const baseShadows = {
+  small: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  medium: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  large: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+};
+
+const baseBorderRadius = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 24,
+};
+
+export const lightTheme: Theme = {
+  colors: {
+    primary: '#10d915',
+    primaryLight: '#4de352',
+    primaryDark: '#0cb010',
+    secondary: '#dc004e',
+    secondaryLight: '#ff5983',
+    secondaryDark: '#9a0036',
+    background: '#f5f5f5',
+    surface: '#ffffff',
+    error: '#f44336',
+    warning: '#ff9800',
+    info: '#2196f3',
+    success: '#4caf50',
+    onPrimary: '#ffffff',
+    onSecondary: '#ffffff',
+    onBackground: '#000000',
+    onSurface: '#000000',
+    onError: '#ffffff',
+    text: 'rgba(0, 0, 0, 0.87)',
+    textSecondary: 'rgba(0, 0, 0, 0.6)',
+    border: 'rgba(0, 0, 0, 0.12)',
+    divider: 'rgba(0, 0, 0, 0.12)',
+    disabled: 'rgba(0, 0, 0, 0.26)',
+    placeholder: 'rgba(0, 0, 0, 0.38)',
+  },
+  mode: 'light',
+  spacing: baseSpacing,
+  typography: baseTypography,
+  shadows: baseShadows,
+  borderRadius: baseBorderRadius,
+};
+
+export const darkTheme: Theme = {
+  colors: {
+    primary: '#10d915',
+    primaryLight: '#4de352',
+    primaryDark: '#0cb010',
+    secondary: '#dc004e',
+    secondaryLight: '#ff5983',
+    secondaryDark: '#9a0036',
+    background: '#121212',
+    surface: '#1e1e1e',
+    error: '#cf6679',
+    warning: '#ffb74d',
+    info: '#81c784',
+    success: '#66bb6a',
+    onPrimary: '#000000',
+    onSecondary: '#000000',
+    onBackground: '#ffffff',
+    onSurface: '#ffffff',
+    onError: '#000000',
+    text: '#ffffff',
+    textSecondary: 'rgba(255, 255, 255, 0.7)',
+    border: 'rgba(255, 255, 255, 0.12)',
+    divider: 'rgba(255, 255, 255, 0.12)',
+    disabled: 'rgba(255, 255, 255, 0.38)',
+    placeholder: 'rgba(255, 255, 255, 0.5)',
+  },
+  mode: 'dark',
+  spacing: baseSpacing,
+  typography: baseTypography,
+  shadows: {
+    small: {
+      ...baseShadows.small,
+      shadowColor: '#000',
+      shadowOpacity: 0.3,
+    },
+    medium: {
+      ...baseShadows.medium,
+      shadowColor: '#000',
+      shadowOpacity: 0.4,
+    },
+    large: {
+      ...baseShadows.large,
+      shadowColor: '#000',
+      shadowOpacity: 0.5,
+    },
+  },
+  borderRadius: baseBorderRadius,
+};
+```
+
+### 12. Theme Context (`src/contexts/ThemeContext.tsx`)
+
+```typescript
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Appearance } from 'react-native';
+import { lightTheme, darkTheme, Theme } from '../constants/theme';
+
+interface ThemeContextType {
+  theme: Theme;
+  isDark: boolean;
+  toggleTheme: () => void;
+  setTheme: (theme: 'light' | 'dark' | 'system') => void;
+  themeMode: 'light' | 'dark' | 'system';
+}
+
+const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+
+export const useTheme = () => {
+  const context = useContext(ThemeContext);
+  if (!context) {
+    throw new Error('useTheme must be used within a ThemeProvider');
+  }
+  return context;
+};
+
+interface ThemeProviderProps {
+  children: ReactNode;
+}
+
+export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
+  const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>('system');
+  const [currentTheme, setCurrentTheme] = useState<Theme>(lightTheme);
+
+  useEffect(() => {
+    loadThemePreference();
+    
+    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+      if (themeMode === 'system') {
+        setCurrentTheme(colorScheme === 'dark' ? darkTheme : lightTheme);
+      }
+    });
+
+    return () => subscription?.remove();
+  }, [themeMode]);
+
+  const loadThemePreference = async () => {
+    try {
+      const savedTheme = await AsyncStorage.getItem('theme_preference');
+      const preference = (savedTheme as 'light' | 'dark' | 'system') || 'system';
+      setThemeMode(preference);
+      
+      if (preference === 'system') {
+        const systemScheme = Appearance.getColorScheme();
+        setCurrentTheme(systemScheme === 'dark' ? darkTheme : lightTheme);
+      } else {
+        setCurrentTheme(preference === 'dark' ? darkTheme : lightTheme);
+      }
+    } catch (error) {
+      console.error('Error loading theme preference:', error);
+    }
+  };
+
+  const toggleTheme = () => {
+    const newMode = currentTheme.mode === 'light' ? 'dark' : 'light';
+    setTheme(newMode);
+  };
+
+  const setTheme = async (mode: 'light' | 'dark' | 'system') => {
+    try {
+      setThemeMode(mode);
+      await AsyncStorage.setItem('theme_preference', mode);
+      
+      if (mode === 'system') {
+        const systemScheme = Appearance.getColorScheme();
+        setCurrentTheme(systemScheme === 'dark' ? darkTheme : lightTheme);
+      } else {
+        setCurrentTheme(mode === 'dark' ? darkTheme : lightTheme);
+      }
+    } catch (error) {
+      console.error('Error saving theme preference:', error);
+    }
+  };
+
+  const value: ThemeContextType = {
+    theme: currentTheme,
+    isDark: currentTheme.mode === 'dark',
+    toggleTheme,
+    setTheme,
+    themeMode,
+  };
+
+  return (
+    <ThemeContext.Provider value={value}>
+      {children}
+    </ThemeContext.Provider>
+  );
+};
+```
+### 12. Hook For Theme (`src/hook/useStyles.ts`)
+
+```typescript
+import { useMemo } from 'react';
+import { StyleSheet } from 'react-native';
+import { useTheme } from '../contexts/ThemeContext';
+import { Theme } from '../constants/theme';
+
+export const useStyles = <T extends StyleSheet.NamedStyles<T>>(
+  stylesFn: (theme: Theme) => T
+): T => {
+  const { theme } = useTheme();
+  
+  return useMemo(() => {
+    return StyleSheet.create(stylesFn(theme));
+  }, [theme, stylesFn]);
+};
 ```
