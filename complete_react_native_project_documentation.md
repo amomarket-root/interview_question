@@ -46,12 +46,9 @@
 VisitCareHealthcare/
 ├── src/
 │   ├── components/
-│   │   │   └── LanguageSwitcher.tsx
 │   ├── constants/
-│   │   │   ├── locales.ts
 │   │   │   └── theme.ts
 │   ├── contexts/
-│   │   │   ├── LanguageContext.tsx
 │   │   │   └── ThemeContext.tsx
 │   ├── hooks/
 │   │   │   └── useStyles.ts
@@ -171,8 +168,8 @@ VisitCareHealthcare/
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE_URL = __DEV__
-  ? 'http://10.0.2.2:8000/api' // Android Emulator
+const API_BASE_URL = __DEV__ 
+  ? 'http://10.0.2.2:8000/api'  // Android Emulator
   : 'https://your-production-domain.com/api';
 
 const apiClient = axios.create({
@@ -184,21 +181,12 @@ const apiClient = axios.create({
   },
 });
 
-// Request interceptor for auth tokens + language header
+// Request interceptor for auth tokens
 apiClient.interceptors.request.use(async (config) => {
-  // Auth token
-  const token =
-    (await AsyncStorage.getItem('auth_token')) || // your original key
-    (await AsyncStorage.getItem('authtoken'));   // handle both keys if needed
+  const token = await AsyncStorage.getItem('auth_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
-
-  // Language header
-  const language = (await AsyncStorage.getItem('appLanguage')) || 'en';
-  config.headers['x-app-language'] = language;
-  config.headers['accept-language'] = language;
-
   return config;
 });
 
@@ -208,7 +196,6 @@ apiClient.interceptors.response.use(
   async (error) => {
     if (error.response?.status === 401) {
       await AsyncStorage.multiRemove(['auth_token', 'user_data']);
-      // optionally: navigate to login, show toast, etc
     }
     return Promise.reject(error);
   }
@@ -2540,12 +2527,11 @@ import React from 'react';
 import { PaperProvider } from 'react-native-paper';
 import { StatusBar } from 'expo-status-bar';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
-import { LanguageProvider } from './src/contexts/LanguageContext';
 import AppNavigator from './src/navigation/AppNavigator';
 
 const AppContent = () => {
   const { theme, isDark } = useTheme();
-
+  
   const paperTheme = {
     colors: {
       primary: theme.colors.primary,
@@ -2572,11 +2558,9 @@ const AppContent = () => {
 
 export default function App() {
   return (
-    <LanguageProvider>
-      <ThemeProvider>
-        <AppContent />
-      </ThemeProvider>
-    </LanguageProvider>
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 }
 ```
@@ -2914,85 +2898,4 @@ export const useStyles = <T extends StyleSheet.NamedStyles<T>>(
   }, [theme, stylesFn]);
 };
 ```
-### 12. Language Context (`src/contexts/LanguageContext.tsx`)
 
-```typescript
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-type Language = 'en' | 'od';
-
-interface LanguageContextType {
-  language: Language;
-  setLanguage: (lang: Language) => void;
-}
-
-const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
-
-export const useLanguage = () => {
-  const context = useContext(LanguageContext);
-  if (!context) throw new Error('useLanguage must be used within a LanguageProvider');
-  return context;
-};
-
-export const LanguageProvider: React.FC<{children: ReactNode}> = ({ children }) => {
-  const [language, setLanguageState] = useState<Language>('en');
-
-  useEffect(() => {
-    const loadLanguage = async () => {
-      const stored = await AsyncStorage.getItem('appLanguage');
-      if (stored) setLanguageState(stored as Language);
-    };
-    loadLanguage();
-  }, []);
-
-  const setLanguage = async (lang: Language) => {
-    setLanguageState(lang);
-    await AsyncStorage.setItem('appLanguage', lang);
-  };
-
-  return (
-    <LanguageContext.Provider value={{ language, setLanguage }}>
-      {children}
-    </LanguageContext.Provider>
-  );
-};
-```
-### 12. locales (`src/constants/locales.ts`)
-
-```typescript
-export const translations = {
-  en: {
-    welcome: "Welcome",
-    dashboard: "Dashboard",
-    appointments: "Appointments",
-    profile: "Profile",
-  },
-  od: {
-    welcome: "ସ୍ବାଗତ",
-    dashboard: "ଡାଶବୋର୍ଡ",
-    appointments: "ଲିଖାପିଏ",
-    profile: "ପ୍ରଫାଇଲ୍",
-  },
-};
-```
-### 12. Language Switcher (`src/components/LanguageSwitcher.tsx`)
-
-```typescript
-import React from 'react';
-import { View } from 'react-native';
-import { Button, Title } from 'react-native-paper';
-import { useLanguage } from '../contexts/LanguageContext';
-
-const LanguageSwitcher: React.FC = () => {
-  const { language, setLanguage } = useLanguage();
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 10 }}>
-      <Title style={{ marginRight: 16 }}>Language</Title>
-      <Button mode={language === 'en' ? 'contained' : 'outlined'} onPress={() => setLanguage('en')}>English</Button>
-      <Button mode={language === 'od' ? 'contained' : 'outlined'} onPress={() => setLanguage('od')} style={{ marginLeft: 8 }}>Odia</Button>
-    </View>
-  );
-};
-export default LanguageSwitcher;
-```
