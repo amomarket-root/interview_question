@@ -2594,8 +2594,8 @@ export default function DashboardScreen({ navigation }: any) {
 
 ```typescript
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, ScrollView, RefreshControl, Alert, TouchableOpacity } from 'react-native';
-import { Card, Title, Text, Chip, Button, ActivityIndicator, Menu, Divider } from 'react-native-paper';
+import { View, ScrollView, RefreshControl, Alert, TouchableOpacity, Modal } from 'react-native';
+import { Card, Title, Text, Chip, Button, ActivityIndicator, Menu, Divider, TextInput } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useStyles } from '../../hooks/useStyles';
@@ -2616,6 +2616,293 @@ interface Appointment {
   specialization?: string;
 }
 
+// Helper function to safely convert any value to string
+const safeString = (value: any, defaultValue: string = '') => {
+  if (value === null || value === undefined) return defaultValue;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return value.toString();
+  if (typeof value === 'boolean') return value.toString();
+  return defaultValue;
+};
+
+// Format date helper function
+const formatDate = (dateString: string) => {
+  try {
+    if (!dateString || typeof dateString !== 'string') return 'No Date';
+    
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Invalid Date';
+    
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+
+    if (date.toDateString() === today.toDateString()) {
+      return 'Today';
+    } else if (date.toDateString() === tomorrow.toDateString()) {
+      return 'Tomorrow';
+    } else {
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric',
+        year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
+      });
+    }
+  } catch (error) {
+    return 'Invalid Date';
+  }
+};
+
+// Appointment Details Modal Component
+const AppointmentDetailsModal = ({ 
+  visible, 
+  appointment, 
+  onClose, 
+  onStatusUpdate 
+}: {
+  visible: boolean;
+  appointment: Appointment | null;
+  onClose: () => void;
+  onStatusUpdate: (id: number, status: string) => void;
+}) => {
+  const [updating, setUpdating] = useState(false);
+  const { theme } = useTheme();
+
+  const styles = useStyles((theme) => ({
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+    },
+    modalContainer: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 12,
+      padding: 20,
+      width: '100%',
+      maxWidth: 400,
+      maxHeight: '80%',
+    },
+    modalHeader: {
+      alignItems: 'center',
+      marginBottom: 20,
+    },
+    modalTitle: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: theme.colors.text,
+      fontFamily: theme.typography.fontFamily,
+      marginBottom: 4,
+    },
+    patientName: {
+      fontSize: 16,
+      color: theme.colors.text,
+      fontFamily: theme.typography.fontFamily,
+      fontWeight: '600',
+    },
+    detailsSection: {
+      marginBottom: 20,
+    },
+    detailRow: {
+      marginBottom: 12,
+    },
+    detailLabel: {
+      fontSize: 12,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      marginBottom: 2,
+    },
+    detailValue: {
+      fontSize: 14,
+      color: theme.colors.text,
+      fontFamily: theme.typography.fontFamily,
+      fontWeight: '500',
+    },
+    doctorInfo: {
+      fontSize: 14,
+      color: theme.colors.text,
+      fontFamily: theme.typography.fontFamily,
+    },
+    specialization: {
+      fontSize: 12,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+    },
+    symptomsSection: {
+      backgroundColor: theme.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#F8F9FA',
+      padding: 12,
+      borderRadius: 8,
+      marginBottom: 16,
+    },
+    symptomsTitle: {
+      fontSize: 12,
+      fontWeight: 'bold',
+      color: theme.colors.text,
+      marginBottom: 4,
+      fontFamily: theme.typography.fontFamily,
+    },
+    symptomsText: {
+      fontSize: 14,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+    },
+    notesSection: {
+      backgroundColor: theme.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#F0F0F0',
+      padding: 12,
+      borderRadius: 8,
+      marginBottom: 20,
+    },
+    notesTitle: {
+      fontSize: 12,
+      fontWeight: 'bold',
+      color: theme.colors.text,
+      marginBottom: 4,
+      fontFamily: theme.typography.fontFamily,
+    },
+    notesText: {
+      fontSize: 14,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      lineHeight: 20,
+    },
+    actionButtonsContainer: {
+      gap: 12,
+    },
+    actionButton: {
+      marginBottom: 8,
+    },
+    confirmButton: {
+      backgroundColor: '#4CAF50',
+    },
+    cancelButton: {
+      backgroundColor: '#F44336',
+    },
+    closeButton: {
+      backgroundColor: 'transparent',
+      borderColor: theme.colors.primary,
+      borderWidth: 1,
+    },
+  }));
+
+  const handleStatusUpdate = async (status: string) => {
+    if (!appointment) return;
+
+    setUpdating(true);
+    try {
+      await onStatusUpdate(appointment.id, status);
+      onClose();
+    } catch (error) {
+      // Error handling is done in parent component
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  if (!appointment) return null;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContainer}>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {/* Header */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Appointment Details</Text>
+              <Text style={styles.patientName}>
+                Patient: {safeString(appointment.patient_name, 'Unknown Patient')}
+              </Text>
+            </View>
+
+            {/* Details Section */}
+            <View style={styles.detailsSection}>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Doctor</Text>
+                <Text style={styles.doctorInfo}>
+                  Dr. {safeString(appointment.doctor_name, 'sameer soumya ranjan jena')}
+                </Text>
+                <Text style={styles.specialization}>
+                  {safeString(appointment.specialization, 'Cardiology')}
+                </Text>
+              </View>
+
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Date & Time</Text>
+                <Text style={styles.detailValue}>
+                  {formatDate(appointment.appointment_date)} at {safeString(appointment.appointment_time, '09:00 AM')}
+                </Text>
+              </View>
+
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Fee</Text>
+                <Text style={styles.detailValue}>
+                  ₹{safeString(appointment.fee, '500.00')}
+                </Text>
+              </View>
+            </View>
+
+            {/* Symptoms/Reason Section */}
+            {appointment.type && (
+              <View style={styles.symptomsSection}>
+                <Text style={styles.symptomsTitle}>Symptoms/Reason</Text>
+                <Text style={styles.symptomsText}>{safeString(appointment.type, 'General consultation')}</Text>
+              </View>
+            )}
+
+            {/* Read-only Notes Section */}
+            {appointment.notes && (
+              <View style={styles.notesSection}>
+                <Text style={styles.notesTitle}>Notes</Text>
+                <Text style={styles.notesText}>{safeString(appointment.notes)}</Text>
+              </View>
+            )}
+
+            {/* Action Buttons */}
+            <View style={styles.actionButtonsContainer}>
+              <Button
+                mode="contained"
+                onPress={() => handleStatusUpdate('confirmed')}
+                loading={updating}
+                disabled={updating}
+                style={[styles.actionButton, styles.confirmButton]}
+                icon={() => <MaterialCommunityIcons name="check" size={16} color="white" />}
+              >
+                Confirm
+              </Button>
+
+              <Button
+                mode="contained"
+                onPress={() => handleStatusUpdate('cancelled')}
+                loading={updating}
+                disabled={updating}
+                style={[styles.actionButton, styles.cancelButton]}
+                icon={() => <MaterialCommunityIcons name="close" size={16} color="white" />}
+              >
+                Cancel
+              </Button>
+
+              <Button
+                mode="outlined"
+                onPress={onClose}
+                disabled={updating}
+                style={[styles.actionButton, styles.closeButton]}
+                labelStyle={{ color: theme.colors.primary }}
+              >
+                Close
+              </Button>
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
 export default function AppointmentsScreen() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [filteredAppointments, setFilteredAppointments] = useState<Appointment[]>([]);
@@ -2623,6 +2910,8 @@ export default function AppointmentsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [filterMenuVisible, setFilterMenuVisible] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState('All');
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
 
   const { theme } = useTheme();
 
@@ -2772,18 +3061,6 @@ export default function AppointmentsScreen() {
       fontFamily: theme.typography.fontFamily,
       fontWeight: 'bold',
     },
-    clinicInfo: {
-      backgroundColor: theme.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#F8F9FA',
-      padding: 8,
-      borderRadius: 4,
-      marginBottom: 16,
-    },
-    clinicName: {
-      fontSize: 14,
-      color: theme.colors.text,
-      fontFamily: theme.typography.fontFamily,
-      fontWeight: '500',
-    },
     notesSection: {
       backgroundColor: theme.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#F0F0F0',
       padding: 8,
@@ -2857,6 +3134,39 @@ export default function AppointmentsScreen() {
     }
   };
 
+  const handleViewDetails = (appointment: Appointment) => {
+    setSelectedAppointment(appointment);
+    setModalVisible(true);
+  };
+
+  const handleStatusUpdate = async (appointmentId: number, status: string) => {
+    try {
+      const response = await healthcareService.updateAppointmentStatus(appointmentId, status);
+      
+      // Update the local state
+      setAppointments(prev => 
+        prev.map(appointment => 
+          appointment.id === appointmentId 
+            ? { ...appointment, status }
+            : appointment
+        )
+      );
+
+      Alert.alert(
+        'Success', 
+        `Appointment ${status} successfully!`,
+        [{ text: 'OK' }]
+      );
+    } catch (error: any) {
+      console.error('Failed to update appointment status:', error);
+      Alert.alert(
+        'Error', 
+        error.message || 'Failed to update appointment status'
+      );
+      throw error; // Re-throw to handle in modal
+    }
+  };
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchAppointments();
@@ -2894,42 +3204,6 @@ export default function AppointmentsScreen() {
       default:
         return 'help-circle';
     }
-  };
-
-  const formatDate = (dateString: string) => {
-    try {
-      if (!dateString || typeof dateString !== 'string') return 'No Date';
-      
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) return 'Invalid Date';
-      
-      const today = new Date();
-      const tomorrow = new Date(today);
-      tomorrow.setDate(today.getDate() + 1);
-
-      if (date.toDateString() === today.toDateString()) {
-        return 'Today';
-      } else if (date.toDateString() === tomorrow.toDateString()) {
-        return 'Tomorrow';
-      } else {
-        return date.toLocaleDateString('en-US', { 
-          month: 'short', 
-          day: 'numeric',
-          year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
-        });
-      }
-    } catch (error) {
-      return 'Invalid Date';
-    }
-  };
-
-  // Helper function to safely convert any value to string
-  const safeString = (value: any, defaultValue: string = '') => {
-    if (value === null || value === undefined) return defaultValue;
-    if (typeof value === 'string') return value;
-    if (typeof value === 'number') return value.toString();
-    if (typeof value === 'boolean') return value.toString();
-    return defaultValue;
   };
 
   if (loading) {
@@ -3080,7 +3354,7 @@ export default function AppointmentsScreen() {
                 <View style={styles.actionButtons}>
                   <Button 
                     mode="outlined" 
-                    onPress={() => Alert.alert('Info', 'View details functionality')}
+                    onPress={() => handleViewDetails(appointment)}
                     style={styles.viewDetailsButton}
                     labelStyle={{ color: theme.mode === 'dark' ? '#4CAF50' : '#2E7D32' }}
                     icon={() => (
@@ -3099,6 +3373,17 @@ export default function AppointmentsScreen() {
           ))
         )}
       </ScrollView>
+
+      {/* Appointment Details Modal */}
+      <AppointmentDetailsModal
+        visible={modalVisible}
+        appointment={selectedAppointment}
+        onClose={() => {
+          setModalVisible(false);
+          setSelectedAppointment(null);
+        }}
+        onStatusUpdate={handleStatusUpdate}
+      />
     </View>
   );
 }
