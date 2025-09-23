@@ -165,49 +165,178 @@ VisitCareHealthcare/
 ### 1. API Configuration (`src/services/api.ts`)
 
 ```typescript
-import axios from 'axios';
+import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE_URL = __DEV__ 
-  ? 'http://10.0.2.2:8000/api'  // Android Emulator
-  : 'https://your-production-domain.com/api';
-
-const apiClient = axios.create({
-  baseURL: API_BASE_URL,
+// Environment-based configuration
+const API_CONFIG = {
+  baseURL: __DEV__ 
+    ? 'http://10.0.2.2:8000/api'
+    : 'https://your-production-domain.com/api',
   timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  },
-});
+  retryAttempts: 3,
+  retryDelay: 1000,
+};
 
-// Request interceptor for auth tokens
-apiClient.interceptors.request.use(async (config) => {
-  const token = await AsyncStorage.getItem('auth_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+// Request cache for GET requests
+const requestCache = new Map<string, { data: any; timestamp: number; ttl: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+class ApiService {
+  private static instance: ApiService;
+  private client;
+  private requestQueue: Map<string, Promise<any>> = new Map();
+
+  private constructor() {
+    this.client = axios.create({
+      baseURL: API_CONFIG.baseURL,
+      timeout: API_CONFIG.timeout,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+    });
+
+    this.setupInterceptors();
   }
-  return config;
-});
 
-// Response interceptor for error handling
-apiClient.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    if (error.response?.status === 401) {
-      await AsyncStorage.multiRemove(['auth_token', 'user_data']);
+  public static getInstance(): ApiService {
+    if (!ApiService.instance) {
+      ApiService.instance = new ApiService();
     }
-    return Promise.reject(error);
+    return ApiService.instance;
   }
-);
 
-export default apiClient;
+  private setupInterceptors() {
+    // Request interceptor with token management
+    this.client.interceptors.request.use(
+      async (config) => {
+        const token = await this.getAuthToken();
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
+
+    // Response interceptor with retry logic
+    this.client.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        const originalRequest = error.config;
+        
+        // Handle 401 errors
+        if (error.response?.status === 401 && !originalRequest._retry) {
+          originalRequest._retry = true;
+          await AsyncStorage.multiRemove(['auth_token', 'user_data']);
+          return Promise.reject(error);
+        }
+
+        // Retry logic for network errors
+        if (this.shouldRetry(error) && originalRequest._retryCount < API_CONFIG.retryAttempts) {
+          originalRequest._retryCount = (originalRequest._retryCount || 0) + 1;
+          await this.delay(API_CONFIG.retryDelay * originalRequest._retryCount);
+          return this.client(originalRequest);
+        }
+
+        return Promise.reject(error);
+      }
+    );
+  }
+
+  private shouldRetry(error: any): boolean {
+    return !error.response || error.response.status >= 500 || error.code === 'NETWORK_ERROR';
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  private async getAuthToken(): Promise<string | null> {
+    try {
+      return await AsyncStorage.getItem('auth_token');
+    } catch {
+      return null;
+    }
+  }
+
+  private getCacheKey(method: string, url: string, params?: any): string {
+    return `${method}:${url}:${JSON.stringify(params || {})}`;
+  }
+
+  private getFromCache(key: string): any | null {
+    const cached = requestCache.get(key);
+    if (cached && Date.now() - cached.timestamp < cached.ttl) {
+      return cached.data;
+    }
+    requestCache.delete(key);
+    return null;
+  }
+
+  private setCache(key: string, data: any, ttl: number = CACHE_TTL): void {
+    requestCache.set(key, { data, timestamp: Date.now(), ttl });
+  }
+
+  // Optimized GET method with caching and request deduplication
+  async get<T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+    const cacheKey = this.getCacheKey('GET', url, config?.params);
+    
+    // Check cache first
+    const cachedData = this.getFromCache(cacheKey);
+    if (cachedData) {
+      return { data: cachedData } as AxiosResponse<T>;
+    }
+
+    // Check if request is already in progress
+    if (this.requestQueue.has(cacheKey)) {
+      return this.requestQueue.get(cacheKey);
+    }
+
+    // Make new request
+    const request = this.client.get<T>(url, config).then(response => {
+      this.setCache(cacheKey, response.data);
+      this.requestQueue.delete(cacheKey);
+      return response;
+    }).catch(error => {
+      this.requestQueue.delete(cacheKey);
+      throw error;
+    });
+
+    this.requestQueue.set(cacheKey, request);
+    return request;
+  }
+
+  async post<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+    return this.client.post<T>(url, data, config);
+  }
+
+  async put<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+    return this.client.put<T>(url, data, config);
+  }
+
+  async delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+    return this.client.delete<T>(url, config);
+  }
+
+  // Clear cache method
+  clearCache(): void {
+    requestCache.clear();
+  }
+
+  // Cancel all pending requests
+  cancelAllRequests(): void {
+    this.requestQueue.clear();
+  }
+}
+
+export default ApiService.getInstance();
 ```
 
 ### 2. Authentication Service (`src/services/authService.ts`)
 
 ```typescript
-import apiClient from './api';
+import ApiService from './api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface LoginCredentials {
@@ -224,101 +353,160 @@ export interface RegisterData {
   phone?: string;
 }
 
+export interface User {
+  id: number;
+  name: string;
+  email: string;
+  user_type: string;
+  phone?: string;
+  address?: string;
+  email_verified_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 class AuthService {
-  async login(credentials: LoginCredentials) {
+  private static instance: AuthService;
+  private currentUser: User | null = null;
+  private authStateListeners: ((isAuthenticated: boolean) => void)[] = [];
+
+  private constructor() {
+    this.initializeAuth();
+  }
+
+  public static getInstance(): AuthService {
+    if (!AuthService.instance) {
+      AuthService.instance = new AuthService();
+    }
+    return AuthService.instance;
+  }
+
+  private async initializeAuth(): Promise<void> {
+    try {
+      const token = await AsyncStorage.getItem('auth_token');
+      if (token) {
+        const userData = await AsyncStorage.getItem('user_data');
+        this.currentUser = userData ? JSON.parse(userData) : null;
+      }
+    } catch (error) {
+      console.error('Auth initialization error:', error);
+    }
+  }
+
+  // Subscribe to auth state changes
+  onAuthStateChange(listener: (isAuthenticated: boolean) => void): () => void {
+    this.authStateListeners.push(listener);
+    return () => {
+      this.authStateListeners = this.authStateListeners.filter(l => l !== listener);
+    };
+  }
+
+  private notifyAuthStateChange(isAuthenticated: boolean): void {
+    this.authStateListeners.forEach(listener => listener(isAuthenticated));
+  }
+
+  async login(credentials: LoginCredentials): Promise<{ token: string; user: User }> {
     try {
       console.log('Attempting login with:', { email: credentials.email });
       
-      const response = await apiClient.post('/login', credentials);
-      console.log('Login response:', response.data);
-      
+      const response = await ApiService.post('/login', credentials);
       const { token, user } = response.data;
       
       if (!token || !user) {
         throw new Error('Invalid response format from server');
       }
       
-      await AsyncStorage.setItem('auth_token', token);
-      await AsyncStorage.setItem('user_data', JSON.stringify(user));
+      // Store auth data
+      await Promise.all([
+        AsyncStorage.setItem('auth_token', token),
+        AsyncStorage.setItem('user_data', JSON.stringify(user))
+      ]);
+      
+      this.currentUser = user;
+      this.notifyAuthStateChange(true);
       
       console.log('Auth data saved successfully');
-      
       return response.data;
     } catch (error: any) {
       console.error('Login error:', error);
-      
-      if (error.response) {
-        const errorMessage = error.response.data?.message || 
-                           error.response.data?.error || 
-                           'Login failed';
-        throw new Error(errorMessage);
-      } else if (error.request) {
-        throw new Error('Network error - please check your connection');
-      } else {
-        throw new Error(error.message || 'Unknown error occurred');
-      }
+      this.handleAuthError(error);
     }
   }
 
-  async register(data: RegisterData) {
+  async register(data: RegisterData): Promise<{ token: string; user: User }> {
     try {
       console.log('Attempting registration with:', { 
         email: data.email, 
         user_type: data.user_type 
       });
       
-      const response = await apiClient.post('/register', data);
-      console.log('Registration response:', response.data);
-      
+      const response = await ApiService.post('/register', data);
       const { token, user } = response.data;
       
       if (!token || !user) {
         throw new Error('Invalid response format from server');
       }
       
-      await AsyncStorage.setItem('auth_token', token);
-      await AsyncStorage.setItem('user_data', JSON.stringify(user));
+      // Store auth data
+      await Promise.all([
+        AsyncStorage.setItem('auth_token', token),
+        AsyncStorage.setItem('user_data', JSON.stringify(user))
+      ]);
+      
+      this.currentUser = user;
+      this.notifyAuthStateChange(true);
       
       return response.data;
     } catch (error: any) {
       console.error('Registration error:', error);
-      
-      if (error.response) {
-        const errorMessage = error.response.data?.message || 
-                           error.response.data?.error || 
-                           'Registration failed';
-        throw new Error(errorMessage);
-      } else if (error.request) {
-        throw new Error('Network error - please check your connection');
-      } else {
-        throw new Error(error.message || 'Unknown error occurred');
-      }
+      this.handleAuthError(error);
     }
   }
 
-  async logout() {
+  async logout(): Promise<void> {
     try {
       console.log('Attempting logout');
-      await apiClient.post('/logout');
-    } catch (error) {
-      console.error('Logout API error:', error);
-    } finally {
-      await AsyncStorage.multiRemove(['auth_token', 'user_data']);
+      
+      // Try to logout from server (don't block on failure)
+      try {
+        await ApiService.post('/logout');
+      } catch (error) {
+        console.warn('Server logout failed:', error);
+      }
+      
+      // Clear local storage
+      await Promise.all([
+        AsyncStorage.multiRemove(['auth_token', 'user_data']),
+        ApiService.clearCache(),
+        ApiService.cancelAllRequests()
+      ]);
+      
+      this.currentUser = null;
+      this.notifyAuthStateChange(false);
+      
       console.log('Auth data cleared');
+    } catch (error) {
+      console.error('Logout error:', error);
+      throw error;
     }
   }
 
-  async getCurrentUser() {
+  getCurrentUser(): User | null {
+    return this.currentUser;
+  }
+
+  async refreshUserData(): Promise<User | null> {
     try {
       const userData = await AsyncStorage.getItem('user_data');
-      return userData ? JSON.parse(userData) : null;
+      this.currentUser = userData ? JSON.parse(userData) : null;
+      return this.currentUser;
     } catch (error) {
-      console.error('Error getting current user:', error);
+      console.error('Error refreshing user data:', error);
       return null;
     }
   }
 
-  async isAuthenticated() {
+  async isAuthenticated(): Promise<boolean> {
     try {
       const token = await AsyncStorage.getItem('auth_token');
       return !!token;
@@ -328,7 +516,7 @@ class AuthService {
     }
   }
 
-  async getAuthToken() {
+  async getAuthToken(): Promise<string | null> {
     try {
       return await AsyncStorage.getItem('auth_token');
     } catch (error) {
@@ -336,50 +524,103 @@ class AuthService {
       return null;
     }
   }
+
+  private handleAuthError(error: any): never {
+    if (error.response) {
+      const errorMessage = error.response.data?.message || 
+                         error.response.data?.error || 
+                         'Authentication failed';
+      throw new Error(errorMessage);
+    } else if (error.request) {
+      throw new Error('Network error - please check your connection');
+    } else {
+      throw new Error(error.message || 'Unknown error occurred');
+    }
+  }
 }
 
-export default new AuthService();
+export default AuthService.getInstance();
 ```
 
 ### 3. Healthcare Service (`src/services/healthcareService.ts`)
 
 ```typescript
-import apiClient from './api';
+import ApiService from './api';
+
+export interface DashboardStats {
+  total_facilities?: number;
+  connected_doctors?: number;
+  today_appointments?: number;
+  monthly_appointments?: number;
+  pending_requests?: number;
+  total_patients?: number;
+}
+
+export interface Appointment {
+  id: number;
+  patient_name: string;
+  doctor_name: string;
+  appointment_date: string;
+  appointment_time: string;
+  status: string;
+  type: string;
+  notes?: string;
+}
+
+export interface AppointmentsResponse {
+  appointments: Appointment[];
+  pagination?: {
+    current_page: number;
+    total_pages: number;
+    total_count: number;
+  };
+}
 
 class HealthcareService {
-  async getDashboardStats() {
+  private static instance: HealthcareService;
+
+  private constructor() {}
+
+  public static getInstance(): HealthcareService {
+    if (!HealthcareService.instance) {
+      HealthcareService.instance = new HealthcareService();
+    }
+    return HealthcareService.instance;
+  }
+
+  async getDashboardStats(): Promise<DashboardStats> {
     try {
-      const response = await apiClient.get('/healthcare/dashboard-stats');
+      const response = await ApiService.get('/healthcare/dashboard-stats');
       return response.data;
     } catch (error) {
       console.error('Failed to fetch dashboard stats:', error);
-      throw error;
+      this.handleServiceError(error, 'Failed to load dashboard statistics');
     }
   }
 
-  async getProfile() {
+  async getProfile(): Promise<any> {
     try {
-      const response = await apiClient.get('/healthcare/profile');
+      const response = await ApiService.get('/healthcare/profile');
       return response.data;
     } catch (error) {
       console.error('Failed to fetch profile:', error);
-      throw error;
+      this.handleServiceError(error, 'Failed to load profile');
     }
   }
 
-  async updateProfile(data: FormData) {
+  async updateProfile(data: FormData): Promise<any> {
     try {
-      const response = await apiClient.post('/healthcare/profile', data, {
+      const response = await ApiService.post('/healthcare/profile', data, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       return response.data;
     } catch (error) {
       console.error('Failed to update profile:', error);
-      throw error;
+      this.handleServiceError(error, 'Failed to update profile');
     }
   }
 
-  async getAppointments(page = 1, filters = {}) {
+  async getAppointments(page: number = 1, filters: Record<string, any> = {}): Promise<AppointmentsResponse> {
     try {
       const params = new URLSearchParams();
       params.append('page', page.toString());
@@ -388,49 +629,58 @@ class HealthcareService {
         if (value) params.append(key, value as string);
       });
       
-      const response = await apiClient.get(`/healthcare/appointments?${params}`);
+      const response = await ApiService.get(`/healthcare/appointments?${params}`);
       return response.data;
     } catch (error) {
       console.error('Failed to fetch appointments:', error);
-      throw error;
+      this.handleServiceError(error, 'Failed to load appointments');
     }
   }
 
-  async getConnectionRequests() {
+  async getConnectionRequests(): Promise<any> {
     try {
-      const response = await apiClient.get('/healthcare/connection-requests');
+      const response = await ApiService.get('/healthcare/connection-requests');
       return response.data;
     } catch (error) {
       console.error('Failed to fetch connection requests:', error);
-      throw error;
+      this.handleServiceError(error, 'Failed to load connection requests');
     }
   }
 
-  async respondToConnectionRequest(requestId: number, status: string, data = {}) {
+  async respondToConnectionRequest(requestId: number, status: string, data: Record<string, any> = {}): Promise<any> {
     try {
-      const response = await apiClient.post(`/healthcare/connection-requests/${requestId}/respond`, {
+      const response = await ApiService.post(`/healthcare/connection-requests/${requestId}/respond`, {
         status,
         ...data
       });
       return response.data;
     } catch (error) {
       console.error('Failed to respond to connection request:', error);
-      throw error;
+      this.handleServiceError(error, 'Failed to respond to connection request');
     }
   }
 
-  async getConnectedDoctors() {
+  async getConnectedDoctors(): Promise<any> {
     try {
-      const response = await apiClient.get('/healthcare/connected-doctors');
+      const response = await ApiService.get('/healthcare/connected-doctors');
       return response.data;
     } catch (error) {
       console.error('Failed to fetch connected doctors:', error);
-      throw error;
+      this.handleServiceError(error, 'Failed to load connected doctors');
     }
+  }
+
+  private handleServiceError(error: any, defaultMessage: string): never {
+    if (error.response?.status === 401) {
+      throw new Error('Session expired. Please log in again.');
+    }
+    
+    const message = error.response?.data?.message || defaultMessage;
+    throw new Error(message);
   }
 }
 
-export default new HealthcareService();
+export default HealthcareService.getInstance();
 ```
 
 ### 4. Login Screen (`src/screens/auth/LoginScreen.tsx`)
@@ -1154,137 +1404,583 @@ export default function RegisterScreen({ navigation }: RegisterScreenProps) {
 ### 6. Navigation Setup (`src/navigation/AppNavigator.tsx`)
 
 ```typescript
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState, useCallback, useMemo, Suspense } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  ActivityIndicator, 
+  Platform, 
+  TouchableOpacity, 
+  Modal,
+  Dimensions,
+  StatusBar 
+} from 'react-native';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Button } from 'react-native-paper';
+import { createBottomTabNavigator, BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
+import { Avatar, Card, Button, Divider } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import type { RouteProp, ParamListBase, Theme } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 
 import { useTheme } from '../contexts/ThemeContext';
 import authService from '../services/authService';
 
-import LoginScreen from '../screens/auth/LoginScreen';
-import RegisterScreen from '../screens/auth/RegisterScreen';
-import DashboardScreen from '../screens/dashboard/DashboardScreen';
-import AppointmentsScreen from '../screens/appointments/AppointmentsScreen';
-import ProfileScreen from '../screens/profile/ProfileScreen';
+// Lazy load screens for better performance
+const LoginScreen = React.lazy(() => import('../screens/auth/LoginScreen'));
+const RegisterScreen = React.lazy(() => import('../screens/auth/RegisterScreen'));
+const DashboardScreen = React.lazy(() => import('../screens/dashboard/DashboardScreen'));
+const AppointmentsScreen = React.lazy(() => import('../screens/appointments/AppointmentsScreen'));
+const ProfileScreen = React.lazy(() => import('../screens/profile/ProfileScreen'));
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
-function LoadingScreen() {
-  return (
-    <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" />
-      <Text style={styles.loadingText}>Loading...</Text>
-    </View>
-  );
-}
+// Type definitions for better TypeScript support
+type TabParamList = {
+  Dashboard: undefined;
+  Appointments: undefined;
+  Profile: undefined;
+};
 
-function MainTabs() {
-  const [currentUser, setCurrentUser] = useState<any>(null);
+type StackParamList = {
+  Login: undefined;
+  Register: undefined;
+  Main: undefined;
+};
 
-  useEffect(() => {
-    const loadCurrentUser = async () => {
-      const user = await authService.getCurrentUser();
-      setCurrentUser(user);
-    };
-    loadCurrentUser();
+// Font weight type definition
+type FontWeight = "100" | "200" | "300" | "400" | "500" | "600" | "700" | "800" | "900" | "bold" | "normal";
+
+// Get screen dimensions
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+
+// Avatar Dropdown Component with Modal
+const AvatarDropdown = React.memo(({ currentUser, onLogout, navigation }: {
+  currentUser: any;
+  onLogout: () => void;
+  navigation: any;
+}) => {
+  const [isVisible, setIsVisible] = useState(false);
+  const { theme } = useTheme();
+
+  const openDropdown = useCallback(() => {
+    setIsVisible(true);
   }, []);
 
-  const handleLogout = async () => {
-    await authService.logout();
-    // Auth state auto-updates, navigation will change via AppNavigator
-  };
+  const closeDropdown = useCallback(() => {
+    setIsVisible(false);
+  }, []);
 
-  const { theme, isDark } = useTheme();
+  const handleProfilePress = useCallback(() => {
+    closeDropdown();
+    setTimeout(() => {
+      navigation.navigate('Profile');
+    }, 100);
+  }, [navigation, closeDropdown]);
+
+  const handleSettingsPress = useCallback(() => {
+    closeDropdown();
+    setTimeout(() => {
+      console.log('Settings pressed - Navigate to settings screen');
+      // Add navigation to settings screen when available
+    }, 100);
+  }, [closeDropdown]);
+
+  const handleLogoutPress = useCallback(async () => {
+    closeDropdown();
+    setTimeout(async () => {
+      try {
+        await onLogout();
+      } catch (error) {
+        console.error('Logout error:', error);
+      }
+    }, 100);
+  }, [onLogout, closeDropdown]);
+
+  // Get user initials for avatar
+  const getUserInitials = useCallback((name: string) => {
+    if (!name) return 'U';
+    const words = name.trim().split(' ');
+    if (words.length === 1) {
+      return words[0].charAt(0).toUpperCase();
+    }
+    return (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase();
+  }, []);
+
+  // Get avatar background color based on user type
+  const getAvatarColor = useCallback((userType: string) => {
+    const colors = {
+      doctor: '#4CAF50',
+      healthcare: '#2196F3',
+      patient: '#FF9800',
+      admin: '#9C27B0',
+      default: theme.colors.primary
+    };
+    return colors[userType?.toLowerCase() as keyof typeof colors] || colors.default;
+  }, [theme.colors.primary]);
+
+  const avatarColor = getAvatarColor(currentUser?.user_type || '');
+  const userInitials = getUserInitials(currentUser?.name || 'User');
+
+  // Menu items configuration
+  const menuItems = [
+    {
+      id: 'profile',
+      title: 'Profile',
+      icon: 'account',
+      onPress: handleProfilePress,
+      color: theme.colors.text,
+    },
+    {
+      id: 'settings',
+      title: 'Settings',
+      icon: 'cog',
+      onPress: handleSettingsPress,
+      color: theme.colors.text,
+    },
+    {
+      id: 'divider',
+      isDivider: true,
+    },
+    {
+      id: 'logout',
+      title: 'Logout',
+      icon: 'logout',
+      onPress: handleLogoutPress,
+      color: '#F44336',
+    },
+  ];
 
   return (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName: keyof typeof MaterialCommunityIcons.glyphMap = 'circle';
-          switch (route.name) {
-            case 'Dashboard':
-              iconName = focused ? 'view-dashboard' : 'view-dashboard-variant';
-              break;
-            case 'Appointments':
-              iconName = focused ? 'calendar-clock' : 'calendar-outline';
-              break;
-            case 'Profile':
-              iconName = focused ? 'account' : 'account-outline';
-              break;
-          }
-          // @ts-ignore
-          return <MaterialCommunityIcons name={iconName} size={size} color={color} />;
-        },
-        tabBarActiveTintColor: '#2E7D32',
-        tabBarInactiveTintColor: 'gray',
-        headerRight: () =>
-          route.name === 'Profile' ? null : (
-            <Button mode="text" onPress={handleLogout} style={{ marginRight: 10 }}>
-              Logout
-            </Button>
-          ),
-        headerTitle: route.name + (currentUser ? ` - ${currentUser.name}` : ''),
-        tabBarStyle: { backgroundColor: theme.colors.surface },
-      })}
-    >
-      <Tab.Screen name="Dashboard" component={DashboardScreen} />
-      <Tab.Screen name="Appointments" component={AppointmentsScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
-    </Tab.Navigator>
-  );
-}
+    <View style={styles.avatarContainer}>
+      {/* Avatar Button */}
+      <TouchableOpacity 
+        onPress={openDropdown}
+        style={styles.avatarButton}
+        activeOpacity={0.8}
+        accessible
+        accessibilityLabel="User menu"
+        accessibilityHint="Opens user menu with profile and settings options"
+      >
+        <Avatar.Text
+          size={36}
+          label={userInitials}
+          style={[styles.avatar, { backgroundColor: avatarColor }]}
+          labelStyle={styles.avatarLabel}
+        />
+      </TouchableOpacity>
 
+      {/* Modal Dropdown */}
+      <Modal
+        visible={isVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeDropdown}
+        statusBarTranslucent={true}
+      >
+        {/* Backdrop */}
+        <TouchableOpacity 
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={closeDropdown}
+        >
+          <View style={styles.modalContainer}>
+            {/* Dropdown Card */}
+            <Card style={[styles.dropdownCard, { backgroundColor: theme.colors.surface }]}>
+              {/* User Info Header */}
+              <View style={styles.userInfoHeader}>
+                <Avatar.Text
+                  size={50}
+                  label={userInitials}
+                  style={[styles.headerAvatar, { backgroundColor: avatarColor }]}
+                  labelStyle={styles.headerAvatarLabel}
+                />
+                <View style={styles.userDetails}>
+                  <Text style={[styles.userName, { color: theme.colors.text }]} numberOfLines={1}>
+                    {currentUser?.name || 'User'}
+                  </Text>
+                  <Text style={[styles.userEmail, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+                    {currentUser?.email || 'user@example.com'}
+                  </Text>
+                  <Text style={[styles.userType, { color: theme.colors.primary }]}>
+                    {(currentUser?.user_type || 'user').charAt(0).toUpperCase() + 
+                     (currentUser?.user_type || 'user').slice(1)}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Menu Items */}
+              <View style={styles.menuItemsContainer}>
+                {menuItems.map((item) => {
+                  if (item.isDivider) {
+                    return (
+                      <Divider 
+                        key={item.id}
+                        style={[styles.menuDivider, { backgroundColor: theme.colors.border || '#e0e0e0' }]} 
+                      />
+                    );
+                  }
+
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={[styles.menuItem, { borderColor: theme.colors.border || '#e0e0e0' }]}
+                      onPress={item.onPress}
+                      activeOpacity={0.7}
+                      accessible
+                      accessibilityLabel={item.title}
+                    >
+                      <MaterialCommunityIcons 
+                        name={item.icon as any} 
+                        size={22} 
+                        color={item.color} 
+                        style={styles.menuIcon}
+                      />
+                      <Text style={[styles.menuItemText, { color: item.color }]}>
+                        {item.title}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </Card>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </View>
+  );
+});
+
+// Loading component with better UX
+const LoadingScreen = React.memo(() => {
+  const { theme } = useTheme();
+  
+  return (
+    <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+      <ActivityIndicator size="large" color={theme.colors.primary} />
+      <Text style={[styles.loadingText, { color: theme.colors.text }]}>Loading...</Text>
+    </View>
+  );
+});
+
+// Suspense fallback component
+const SuspenseFallback = React.memo(() => {
+  const { theme } = useTheme();
+  
+  return (
+    <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+      <ActivityIndicator size="large" color={theme.colors.primary} />
+      <Text style={[styles.loadingText, { color: theme.colors.text }]}>Loading Screen...</Text>
+    </View>
+  );
+});
+
+// Optimized main tabs with memoization and proper TypeScript
+const MainTabs = React.memo(() => {
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const { theme, isDark } = useTheme();
+
+  useEffect(() => {
+    const loadCurrentUser = () => {
+      const user = authService.getCurrentUser();
+      setCurrentUser(user);
+    };
+    
+    loadCurrentUser();
+    
+    // Subscribe to auth state changes
+    const unsubscribe = authService.onAuthStateChange(() => {
+      loadCurrentUser();
+    });
+
+    return unsubscribe;
+  }, []);
+
+  const handleLogout = useCallback(async () => {
+    try {
+      await authService.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  }, []);
+
+  // Fixed screenOptions with proper generic types
+  const screenOptions = useCallback((props: {
+    route: RouteProp<ParamListBase, string>;
+    navigation: BottomTabNavigationProp<ParamListBase, string, undefined>;
+    theme: Theme;
+  }): BottomTabNavigationOptions => {
+    const { route, navigation } = props;
+    
+    return {
+      tabBarIcon: ({ focused, color, size }) => {
+        let iconName: keyof typeof MaterialCommunityIcons.glyphMap;
+        
+        switch (route.name) {
+          case 'Dashboard':
+            iconName = focused ? 'view-dashboard' : 'view-dashboard-variant';
+            break;
+          case 'Appointments':
+            iconName = focused ? 'calendar-clock' : 'calendar-outline';
+            break;
+          case 'Profile':
+            iconName = focused ? 'account' : 'account-outline';
+            break;
+          default:
+            iconName = 'circle';
+            break;
+        }
+        
+        return <MaterialCommunityIcons name={iconName} size={size} color={color} />;
+      },
+      tabBarActiveTintColor: theme.colors.primary,
+      tabBarInactiveTintColor: theme.colors.textSecondary,
+      tabBarStyle: { 
+        backgroundColor: theme.colors.surface,
+        borderTopColor: theme.colors.border || '#e0e0e0',
+        elevation: Platform.OS === 'android' ? 8 : 0,
+        shadowOffset: Platform.OS === 'ios' ? {
+          width: 0,
+          height: -3,
+        } : { width: 0, height: 0 },
+        shadowRadius: Platform.OS === 'ios' ? 3 : 0,
+        shadowOpacity: Platform.OS === 'ios' ? 0.1 : 0,
+        shadowColor: Platform.OS === 'ios' ? '#000' : 'transparent',
+      },
+      headerStyle: { 
+        backgroundColor: theme.colors.surface,
+        elevation: Platform.OS === 'android' ? 4 : 0,
+        shadowOffset: Platform.OS === 'ios' ? {
+          width: 0,
+          height: 2,
+        } : { width: 0, height: 0 },
+        shadowRadius: Platform.OS === 'ios' ? 3.84 : 0,
+        shadowOpacity: Platform.OS === 'ios' ? 0.25 : 0,
+        shadowColor: Platform.OS === 'ios' ? '#000' : 'transparent',
+      },
+      headerTintColor: theme.colors.text,
+      tabBarLabelStyle: {
+        fontSize: 12,
+        fontWeight: '600',
+      },
+      tabBarIconStyle: {
+        marginBottom: -3,
+      },
+      // Add avatar dropdown to header right (except for Profile tab)
+      headerRight: route.name !== 'Profile' ? () => (
+        <AvatarDropdown 
+          currentUser={currentUser} 
+          onLogout={handleLogout}
+          navigation={navigation}
+        />
+      ) : undefined,
+    };
+  }, [theme, currentUser, handleLogout]);
+
+  return (
+    <Suspense fallback={<SuspenseFallback />}>
+      <Tab.Navigator screenOptions={screenOptions}>
+        <Tab.Screen 
+          name="Dashboard" 
+          component={DashboardScreen}
+          options={{
+            headerTitle: `Dashboard${currentUser ? ` - ${currentUser.name}` : ''}`,
+            headerTitleStyle: {
+              fontSize: 18,
+              fontWeight: '600' as FontWeight,
+            },
+          }}
+        />
+        <Tab.Screen 
+          name="Appointments" 
+          component={AppointmentsScreen}
+          options={{
+            headerTitle: `Appointments${currentUser ? ` - ${currentUser.name}` : ''}`,
+            headerTitleStyle: {
+              fontSize: 18,
+              fontWeight: '600' as FontWeight,
+            },
+          }}
+        />
+        <Tab.Screen 
+          name="Profile" 
+          component={ProfileScreen}
+          options={{
+            headerTitle: `Profile${currentUser ? ` - ${currentUser.name}` : ''}`,
+            headerTitleStyle: {
+              fontSize: 18,
+              fontWeight: '600' as FontWeight,
+            },
+          }}
+        />
+      </Tab.Navigator>
+    </Suspense>
+  );
+});
+
+// Main navigator with optimized auth flow and proper TypeScript
 export default function AppNavigator() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { theme, isDark } = useTheme();
 
   useEffect(() => {
-    // Listen for auth state changes
-    let unmounted = false;
+    let mounted = true;
+
     const checkAuthState = async () => {
       try {
         const authenticated = await authService.isAuthenticated();
-        if (!unmounted) setIsAuthenticated(authenticated);
+        if (mounted) setIsAuthenticated(authenticated);
       } catch (error) {
-        if (!unmounted) setIsAuthenticated(false);
+        console.error('Auth check error:', error);
+        if (mounted) setIsAuthenticated(false);
       } finally {
-        if (!unmounted && isLoading) setIsLoading(false);
+        if (mounted) setIsLoading(false);
       }
     };
+
+    // Initial auth check
     checkAuthState();
-    const interval = setInterval(checkAuthState, 1000);
+
+    // Subscribe to auth state changes
+    const unsubscribe = authService.onAuthStateChange((authenticated) => {
+      if (mounted) {
+        setIsAuthenticated(authenticated);
+        setIsLoading(false);
+      }
+    });
+
     return () => {
-      unmounted = true;
-      clearInterval(interval);
+      mounted = false;
+      unsubscribe();
     };
   }, []);
 
-  if (isLoading) return <LoadingScreen />;
+  // Fixed navigation theme with proper font weight types
+  const navigationTheme = useMemo((): Theme => ({
+    dark: isDark,
+    colors: {
+      ...(isDark ? DarkTheme.colors : DefaultTheme.colors),
+      primary: theme.colors.primary,
+      background: theme.colors.background,
+      card: theme.colors.surface,
+      text: theme.colors.text,
+      border: theme.colors.border || (isDark ? '#2c2c2e' : '#e0e0e0'),
+      notification: theme.colors.primary,
+    },
+    fonts: {
+      regular: {
+        fontFamily: Platform.select({
+          ios: 'System',
+          android: 'Roboto',
+          default: 'System',
+        }),
+        fontWeight: '400' as FontWeight,
+      },
+      medium: {
+        fontFamily: Platform.select({
+          ios: 'System',
+          android: 'Roboto-Medium',
+          default: 'System',
+        }),
+        fontWeight: '500' as FontWeight,
+      },
+      bold: {
+        fontFamily: Platform.select({
+          ios: 'System',
+          android: 'Roboto-Bold',
+          default: 'System',
+        }),
+        fontWeight: '700' as FontWeight,
+      },
+      heavy: {
+        fontFamily: Platform.select({
+          ios: 'System',
+          android: 'Roboto-Black',
+          default: 'System',
+        }),
+        fontWeight: '900' as FontWeight,
+      },
+    },
+  }), [isDark, theme.colors]);
+
+  // Show loading screen while checking auth state
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
 
   return (
-    <NavigationContainer 
-      theme={{
-        ...((isDark ? DarkTheme : DefaultTheme) as any),
-        colors: {
-          ...((isDark ? DarkTheme : DefaultTheme).colors),
-          ...theme.colors,
-        },
-      }}
-    >
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <NavigationContainer theme={navigationTheme}>
+      <Stack.Navigator 
+        screenOptions={{ 
+          headerShown: false,
+          cardStyle: { backgroundColor: theme.colors.background },
+          gestureEnabled: true,
+          presentation: 'card',
+        }}
+        initialRouteName={isAuthenticated ? 'Main' : 'Login'}
+      >
         {isAuthenticated ? (
-          <Stack.Screen name="Main" component={MainTabs} />
+          <Stack.Screen 
+            name="Main" 
+            component={MainTabs} 
+            options={{
+              headerShown: false,
+            }}
+          />
         ) : (
-          <>
-            <Stack.Screen name="Login" component={LoginScreen} />
-            <Stack.Screen name="Register" component={RegisterScreen} />
-          </>
+          <Stack.Group 
+            screenOptions={{
+              headerShown: true,
+              headerStyle: {
+                backgroundColor: theme.colors.surface,
+                elevation: Platform.OS === 'android' ? 4 : 0,
+                shadowOffset: Platform.OS === 'ios' ? {
+                  width: 0,
+                  height: 2,
+                } : { width: 0, height: 0 },
+                shadowRadius: Platform.OS === 'ios' ? 3.84 : 0,
+                shadowOpacity: Platform.OS === 'ios' ? 0.25 : 0,
+                shadowColor: Platform.OS === 'ios' ? '#000' : 'transparent',
+              },
+              headerTintColor: theme.colors.text,
+              headerTitleStyle: {
+                fontSize: 20,
+                fontWeight: '600' as FontWeight,
+              },
+              presentation: 'card',
+            }}
+          >
+            <Stack.Screen 
+              name="Login" 
+              options={{
+                title: 'Sign In',
+                headerLeft: () => null,
+                gestureEnabled: false,
+              }}
+            >
+              {(props) => (
+                <Suspense fallback={<SuspenseFallback />}>
+                  <LoginScreen {...props} />
+                </Suspense>
+              )}
+            </Stack.Screen>
+            <Stack.Screen 
+              name="Register" 
+              options={{
+                title: 'Sign Up',
+                headerBackTitle: 'Back',
+              }}
+            >
+              {(props) => (
+                <Suspense fallback={<SuspenseFallback />}>
+                  <RegisterScreen {...props} />
+                </Suspense>
+              )}
+            </Stack.Screen>
+          </Stack.Group>
         )}
       </Stack.Navigator>
     </NavigationContainer>
@@ -1296,12 +1992,117 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F5F7FA',
+    padding: 20,
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#666',
+    fontWeight: '500' as FontWeight,
+    textAlign: 'center',
+  },
+  
+  // Avatar Container
+  avatarContainer: {
+    marginRight: 12,
+  },
+  avatarButton: {
+    borderRadius: 18,
+    overflow: 'hidden',
+  },
+  avatar: {
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  avatarLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  
+  // Modal Styles
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+  },
+  modalContainer: {
+    marginTop: Platform.OS === 'android' ? StatusBar.currentHeight + 60 : 100,
+    marginRight: 12,
+  },
+  dropdownCard: {
+    borderRadius: 12,
+    minWidth: 280,
+    maxWidth: screenWidth - 40,
+    elevation: 8,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowRadius: 8,
+    shadowOpacity: 0.25,
+    shadowColor: '#000',
+  },
+  
+  // User Info Header
+  userInfoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+    paddingBottom: 16,
+  },
+  headerAvatar: {
+    marginRight: 16,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  headerAvatarLabel: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  userDetails: {
+    flex: 1,
+  },
+  userName: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  userEmail: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  userType: {
+    fontSize: 13,
+    fontWeight: '500',
+    textTransform: 'capitalize',
+  },
+  
+  // Menu Items
+  menuItemsContainer: {
+    paddingBottom: 12,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    minHeight: 48,
+  },
+  menuIcon: {
+    marginRight: 16,
+    width: 22,
+  },
+  menuItemText: {
+    fontSize: 16,
+    fontWeight: '500',
+    flex: 1,
+  },
+  menuDivider: {
+    marginVertical: 8,
+    marginHorizontal: 20,
+    height: 1,
   },
 });
 ```
@@ -1309,29 +2110,74 @@ const styles = StyleSheet.create({
 ### 7. Dashboard Screen (`src/screens/dashboard/DashboardScreen.tsx`)
 
 ```typescript
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { View, ScrollView, RefreshControl, Alert } from 'react-native';
 import { Card, Title, Paragraph, Button, Text, ActivityIndicator, IconButton } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useStyles } from '../../hooks/useStyles';
-import healthcareService from '../../services/healthcareService';
+import healthcareService, { DashboardStats } from '../../services/healthcareService';
 import authService from '../../services/authService';
 
-interface DashboardStats {
-  total_facilities?: number;
-  connected_doctors?: number;
-  today_appointments?: number;
-  monthly_appointments?: number;
-  pending_requests?: number;
-  total_patients?: number;
-}
+// Memoized stat card component for better performance
+const StatCard = React.memo(({ icon, title, value, color = '#2E7D32' }: {
+  icon: string;
+  title: string;
+  value: number | undefined;
+  color?: string;
+}) => {
+  const styles = useStyles((theme) => ({
+    statCard: {
+      width: '48%',
+      marginBottom: theme.spacing.sm,
+      ...theme.shadows.medium,
+      borderLeftWidth: 4,
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.md,
+      borderLeftColor: color,
+    },
+    statContent: {
+      paddingVertical: theme.spacing.sm,
+    },
+    statHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: theme.spacing.xs,
+    },
+    statValue: {
+      fontSize: theme.typography.sizes.xl,
+      fontWeight: theme.typography.weights.bold,
+      fontFamily: theme.typography.fontFamily,
+      color,
+    },
+    statTitle: {
+      fontSize: theme.typography.sizes.xs,
+      color: theme.colors.textSecondary,
+      textAlign: 'center',
+      fontFamily: theme.typography.fontFamily,
+    },
+  }));
+
+  return (
+    <Card style={styles.statCard}>
+      <Card.Content style={styles.statContent}>
+        <View style={styles.statHeader}>
+          <MaterialCommunityIcons name={icon as any} size={24} color={color} />
+          <Text style={styles.statValue}>{value || 0}</Text>
+        </View>
+        <Text style={styles.statTitle}>{title}</Text>
+      </Card.Content>
+    </Card>
+  );
+});
 
 export default function DashboardScreen({ navigation }: any) {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { toggleTheme, isDark } = useTheme();
 
   const styles = useStyles((theme) => ({
@@ -1350,6 +2196,19 @@ export default function DashboardScreen({ navigation }: any) {
       marginTop: theme.spacing.md,
       fontSize: theme.typography.sizes.md,
       color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+    },
+    errorContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: theme.spacing.lg,
+    },
+    errorText: {
+      fontSize: theme.typography.sizes.md,
+      color: theme.colors.error,
+      textAlign: 'center',
+      marginBottom: theme.spacing.md,
       fontFamily: theme.typography.fontFamily,
     },
     welcomeCard: {
@@ -1400,34 +2259,6 @@ export default function DashboardScreen({ navigation }: any) {
       justifyContent: 'space-between',
       marginBottom: theme.spacing.lg,
     },
-    statCard: {
-      width: '48%',
-      marginBottom: theme.spacing.sm,
-      ...theme.shadows.medium,
-      borderLeftWidth: 4,
-      backgroundColor: theme.colors.surface,
-      borderRadius: theme.borderRadius.md,
-    },
-    statContent: {
-      paddingVertical: theme.spacing.sm,
-    },
-    statHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: theme.spacing.xs,
-    },
-    statValue: {
-      fontSize: theme.typography.sizes.xl,
-      fontWeight: theme.typography.weights.bold,
-      fontFamily: theme.typography.fontFamily,
-    },
-    statTitle: {
-      fontSize: theme.typography.sizes.xs,
-      color: theme.colors.textSecondary,
-      textAlign: 'center',
-      fontFamily: theme.typography.fontFamily,
-    },
     actionsGrid: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -1466,69 +2297,8 @@ export default function DashboardScreen({ navigation }: any) {
     },
   }));
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
-
-  const loadDashboardData = async () => {
-    try {
-      const [user, dashboardStats] = await Promise.all([
-        authService.getCurrentUser(),
-        fetchDashboardStats()
-      ]);
-      
-      setCurrentUser(user);
-      setStats(dashboardStats);
-    } catch (error) {
-      console.error('Failed to load dashboard data:', error);
-      Alert.alert('Error', 'Failed to load dashboard data');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  const fetchDashboardStats = async () => {
-    try {
-      const data = await healthcareService.getDashboardStats();
-      return data;
-    } catch (error: any) {
-      if (error.response?.status === 401) {
-        Alert.alert('Session Expired', 'Please log in again');
-        await authService.logout();
-        return null;
-      }
-      throw error;
-    }
-  };
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    loadDashboardData();
-  }, []);
-
-  const StatCard = ({ icon, title, value, color = '#2E7D32' }: any) => (
-    <Card style={[styles.statCard, { borderLeftColor: color }]}>
-      <Card.Content style={styles.statContent}>
-        <View style={styles.statHeader}>
-          <MaterialCommunityIcons name={icon} size={24} color={color} />
-          <Text style={[styles.statValue, { color }]}>{value || 0}</Text>
-        </View>
-        <Text style={styles.statTitle}>{title}</Text>
-      </Card.Content>
-    </Card>
-  );
-
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2E7D32" />
-        <Text style={styles.loadingText}>Loading Dashboard...</Text>
-      </View>
-    );
-  }
-
-  const getUserTypeDisplay = (userType: string) => {
+  // Memoized user type display function
+  const getUserTypeDisplay = useCallback((userType: string) => {
     switch (userType?.toLowerCase()) {
       case 'healthcare':
         return 'Healthcare Provider';
@@ -1541,7 +2311,122 @@ export default function DashboardScreen({ navigation }: any) {
       default:
         return userType || 'User';
     }
-  };
+  }, []);
+
+  // Memoized date string
+  const currentDateString = useMemo(() => {
+    return new Date().toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  }, []);
+
+  // Optimized data loading function
+  const loadDashboardData = useCallback(async () => {
+    try {
+      setError(null);
+      
+      const [user, dashboardStats] = await Promise.allSettled([
+        Promise.resolve(authService.getCurrentUser()),
+        healthcareService.getDashboardStats()
+      ]);
+      
+      if (user.status === 'fulfilled') {
+        setCurrentUser(user.value);
+      }
+      
+      if (dashboardStats.status === 'fulfilled') {
+        setStats(dashboardStats.value);
+      } else {
+        console.warn('Failed to load dashboard stats:', dashboardStats.reason);
+        setError('Failed to load dashboard statistics');
+      }
+    } catch (error) {
+      console.error('Failed to load dashboard data:', error);
+      setError('Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadDashboardData();
+  }, [loadDashboardData]);
+
+  const handleRetry = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    loadDashboardData();
+  }, [loadDashboardData]);
+
+  // Memoized stats configuration
+  const statsConfig = useMemo(() => [
+    {
+      icon: 'hospital-building',
+      title: 'Total Facilities',
+      value: stats?.total_facilities,
+      color: '#1976D2'
+    },
+    {
+      icon: 'doctor',
+      title: 'Connected Doctors',
+      value: stats?.connected_doctors,
+      color: '#388E3C'
+    },
+    {
+      icon: 'calendar-today',
+      title: "Today's Appointments",
+      value: stats?.today_appointments,
+      color: '#F57C00'
+    },
+    {
+      icon: 'calendar-month',
+      title: 'Monthly Appointments',
+      value: stats?.monthly_appointments,
+      color: '#7B1FA2'
+    },
+    ...(stats?.pending_requests !== undefined ? [{
+      icon: 'clock-outline',
+      title: 'Pending Requests',
+      value: stats.pending_requests,
+      color: '#D32F2F'
+    }] : []),
+    ...(stats?.total_patients !== undefined ? [{
+      icon: 'account-group',
+      title: 'Total Patients',
+      value: stats.total_patients,
+      color: '#00796B'
+    }] : [])
+  ], [stats]);
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#2E7D32" />
+        <Text style={styles.loadingText}>Loading Dashboard...</Text>
+      </View>
+    );
+  }
+
+  if (error && !stats) {
+    return (
+      <View style={styles.errorContainer}>
+        <MaterialCommunityIcons name="alert-circle" size={64} color="#F44336" />
+        <Text style={styles.errorText}>{error}</Text>
+        <Button mode="contained" onPress={handleRetry}>
+          Retry
+        </Button>
+      </View>
+    );
+  }
 
   return (
     <ScrollView 
@@ -1554,7 +2439,9 @@ export default function DashboardScreen({ navigation }: any) {
           progressBackgroundColor={isDark ? '#1e1e1e' : '#ffffff'}
         />
       }
+      showsVerticalScrollIndicator={false}
     >
+      {/* Welcome Card */}
       <Card style={styles.welcomeCard}>
         <Card.Content>
           <View style={styles.welcomeHeader}>
@@ -1573,72 +2460,37 @@ export default function DashboardScreen({ navigation }: any) {
             {getUserTypeDisplay(currentUser?.user_type)} Dashboard
           </Paragraph>
           <Text style={styles.welcomeDate}>
-            {new Date().toLocaleDateString('en-US', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            })}
+            {currentDateString}
           </Text>
         </Card.Content>
       </Card>
 
+      {/* Overview Section */}
       <Text style={styles.sectionTitle}>Overview</Text>
       
       <View style={styles.statsGrid}>
-        <StatCard
-          icon="hospital-building"
-          title="Total Facilities"
-          value={stats?.total_facilities}
-          color="#1976D2"
-        />
-        
-        <StatCard
-          icon="doctor"
-          title="Connected Doctors"
-          value={stats?.connected_doctors}
-          color="#388E3C"
-        />
-        
-        <StatCard
-          icon="calendar-today"
-          title="Today's Appointments"
-          value={stats?.today_appointments}
-          color="#F57C00"
-        />
-        
-        <StatCard
-          icon="calendar-month"
-          title="Monthly Appointments"
-          value={stats?.monthly_appointments}
-          color="#7B1FA2"
-        />
-
-        {stats?.pending_requests !== undefined && (
+        {statsConfig.map((stat, index) => (
           <StatCard
-            icon="clock-outline"
-            title="Pending Requests"
-            value={stats.pending_requests}
-            color="#D32F2F"
+            key={index}
+            icon={stat.icon}
+            title={stat.title}
+            value={stat.value}
+            color={stat.color}
           />
-        )}
-
-        {stats?.total_patients !== undefined && (
-          <StatCard
-            icon="account-group"
-            title="Total Patients"
-            value={stats.total_patients}
-            color="#00796B"
-          />
-        )}
+        ))}
       </View>
 
+      {/* Quick Actions */}
       <Text style={styles.sectionTitle}>Quick Actions</Text>
       
       <View style={styles.actionsGrid}>
         <Card style={styles.actionCard}>
           <Card.Content style={styles.actionContent}>
-            <MaterialCommunityIcons name="calendar-plus" size={32} color={isDark ? '#4de352' : '#2E7D32'} />
+            <MaterialCommunityIcons 
+              name="calendar-plus" 
+              size={32} 
+              color={isDark ? '#4de352' : '#2E7D32'} 
+            />
             <Button
               mode="outlined"
               onPress={() => navigation.navigate('Appointments')}
@@ -1651,7 +2503,11 @@ export default function DashboardScreen({ navigation }: any) {
 
         <Card style={styles.actionCard}>
           <Card.Content style={styles.actionContent}>
-            <MaterialCommunityIcons name="account-cog" size={32} color={isDark ? '#4de352' : '#2E7D32'} />
+            <MaterialCommunityIcons 
+              name="account-cog" 
+              size={32} 
+              color={isDark ? '#4de352' : '#2E7D32'} 
+            />
             <Button
               mode="outlined"
               onPress={() => navigation.navigate('Profile')}
@@ -1663,6 +2519,7 @@ export default function DashboardScreen({ navigation }: any) {
         </Card>
       </View>
 
+      {/* Recent Activity */}
       <Text style={styles.sectionTitle}>Recent Activity</Text>
       
       <Card style={styles.activityCard}>
@@ -1673,8 +2530,16 @@ export default function DashboardScreen({ navigation }: any) {
           </View>
           <View style={styles.activityItem}>
             <MaterialCommunityIcons name="update" size={20} color="#FF9800" />
-            <Text style={styles.activityText}>Data last updated: {new Date().toLocaleTimeString()}</Text>
+            <Text style={styles.activityText}>
+              Data last updated: {new Date().toLocaleTimeString()}
+            </Text>
           </View>
+          {error && (
+            <View style={styles.activityItem}>
+              <MaterialCommunityIcons name="alert" size={20} color="#F44336" />
+              <Text style={styles.activityText}>Some data may be incomplete</Text>
+            </View>
+          )}
         </Card.Content>
       </Card>
     </ScrollView>
@@ -2784,9 +3649,9 @@ export const darkTheme: Theme = {
 ### 12. Theme Context (`src/contexts/ThemeContext.tsx`)
 
 ```typescript
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Appearance } from 'react-native';
+import { Appearance, ColorSchemeName } from 'react-native';
 import { lightTheme, darkTheme, Theme } from '../constants/theme';
 
 interface ThemeContextType {
@@ -2815,55 +3680,66 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>('system');
   const [currentTheme, setCurrentTheme] = useState<Theme>(lightTheme);
 
+  // Memoized theme calculation
+  const calculateTheme = useCallback((mode: 'light' | 'dark' | 'system', systemScheme?: ColorSchemeName) => {
+    if (mode === 'system') {
+      const scheme = systemScheme || Appearance.getColorScheme();
+      return scheme === 'dark' ? darkTheme : lightTheme;
+    }
+    return mode === 'dark' ? darkTheme : lightTheme;
+  }, []);
+
   useEffect(() => {
-    loadThemePreference();
-    
-    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
-      if (themeMode === 'system') {
-        setCurrentTheme(colorScheme === 'dark' ? darkTheme : lightTheme);
+    let mounted = true;
+
+    const loadThemePreference = async () => {
+      try {
+        const savedTheme = await AsyncStorage.getItem('theme_preference');
+        const preference = (savedTheme as 'light' | 'dark' | 'system') || 'system';
+        
+        if (mounted) {
+          setThemeMode(preference);
+          setCurrentTheme(calculateTheme(preference));
+        }
+      } catch (error) {
+        console.error('Error loading theme preference:', error);
+        if (mounted) {
+          setCurrentTheme(lightTheme);
+        }
       }
+    };
+
+    loadThemePreference();
+
+    return () => {
+      mounted = false;
+    };
+  }, [calculateTheme]);
+
+  useEffect(() => {
+    if (themeMode !== 'system') return;
+
+    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+      setCurrentTheme(calculateTheme('system', colorScheme));
     });
 
     return () => subscription?.remove();
-  }, [themeMode]);
+  }, [themeMode, calculateTheme]);
 
-  const loadThemePreference = async () => {
-    try {
-      const savedTheme = await AsyncStorage.getItem('theme_preference');
-      const preference = (savedTheme as 'light' | 'dark' | 'system') || 'system';
-      setThemeMode(preference);
-      
-      if (preference === 'system') {
-        const systemScheme = Appearance.getColorScheme();
-        setCurrentTheme(systemScheme === 'dark' ? darkTheme : lightTheme);
-      } else {
-        setCurrentTheme(preference === 'dark' ? darkTheme : lightTheme);
-      }
-    } catch (error) {
-      console.error('Error loading theme preference:', error);
-    }
-  };
-
-  const toggleTheme = () => {
+  const toggleTheme = useCallback(() => {
     const newMode = currentTheme.mode === 'light' ? 'dark' : 'light';
     setTheme(newMode);
-  };
+  }, [currentTheme.mode]);
 
-  const setTheme = async (mode: 'light' | 'dark' | 'system') => {
+  const setTheme = useCallback(async (mode: 'light' | 'dark' | 'system') => {
     try {
       setThemeMode(mode);
       await AsyncStorage.setItem('theme_preference', mode);
-      
-      if (mode === 'system') {
-        const systemScheme = Appearance.getColorScheme();
-        setCurrentTheme(systemScheme === 'dark' ? darkTheme : lightTheme);
-      } else {
-        setCurrentTheme(mode === 'dark' ? darkTheme : lightTheme);
-      }
+      setCurrentTheme(calculateTheme(mode));
     } catch (error) {
       console.error('Error saving theme preference:', error);
     }
-  };
+  }, [calculateTheme]);
 
   const value: ThemeContextType = {
     theme: currentTheme,
@@ -2888,6 +3764,7 @@ import { StyleSheet } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { Theme } from '../constants/theme';
 
+// Optimized styles hook with better memoization
 export const useStyles = <T extends StyleSheet.NamedStyles<T>>(
   stylesFn: (theme: Theme) => T
 ): T => {
@@ -2896,6 +3773,24 @@ export const useStyles = <T extends StyleSheet.NamedStyles<T>>(
   return useMemo(() => {
     return StyleSheet.create(stylesFn(theme));
   }, [theme, stylesFn]);
+};
+
+// Performance monitoring hook
+export const usePerformance = () => {
+  const startTime = useMemo(() => Date.now(), []);
+  
+  const measureRender = useMemo(() => (componentName: string) => {
+    const endTime = Date.now();
+    const renderTime = endTime - startTime;
+    
+    if (__DEV__ && renderTime > 100) {
+      console.warn(`Slow render detected in ${componentName}: ${renderTime}ms`);
+    }
+    
+    return renderTime;
+  }, [startTime]);
+
+  return { measureRender };
 };
 ```
 
