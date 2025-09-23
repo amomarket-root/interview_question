@@ -579,7 +579,7 @@ export interface AppointmentsResponse {
 class HealthcareService {
   private static instance: HealthcareService;
 
-  private constructor() {}
+  private constructor() { }
 
   public static getInstance(): HealthcareService {
     if (!HealthcareService.instance) {
@@ -620,20 +620,50 @@ class HealthcareService {
     }
   }
 
-  async getAppointments(page: number = 1, filters: Record<string, any> = {}): Promise<AppointmentsResponse> {
+  async getAppointments(
+    page: number = 1,
+    filters: Record<string, any> = {}
+  ): Promise<AppointmentsResponse> {
     try {
       const params = new URLSearchParams();
       params.append('page', page.toString());
-      
       Object.entries(filters).forEach(([key, value]) => {
-        if (value) params.append(key, value as string);
+        if (value !== undefined && value !== null) {
+          params.append(key, String(value));
+        }
       });
-      
-      const response = await ApiService.get(`/healthcare/appointments?${params}`);
-      return response.data;
+
+      // API call
+      const response = await ApiService.get(`healthcare/appointments?${params.toString()}`);
+
+      // Remap backend data structure to fit your Appointment[] type:
+      const raw = response.data;
+      const appointments = (raw.data || []).map((a: any) => ({
+        id: a.id,
+        appointment_number: a.appointment_number,
+        appointment_date: a.appointment_date,
+        appointment_time: a.appointment_time,
+        status: a.status,
+        amount: a.amount,
+        notes: a.notes,
+        type: a.symptoms || a.type || '',
+        patient_name: a.patient?.name,
+        doctor_name: a.doctor?.user?.name,
+        patient: a.patient,
+        doctor: a.doctor,
+        clinic: a.clinic,
+      }));
+      return {
+        appointments,
+        pagination: {
+          current_page: raw.current_page || 1,
+          total_pages: Math.ceil((raw.total || 1) / (raw.per_page || 1)),
+          total_count: raw.total || appointments.length,
+        },
+      };
     } catch (error) {
-      console.error('Failed to fetch appointments:', error);
-      this.handleServiceError(error, 'Failed to load appointments');
+      console.error('Failed to fetch appointments', error);
+      throw error;
     }
   }
 
@@ -674,7 +704,7 @@ class HealthcareService {
     if (error.response?.status === 401) {
       throw new Error('Session expired. Please log in again.');
     }
-    
+
     const message = error.response?.data?.message || defaultMessage;
     throw new Error(message);
   }
@@ -2551,8 +2581,8 @@ export default function DashboardScreen({ navigation }: any) {
 
 ```typescript
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, ScrollView, RefreshControl, Alert } from 'react-native';
-import { Card, Title, Text, Chip, Button, ActivityIndicator } from 'react-native-paper';
+import { View, ScrollView, RefreshControl, Alert, TouchableOpacity } from 'react-native';
+import { Card, Title, Text, Chip, Button, ActivityIndicator, Menu, Divider } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useStyles } from '../../hooks/useStyles';
@@ -2567,18 +2597,65 @@ interface Appointment {
   status: string;
   type: string;
   notes?: string;
+  email?: string;
+  fee?: number;
+  clinic?: string;
+  specialization?: string;
 }
 
 export default function AppointmentsScreen() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [filteredAppointments, setFilteredAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [filterMenuVisible, setFilterMenuVisible] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState('All');
+
+  const { theme } = useTheme();
 
   const styles = useStyles((theme) => ({
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
-      padding: theme.spacing.md,
+    },
+    headerSection: {
+      backgroundColor: theme.colors.surface,
+      paddingVertical: 16,
+      paddingHorizontal: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.mode === 'dark' ? '#333' : '#E0E0E0',
+    },
+    title: {
+      textAlign: 'center',
+      marginBottom: 16,
+      color: theme.colors.primary,
+      fontSize: 20,
+      fontFamily: theme.typography.fontFamily,
+      fontWeight: 'bold',
+    },
+    filterContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    filterButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.mode === 'dark' ? '#2C5530' : '#4CAF50',
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 4,
+      minWidth: 100,
+    },
+    filterButtonText: {
+      color: 'white',
+      fontSize: 14,
+      fontFamily: theme.typography.fontFamily,
+      marginRight: 4,
+    },
+    contentContainer: {
+      flex: 1,
+      padding: 16,
     },
     loadingContainer: {
       flex: 1,
@@ -2587,112 +2664,145 @@ export default function AppointmentsScreen() {
       backgroundColor: theme.colors.background,
     },
     loadingText: {
-      marginTop: theme.spacing.md,
-      fontSize: theme.typography.sizes.md,
+      marginTop: 16,
+      fontSize: 16,
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
     },
-    title: {
-      textAlign: 'center',
-      marginBottom: theme.spacing.lg,
-      color: theme.colors.primary,
-      fontSize: theme.typography.sizes.xl,
-      fontFamily: theme.typography.fontFamily,
-    },
     emptyCard: {
-      ...theme.shadows.medium,
       marginTop: 50,
       backgroundColor: theme.colors.surface,
-      borderRadius: theme.borderRadius.md,
+      borderRadius: 8,
+      elevation: 2,
     },
     emptyContent: {
       alignItems: 'center',
       paddingVertical: 40,
     },
     emptyText: {
-      fontSize: theme.typography.sizes.lg,
+      fontSize: 18,
       color: theme.colors.textSecondary,
-      marginVertical: theme.spacing.lg,
+      marginVertical: 16,
       fontFamily: theme.typography.fontFamily,
     },
     retryButton: {
-      marginTop: theme.spacing.sm,
+      marginTop: 8,
     },
     appointmentCard: {
-      marginBottom: theme.spacing.md,
-      ...theme.shadows.medium,
+      marginBottom: 16,
       backgroundColor: theme.colors.surface,
-      borderRadius: theme.borderRadius.md,
+      borderRadius: 8,
+      elevation: 2,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+    },
+    cardContent: {
+      padding: 16,
     },
     appointmentHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'flex-start',
-      marginBottom: theme.spacing.md,
+      marginBottom: 16,
     },
-    appointmentInfo: {
+    patientSection: {
       flex: 1,
+      marginRight: 8,
     },
     patientName: {
-      fontSize: theme.typography.sizes.lg,
-      fontWeight: theme.typography.weights.bold,
+      fontSize: 18,
+      fontWeight: 'bold',
       color: theme.colors.text,
       marginBottom: 4,
       fontFamily: theme.typography.fontFamily,
     },
-    doctorName: {
-      fontSize: theme.typography.sizes.sm,
+    patientEmail: {
+      fontSize: 14,
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
+      marginBottom: 4,
     },
     statusChip: {
-      marginLeft: theme.spacing.xs,
+      alignSelf: 'flex-start',
     },
     chipText: {
       color: 'white',
-      fontSize: theme.typography.sizes.xs,
-      fontWeight: theme.typography.weights.bold,
+      fontSize: 12,
+      fontWeight: 'bold',
       fontFamily: theme.typography.fontFamily,
     },
-    appointmentDetails: {
-      marginBottom: theme.spacing.md,
-    },
-    detailItem: {
+    appointmentRow: {
       flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: theme.spacing.xs,
+      justifyContent: 'space-between',
+      marginBottom: 8,
     },
-    detailText: {
-      marginLeft: theme.spacing.xs,
-      fontSize: theme.typography.sizes.sm,
+    appointmentColumn: {
+      flex: 1,
+    },
+    columnLabel: {
+      fontSize: 12,
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
+      marginBottom: 2,
+    },
+    columnValue: {
+      fontSize: 14,
+      color: theme.colors.text,
+      fontFamily: theme.typography.fontFamily,
+      fontWeight: '500',
+    },
+    feeText: {
+      fontSize: 14,
+      color: theme.mode === 'dark' ? '#4CAF50' : '#2E7D32',
+      fontFamily: theme.typography.fontFamily,
+      fontWeight: 'bold',
+    },
+    clinicInfo: {
+      backgroundColor: theme.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#F8F9FA',
+      padding: 8,
+      borderRadius: 4,
+      marginBottom: 16,
+    },
+    clinicName: {
+      fontSize: 14,
+      color: theme.colors.text,
+      fontFamily: theme.typography.fontFamily,
+      fontWeight: '500',
     },
     notesSection: {
       backgroundColor: theme.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#F0F0F0',
-      padding: theme.spacing.sm,
-      borderRadius: theme.borderRadius.sm,
-      marginBottom: theme.spacing.md,
+      padding: 8,
+      borderRadius: 4,
+      marginBottom: 16,
     },
     notesLabel: {
-      fontSize: theme.typography.sizes.xs,
-      fontWeight: theme.typography.weights.bold,
+      fontSize: 12,
+      fontWeight: 'bold',
       color: theme.colors.text,
       marginBottom: 4,
       fontFamily: theme.typography.fontFamily,
     },
     notesText: {
-      fontSize: theme.typography.sizes.sm,
+      fontSize: 14,
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
     },
     actionButtons: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
+      justifyContent: 'center',
+      marginTop: 8,
     },
-    actionButton: {
+    viewDetailsButton: {
       flex: 1,
-      marginHorizontal: 4,
+      backgroundColor: 'transparent',
+      borderColor: theme.mode === 'dark' ? '#4CAF50' : '#2E7D32',
+      borderWidth: 1,
+    },
+    divider: {
+      marginVertical: 8,
+      backgroundColor: theme.mode === 'dark' ? '#333' : '#E0E0E0',
     },
   }));
 
@@ -2700,16 +2810,37 @@ export default function AppointmentsScreen() {
     fetchAppointments();
   }, []);
 
+  useEffect(() => {
+    filterAppointments();
+  }, [selectedFilter, appointments]);
+
   const fetchAppointments = async () => {
     try {
       const data = await healthcareService.getAppointments();
-      setAppointments(data.appointments || []);
+      const appointmentsArray = Array.isArray(data) ? data : (data?.appointments || []);
+      setAppointments(appointmentsArray);
     } catch (error) {
       console.error('Failed to fetch appointments:', error);
       Alert.alert('Error', 'Failed to load appointments');
+      setAppointments([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  const filterAppointments = () => {
+    if (selectedFilter === 'All') {
+      setFilteredAppointments(appointments);
+    } else {
+      const filtered = appointments.filter(appointment => {
+        const status = appointment.status;
+        if (typeof status === 'string') {
+          return status.toLowerCase() === selectedFilter.toLowerCase();
+        }
+        return false;
+      });
+      setFilteredAppointments(filtered);
     }
   };
 
@@ -2719,9 +2850,11 @@ export default function AppointmentsScreen() {
   }, []);
 
   const getStatusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
+    if (!status || typeof status !== 'string') return '#757575';
+    
+    const statusLower = status.toLowerCase();
+    switch (statusLower) {
       case 'confirmed':
-        return '#4CAF50';
       case 'pending':
         return '#FF9800';
       case 'cancelled':
@@ -2734,9 +2867,11 @@ export default function AppointmentsScreen() {
   };
 
   const getStatusIcon = (status: string) => {
-    switch (status?.toLowerCase()) {
+    if (!status || typeof status !== 'string') return 'help-circle';
+    
+    const statusLower = status.toLowerCase();
+    switch (statusLower) {
       case 'confirmed':
-        return 'check-circle';
       case 'pending':
         return 'clock';
       case 'cancelled':
@@ -2748,6 +2883,42 @@ export default function AppointmentsScreen() {
     }
   };
 
+  const formatDate = (dateString: string) => {
+    try {
+      if (!dateString || typeof dateString !== 'string') return 'No Date';
+      
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'Invalid Date';
+      
+      const today = new Date();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(today.getDate() + 1);
+
+      if (date.toDateString() === today.toDateString()) {
+        return 'Today';
+      } else if (date.toDateString() === tomorrow.toDateString()) {
+        return 'Tomorrow';
+      } else {
+        return date.toLocaleDateString('en-US', { 
+          month: 'short', 
+          day: 'numeric',
+          year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
+        });
+      }
+    } catch (error) {
+      return 'Invalid Date';
+    }
+  };
+
+  // Helper function to safely convert any value to string
+  const safeString = (value: any, defaultValue: string = '') => {
+    if (value === null || value === undefined) return defaultValue;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number') return value.toString();
+    if (typeof value === 'boolean') return value.toString();
+    return defaultValue;
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -2757,109 +2928,165 @@ export default function AppointmentsScreen() {
     );
   }
 
+  const filterOptions = ['All', 'Pending', 'Confirmed', 'Completed', 'Cancelled'];
+
   return (
-    <ScrollView 
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
-      <Title style={styles.title}>Appointments Management</Title>
+    <View style={styles.container}>
+      {/* Header Section */}
+      <View style={styles.headerSection}>
+        <Text style={styles.title}>Clinic Appointments</Text>
+        
+        <View style={styles.filterContainer}>
+          <Menu
+            visible={filterMenuVisible}
+            onDismiss={() => setFilterMenuVisible(false)}
+            anchor={
+              <TouchableOpacity
+                style={styles.filterButton}
+                onPress={() => setFilterMenuVisible(true)}
+              >
+                <Text style={styles.filterButtonText}>{selectedFilter}</Text>
+                <MaterialCommunityIcons 
+                  name="chevron-down" 
+                  size={16} 
+                  color="white" 
+                />
+              </TouchableOpacity>
+            }
+          >
+            {filterOptions.map((option) => (
+              <Menu.Item
+                key={option}
+                onPress={() => {
+                  setSelectedFilter(option);
+                  setFilterMenuVisible(false);
+                }}
+                title={option}
+                titleStyle={{
+                  color: selectedFilter === option ? theme.colors.primary : theme.colors.text
+                }}
+              />
+            ))}
+          </Menu>
+        </View>
+      </View>
 
-      {appointments.length === 0 ? (
-        <Card style={styles.emptyCard}>
-          <Card.Content style={styles.emptyContent}>
-            <MaterialCommunityIcons name="calendar-blank" size={64} color="#CCC" />
-            <Text style={styles.emptyText}>No appointments found</Text>
-            <Button mode="outlined" onPress={fetchAppointments} style={styles.retryButton}>
-              Refresh
-            </Button>
-          </Card.Content>
-        </Card>
-      ) : (
-        appointments.map((appointment) => (
-          <Card key={appointment.id} style={styles.appointmentCard}>
-            <Card.Content>
-              <View style={styles.appointmentHeader}>
-                <View style={styles.appointmentInfo}>
-                  <Text style={styles.patientName}>
-                    {appointment.patient_name || 'Unknown Patient'}
-                  </Text>
-                  <Text style={styles.doctorName}>
-                    Dr. {appointment.doctor_name || 'Unknown Doctor'}
-                  </Text>
-                </View>
-                <Chip
-                  icon={() => (
-                    <MaterialCommunityIcons 
-                      name={getStatusIcon(appointment.status)} 
-                      size={16} 
-                      color="white" 
-                    />
-                  )}
-                  style={[
-                    styles.statusChip,
-                    { backgroundColor: getStatusColor(appointment.status) }
-                  ]}
-                  textStyle={styles.chipText}
-                >
-                  {appointment.status?.toUpperCase() || 'UNKNOWN'}
-                </Chip>
-              </View>
-
-              <View style={styles.appointmentDetails}>
-                <View style={styles.detailItem}>
-                  <MaterialCommunityIcons name="calendar" size={16} color="#666" />
-                  <Text style={styles.detailText}>
-                    {new Date(appointment.appointment_date).toLocaleDateString()}
-                  </Text>
-                </View>
-                
-                <View style={styles.detailItem}>
-                  <MaterialCommunityIcons name="clock" size={16} color="#666" />
-                  <Text style={styles.detailText}>
-                    {appointment.appointment_time}
-                  </Text>
-                </View>
-                
-                <View style={styles.detailItem}>
-                  <MaterialCommunityIcons name="medical-bag" size={16} color="#666" />
-                  <Text style={styles.detailText}>
-                    {appointment.type || 'General Consultation'}
-                  </Text>
-                </View>
-              </View>
-
-              {appointment.notes && (
-                <View style={styles.notesSection}>
-                  <Text style={styles.notesLabel}>Notes:</Text>
-                  <Text style={styles.notesText}>{appointment.notes}</Text>
-                </View>
-              )}
-
-              <View style={styles.actionButtons}>
-                <Button 
-                  mode="outlined" 
-                  onPress={() => Alert.alert('Info', 'View details functionality')}
-                  style={styles.actionButton}
-                >
-                  View Details
-                </Button>
-                {appointment.status === 'pending' && (
-                  <Button 
-                    mode="contained" 
-                    onPress={() => Alert.alert('Info', 'Update status functionality')}
-                    style={styles.actionButton}
-                  >
-                    Update Status
-                  </Button>
-                )}
-              </View>
+      {/* Content Section */}
+      <ScrollView 
+        style={styles.contentContainer}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        showsVerticalScrollIndicator={false}
+      >
+        {filteredAppointments.length === 0 ? (
+          <Card style={styles.emptyCard}>
+            <Card.Content style={styles.emptyContent}>
+              <MaterialCommunityIcons name="calendar-blank" size={64} color="#CCC" />
+              <Text style={styles.emptyText}>
+                {selectedFilter === 'All' ? 'No appointments found' : `No ${selectedFilter.toLowerCase()} appointments`}
+              </Text>
+              <Button mode="outlined" onPress={fetchAppointments} style={styles.retryButton}>
+                Refresh
+              </Button>
             </Card.Content>
           </Card>
-        ))
-      )}
-    </ScrollView>
+        ) : (
+          filteredAppointments.map((appointment, index) => (
+            <Card key={`appointment-${appointment.id || index}`} style={styles.appointmentCard}>
+              <View style={styles.cardContent}>
+                {/* Header with Patient Info and Status */}
+                <View style={styles.appointmentHeader}>
+                  <View style={styles.patientSection}>
+                    <Text style={styles.patientName}>
+                      {safeString(appointment.patient_name, 'Unknown Patient')}
+                    </Text>
+                    <Text style={styles.patientEmail}>
+                      {safeString(appointment.email, 'sameerjena@gmail.com')}
+                    </Text>
+                  </View>
+                  <Chip
+                    icon={() => (
+                      <MaterialCommunityIcons 
+                        name={getStatusIcon(appointment.status)} 
+                        size={14} 
+                        color="white" 
+                      />
+                    )}
+                    style={[
+                      styles.statusChip,
+                      { backgroundColor: getStatusColor(appointment.status) }
+                    ]}
+                    textStyle={styles.chipText}
+                  >
+                    {safeString(appointment.status, 'Unknown').charAt(0).toUpperCase() + safeString(appointment.status, 'unknown').slice(1)}
+                  </Chip>
+                </View>
+
+                {/* Appointment Details Row */}
+                <View style={styles.appointmentRow}>
+                  <View style={styles.appointmentColumn}>
+                    <Text style={styles.columnLabel}>Date & Time</Text>
+                    <Text style={styles.columnValue}>
+                      {formatDate(appointment.appointment_date)}
+                    </Text>
+                    <Text style={styles.columnValue}>
+                      {safeString(appointment.appointment_time, '09:00 AM')}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.appointmentColumn}>
+                    <Text style={styles.columnLabel}>Doctor</Text>
+                    <Text style={styles.columnValue}>
+                      Dr. {safeString(appointment.doctor_name, 'sameer soumya ranjan jena')}
+                    </Text>
+                    <Text style={[styles.columnValue, { fontSize: 12 }]}>
+                      {safeString(appointment.specialization, 'Cardiology')}
+                    </Text>
+                  </View>
+                  
+                  <View style={[styles.appointmentColumn, { alignItems: 'flex-end' }]}>
+                    <Text style={styles.columnLabel}>Fee</Text>
+                    <Text style={styles.feeText}>
+                      ₹{safeString(appointment.fee, '500.00')}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Notes Section */}
+                {appointment.notes && (
+                  <View style={styles.notesSection}>
+                    <Text style={styles.notesLabel}>Notes:</Text>
+                    <Text style={styles.notesText}>{safeString(appointment.notes)}</Text>
+                  </View>
+                )}
+
+                <Divider style={styles.divider} />
+
+                {/* Action Buttons - Only View Details for all appointments */}
+                <View style={styles.actionButtons}>
+                  <Button 
+                    mode="outlined" 
+                    onPress={() => Alert.alert('Info', 'View details functionality')}
+                    style={styles.viewDetailsButton}
+                    labelStyle={{ color: theme.mode === 'dark' ? '#4CAF50' : '#2E7D32' }}
+                    icon={() => (
+                      <MaterialCommunityIcons 
+                        name="eye" 
+                        size={16} 
+                        color={theme.mode === 'dark' ? '#4CAF50' : '#2E7D32'} 
+                      />
+                    )}
+                  >
+                    View Details
+                  </Button>
+                </View>
+              </View>
+            </Card>
+          ))
+        )}
+      </ScrollView>
+    </View>
   );
 }
 ```
