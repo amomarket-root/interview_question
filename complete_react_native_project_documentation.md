@@ -131,6 +131,7 @@ VisitCareHealthcare/
     "web": "expo start --web"
   },
   "dependencies": {
+    "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-navigation/bottom-tabs": "^7.4.7",
     "@react-navigation/native": "^7.1.17",
@@ -430,10 +431,13 @@ export default new HealthcareService();
 ### 4. Login Screen (`src/screens/auth/LoginScreen.tsx`)
 
 ```typescript
+// SOLUTION 1: Updated LoginScreen with alternative icon implementation
+
 import React, { useState } from 'react';
-import { View, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
-import { TextInput, Button, Card, Title, Text, HelperText } from 'react-native-paper';
+import { View, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import { TextInput, Button, Card, Title, Text, HelperText, IconButton } from 'react-native-paper';
 import { useForm, Controller } from 'react-hook-form';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import authService, { LoginCredentials } from '../../services/authService';
 
 interface LoginScreenProps {
@@ -443,6 +447,7 @@ interface LoginScreenProps {
 export default function LoginScreen({ navigation }: LoginScreenProps) {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [imageError, setImageError] = useState(false);
   
   const { control, handleSubmit, formState: { errors } } = useForm<LoginCredentials>({
     defaultValues: {
@@ -462,7 +467,12 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
       Alert.alert(
         'Login Successful', 
         `Welcome ${response.user.name}!`,
-        [{ text: 'OK', onPress: () => navigation.navigate('Dashboard') }]
+        [{ 
+          text: 'OK', 
+          onPress: () => {
+            console.log('Login completed, navigation will update automatically');
+          }
+        }]
       );
     } catch (error: any) {
       console.error('Login failed:', error);
@@ -477,27 +487,6 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
     }
   };
 
-  const handleTestLogin = () => {
-    // Pre-fill with test credentials for healthcare user
-    Alert.alert(
-      'Test Login',
-      'Would you like to use test credentials?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Use Test Healthcare', 
-          onPress: () => {
-            // You can update these with actual test credentials from your database
-            onLogin({ 
-              email: 'healthcare@test.com', 
-              password: 'password123' 
-            });
-          }
-        }
-      ]
-    );
-  };
-
   return (
     <KeyboardAvoidingView 
       style={styles.container} 
@@ -507,6 +496,20 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
         <View style={styles.content}>
           <Card style={styles.card}>
             <Card.Content>
+              {/* App Logo */}
+              <View style={styles.iconContainer}>
+                {!imageError ? (
+                  <Image 
+                    source={require('../../../assets/images/icon.webp')} 
+                    style={styles.logoImage}
+                    resizeMode="contain"
+                    onError={() => setImageError(true)}
+                  />
+                ) : (
+                  <Icon name="hospital-box" size={80} color="#2E7D32" />
+                )}
+              </View>
+              
               <Title style={styles.title}>Visit Care Healthcare</Title>
               <Text style={styles.subtitle}>Healthcare Management System</Text>
               
@@ -533,6 +536,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
                       autoCorrect={false}
                       error={!!errors.email}
                       disabled={loading}
+                      left={<TextInput.Icon icon="email" />}
                     />
                     {errors.email && (
                       <HelperText type="error" visible={!!errors.email}>
@@ -564,6 +568,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
                       style={styles.input}
                       error={!!errors.password}
                       disabled={loading}
+                      left={<TextInput.Icon icon="lock" />}
                       right={
                         <TextInput.Icon 
                           icon={showPassword ? "eye-off" : "eye"} 
@@ -587,17 +592,9 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
                 disabled={loading}
                 style={styles.button}
                 contentStyle={styles.buttonContent}
+                icon="login"
               >
                 {loading ? 'Logging in...' : 'Login'}
-              </Button>
-
-              <Button
-                mode="outlined"
-                onPress={handleTestLogin}
-                disabled={loading}
-                style={styles.testButton}
-              >
-                Use Test Credentials
               </Button>
               
               <Button
@@ -605,11 +602,49 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
                 onPress={() => navigation.navigate('Register')}
                 disabled={loading}
                 style={styles.linkButton}
+                icon="account-plus"
               >
                 Don't have an account? Register
               </Button>
+
+              <Button
+                mode="text"
+                onPress={() => Alert.alert('Info', 'Forgot password functionality will be implemented')}
+                disabled={loading}
+                style={styles.linkButton}
+                icon="help-circle"
+              >
+                Forgot Password?
+              </Button>
             </Card.Content>
           </Card>
+
+          {/* Footer - Alternative implementation using React Native Paper IconButton */}
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>
+              Secure healthcare management platform
+            </Text>
+            <View style={styles.securityIcons}>
+              <IconButton 
+                icon="shield-check" 
+                iconColor="#4CAF50" 
+                size={20}
+                style={styles.iconButton}
+              />
+              <IconButton 
+                icon="lock" 
+                iconColor="#4CAF50" 
+                size={20}
+                style={styles.iconButton}
+              />
+              <IconButton 
+                icon="hospital" 
+                iconColor="#4CAF50" 
+                size={20}
+                style={styles.iconButton}
+              />
+            </View>
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -633,7 +668,17 @@ const styles = StyleSheet.create({
   card: {
     padding: 16,
     elevation: 4,
-    borderRadius: 12
+    borderRadius: 12,
+    backgroundColor: 'white'
+  },
+  iconContainer: {
+    alignItems: 'center',
+    marginBottom: 16
+  },
+  logoImage: {
+    width: 100,
+    height: 80,
+    marginBottom: 8
   },
   title: {
     textAlign: 'center',
@@ -658,11 +703,27 @@ const styles = StyleSheet.create({
   buttonContent: {
     paddingVertical: 8
   },
-  testButton: {
-    marginBottom: 16
-  },
   linkButton: {
     marginTop: 8
+  },
+  footer: {
+    alignItems: 'center',
+    marginTop: 32,
+    paddingTop: 16
+  },
+  footerText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8
+  },
+  securityIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  iconButton: {
+    margin: 0,
+    marginHorizontal: 4
   }
 });
 ```
@@ -670,9 +731,10 @@ const styles = StyleSheet.create({
 
 ```typescript
 import React, { useState } from 'react';
-import { View, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { TextInput, Button, Card, Title, Text, HelperText, RadioButton } from 'react-native-paper';
 import { useForm, Controller } from 'react-hook-form';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import authService, { RegisterData } from '../../services/authService';
 
 interface RegisterScreenProps {
@@ -683,6 +745,7 @@ export default function RegisterScreen({ navigation }: RegisterScreenProps) {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [imageError, setImageError] = useState(false);
   
   const { control, handleSubmit, formState: { errors }, watch } = useForm<RegisterData>({
     defaultValues: {
@@ -711,7 +774,13 @@ export default function RegisterScreen({ navigation }: RegisterScreenProps) {
       Alert.alert(
         'Registration Successful', 
         `Welcome ${response.user.name}! Your account has been created.`,
-        [{ text: 'OK', onPress: () => navigation.replace('Main') }]
+        [{ 
+          text: 'OK', 
+          onPress: () => {
+            // Navigation will be handled automatically by the auth state change
+            console.log('Registration completed, navigation will update automatically');
+          }
+        }]
       );
     } catch (error: any) {
       console.error('Registration failed:', error);
@@ -735,6 +804,20 @@ export default function RegisterScreen({ navigation }: RegisterScreenProps) {
         <View style={styles.content}>
           <Card style={styles.card}>
             <Card.Content>
+              {/* App Logo - Local WebP Image */}
+              <View style={styles.iconContainer}>
+                {!imageError ? (
+                  <Image 
+                    source={require('../../../assets/images/icon.webp')} 
+                    style={styles.logoImage}
+                    resizeMode="contain"
+                    onError={() => setImageError(true)}
+                  />
+                ) : (
+                  <MaterialCommunityIcons name="hospital-box" size={60} color="#2E7D32" />
+                )}
+              </View>
+              
               <Title style={styles.title}>Create Account</Title>
               <Text style={styles.subtitle}>Join Visit Care Healthcare</Text>
               
@@ -752,6 +835,7 @@ export default function RegisterScreen({ navigation }: RegisterScreenProps) {
                       style={styles.input}
                       error={!!errors.name}
                       disabled={loading}
+                      left={<TextInput.Icon icon="account" />}
                     />
                     {errors.name && (
                       <HelperText type="error" visible={!!errors.name}>
@@ -784,6 +868,7 @@ export default function RegisterScreen({ navigation }: RegisterScreenProps) {
                       autoCapitalize="none"
                       error={!!errors.email}
                       disabled={loading}
+                      left={<TextInput.Icon icon="email" />}
                     />
                     {errors.email && (
                       <HelperText type="error" visible={!!errors.email}>
@@ -806,6 +891,7 @@ export default function RegisterScreen({ navigation }: RegisterScreenProps) {
                     style={styles.input}
                     keyboardType="phone-pad"
                     disabled={loading}
+                    left={<TextInput.Icon icon="phone" />}
                   />
                 )}
               />
@@ -818,15 +904,8 @@ export default function RegisterScreen({ navigation }: RegisterScreenProps) {
                   <View style={styles.radioGroup}>
                     <RadioButton.Group onValueChange={onChange} value={value}>
                       <View style={styles.radioItem}>
-                        <RadioButton value="patient" />
-                        <Text style={styles.radioLabel}>Patient</Text>
-                      </View>
-                      <View style={styles.radioItem}>
-                        <RadioButton value="doctor" />
-                        <Text style={styles.radioLabel}>Doctor</Text>
-                      </View>
-                      <View style={styles.radioItem}>
                         <RadioButton value="healthcare" />
+                        <MaterialCommunityIcons name="hospital-building" size={20} color="#666" style={{ marginLeft: 8 }} />
                         <Text style={styles.radioLabel}>Healthcare Provider</Text>
                       </View>
                     </RadioButton.Group>
@@ -855,6 +934,7 @@ export default function RegisterScreen({ navigation }: RegisterScreenProps) {
                       style={styles.input}
                       error={!!errors.password}
                       disabled={loading}
+                      left={<TextInput.Icon icon="lock" />}
                       right={
                         <TextInput.Icon 
                           icon={showPassword ? "eye-off" : "eye"} 
@@ -889,6 +969,7 @@ export default function RegisterScreen({ navigation }: RegisterScreenProps) {
                       style={styles.input}
                       error={!!errors.password_confirmation}
                       disabled={loading}
+                      left={<TextInput.Icon icon="lock-check" />}
                       right={
                         <TextInput.Icon 
                           icon={showConfirmPassword ? "eye-off" : "eye"} 
@@ -912,6 +993,7 @@ export default function RegisterScreen({ navigation }: RegisterScreenProps) {
                 disabled={loading}
                 style={styles.button}
                 contentStyle={styles.buttonContent}
+                icon="account-plus"
               >
                 {loading ? 'Creating Account...' : 'Register'}
               </Button>
@@ -921,6 +1003,7 @@ export default function RegisterScreen({ navigation }: RegisterScreenProps) {
                 onPress={() => navigation.navigate('Login')}
                 disabled={loading}
                 style={styles.linkButton}
+                icon="login"
               >
                 Already have an account? Login
               </Button>
@@ -949,7 +1032,17 @@ const styles = StyleSheet.create({
   card: {
     padding: 16,
     elevation: 4,
-    borderRadius: 12
+    borderRadius: 12,
+    backgroundColor: 'white'
+  },
+  iconContainer: {
+    alignItems: 'center',
+    marginBottom: 16
+  },
+  logoImage: {
+    width: 80,
+    height: 60,
+    marginBottom: 8
   },
   title: {
     textAlign: 'center',
@@ -1008,7 +1101,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, StyleSheet } from 'react-native';
 import { ActivityIndicator, Button } from 'react-native-paper';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import authService from '../services/authService';
 import LoginScreen from '../screens/auth/LoginScreen';
@@ -1029,20 +1122,6 @@ function LoadingScreen() {
   );
 }
 
-function AuthStack() {
-  return (
-    <Stack.Navigator 
-      initialRouteName="Login"
-      screenOptions={{
-        headerShown: false
-      }}
-    >
-      <Stack.Screen name="Login" component={LoginScreen} />
-      <Stack.Screen name="Register" component={RegisterScreen} />
-    </Stack.Navigator>
-  );
-}
-
 function MainTabs() {
   const [currentUser, setCurrentUser] = useState<any>(null);
 
@@ -1057,21 +1136,22 @@ function MainTabs() {
 
   const handleLogout = async () => {
     await authService.logout();
-    // Navigation will be handled by the auth state change
+    // The auth state will be updated automatically and trigger re-navigation
   };
 
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName;
+          let iconName: keyof typeof MaterialCommunityIcons.glyphMap;
           
           switch (route.name) {
             case 'Dashboard':
-              iconName = focused ? 'view-dashboard' : 'view-dashboard-outline';
+              // Fixed: Use correct icon names that exist in MaterialCommunityIcons
+              iconName = focused ? 'view-dashboard' : 'view-dashboard-variant';
               break;
             case 'Appointments':
-              iconName = focused ? 'calendar-clock' : 'calendar-clock-outline';
+              iconName = focused ? 'calendar-clock' : 'calendar-outline';
               break;
             case 'Profile':
               iconName = focused ? 'account' : 'account-outline';
@@ -1080,7 +1160,7 @@ function MainTabs() {
               iconName = 'circle';
           }
           
-          return <Icon name={iconName} size={size} color={color} />;
+          return <MaterialCommunityIcons name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: '#2E7D32',
         tabBarInactiveTintColor: 'gray',
@@ -1109,18 +1189,25 @@ export default function AppNavigator() {
 
   useEffect(() => {
     checkAuthState();
+    
+    // Listen for auth state changes
+    const interval = setInterval(checkAuthState, 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const checkAuthState = async () => {
     try {
       const authenticated = await authService.isAuthenticated();
-      console.log('Auth state checked:', authenticated);
-      setIsAuthenticated(authenticated);
+      if (authenticated !== isAuthenticated) {
+        setIsAuthenticated(authenticated);
+      }
     } catch (error) {
       console.error('Error checking auth state:', error);
       setIsAuthenticated(false);
     } finally {
-      setIsLoading(false);
+      if (isLoading) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -1130,13 +1217,17 @@ export default function AppNavigator() {
 
   return (
     <NavigationContainer>
-      {isAuthenticated ? (
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {isAuthenticated ? (
+          // Fixed: Changed from 'MainTabs' to 'Main' to match LoginScreen navigation
           <Stack.Screen name="Main" component={MainTabs} />
-        </Stack.Navigator>
-      ) : (
-        <AuthStack />
-      )}
+        ) : (
+          <>
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="Register" component={RegisterScreen} />
+          </>
+        )}
+      </Stack.Navigator>
     </NavigationContainer>
   );
 }
@@ -1162,7 +1253,7 @@ const styles = StyleSheet.create({
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl, Alert } from 'react-native';
 import { Card, Title, Paragraph, Button, Text, ActivityIndicator } from 'react-native-paper';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import healthcareService from '../../services/healthcareService';
 import authService from '../../services/authService';
 
@@ -1226,7 +1317,7 @@ export default function DashboardScreen({ navigation }: any) {
     <Card style={[styles.statCard, { borderLeftColor: color }]}>
       <Card.Content style={styles.statContent}>
         <View style={styles.statHeader}>
-          <Icon name={icon} size={24} color={color} />
+          <MaterialCommunityIcons name={icon} size={24} color={color} />
           <Text style={[styles.statValue, { color }]}>{value || 0}</Text>
         </View>
         <Text style={styles.statTitle}>{title}</Text>
@@ -1342,7 +1433,7 @@ export default function DashboardScreen({ navigation }: any) {
       <View style={styles.actionsGrid}>
         <Card style={styles.actionCard}>
           <Card.Content style={styles.actionContent}>
-            <Icon name="calendar-plus" size={32} color="#2E7D32" />
+            <MaterialCommunityIcons name="calendar-plus" size={32} color="#2E7D32" />
             <Button
               mode="outlined"
               onPress={() => navigation.navigate('Appointments')}
@@ -1355,7 +1446,7 @@ export default function DashboardScreen({ navigation }: any) {
 
         <Card style={styles.actionCard}>
           <Card.Content style={styles.actionContent}>
-            <Icon name="account-cog" size={32} color="#2E7D32" />
+            <MaterialCommunityIcons name="account-cog" size={32} color="#2E7D32" />
             <Button
               mode="outlined"
               onPress={() => navigation.navigate('Profile')}
@@ -1373,11 +1464,11 @@ export default function DashboardScreen({ navigation }: any) {
       <Card style={styles.activityCard}>
         <Card.Content>
           <View style={styles.activityItem}>
-            <Icon name="check-circle" size={20} color="#4CAF50" />
+            <MaterialCommunityIcons name="check-circle" size={20} color="#4CAF50" />
             <Text style={styles.activityText}>Dashboard loaded successfully</Text>
           </View>
           <View style={styles.activityItem}>
-            <Icon name="update" size={20} color="#FF9800" />
+            <MaterialCommunityIcons name="update" size={20} color="#FF9800" />
             <Text style={styles.activityText}>Data last updated: {new Date().toLocaleTimeString()}</Text>
           </View>
         </Card.Content>
@@ -1499,7 +1590,7 @@ const styles = StyleSheet.create({
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl, Alert } from 'react-native';
 import { Card, Title, Text, Chip, Button, ActivityIndicator } from 'react-native-paper';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import healthcareService from '../../services/healthcareService';
 
 interface Appointment {
@@ -1591,7 +1682,7 @@ export default function AppointmentsScreen() {
       {appointments.length === 0 ? (
         <Card style={styles.emptyCard}>
           <Card.Content style={styles.emptyContent}>
-            <Icon name="calendar-blank" size={64} color="#CCC" />
+            <MaterialCommunityIcons name="calendar-blank" size={64} color="#CCC" />
             <Text style={styles.emptyText}>No appointments found</Text>
             <Button mode="outlined" onPress={fetchAppointments} style={styles.retryButton}>
               Refresh
@@ -1613,7 +1704,7 @@ export default function AppointmentsScreen() {
                 </View>
                 <Chip
                   icon={() => (
-                    <Icon 
+                    <MaterialCommunityIcons 
                       name={getStatusIcon(appointment.status)} 
                       size={16} 
                       color="white" 
@@ -1631,21 +1722,21 @@ export default function AppointmentsScreen() {
 
               <View style={styles.appointmentDetails}>
                 <View style={styles.detailItem}>
-                  <Icon name="calendar" size={16} color="#666" />
+                  <MaterialCommunityIcons name="calendar" size={16} color="#666" />
                   <Text style={styles.detailText}>
                     {new Date(appointment.appointment_date).toLocaleDateString()}
                   </Text>
                 </View>
                 
                 <View style={styles.detailItem}>
-                  <Icon name="clock" size={16} color="#666" />
+                  <MaterialCommunityIcons name="clock" size={16} color="#666" />
                   <Text style={styles.detailText}>
                     {appointment.appointment_time}
                   </Text>
                 </View>
                 
                 <View style={styles.detailItem}>
-                  <Icon name="medical-bag" size={16} color="#666" />
+                  <MaterialCommunityIcons name="medical-bag" size={16} color="#666" />
                   <Text style={styles.detailText}>
                     {appointment.type || 'General Consultation'}
                   </Text>
@@ -1795,13 +1886,13 @@ const styles = StyleSheet.create({
 });
 ```
 
-### 9. Appointments Screen (`src/screens/profile/ProfileScreen.tsx`)
+### 9. Profile Screen (`src/screens/profile/ProfileScreen.tsx`)
 
 ```typescript
 import React, { useEffect, useState } from 'react';
 import { View, ScrollView, StyleSheet, Alert } from 'react-native';
 import { Card, Title, Text, Button, Avatar, Divider } from 'react-native-paper';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import authService from '../../services/authService';
 import healthcareService from '../../services/healthcareService';
 
@@ -1898,7 +1989,7 @@ export default function ProfileScreen({ navigation }: any) {
           <Title style={styles.sectionTitle}>Account Information</Title>
           
           <View style={styles.detailRow}>
-            <Icon name="account" size={20} color="#666" />
+            <MaterialCommunityIcons name="account" size={20} color="#666" />
             <View style={styles.detailContent}>
               <Text style={styles.detailLabel}>Full Name</Text>
               <Text style={styles.detailValue}>{user.name || 'Not provided'}</Text>
@@ -1908,7 +1999,7 @@ export default function ProfileScreen({ navigation }: any) {
           <Divider style={styles.divider} />
 
           <View style={styles.detailRow}>
-            <Icon name="email" size={20} color="#666" />
+            <MaterialCommunityIcons name="email" size={20} color="#666" />
             <View style={styles.detailContent}>
               <Text style={styles.detailLabel}>Email Address</Text>
               <Text style={styles.detailValue}>{user.email}</Text>
@@ -1918,7 +2009,7 @@ export default function ProfileScreen({ navigation }: any) {
           <Divider style={styles.divider} />
 
           <View style={styles.detailRow}>
-            <Icon name="phone" size={20} color="#666" />
+            <MaterialCommunityIcons name="phone" size={20} color="#666" />
             <View style={styles.detailContent}>
               <Text style={styles.detailLabel}>Phone Number</Text>
               <Text style={styles.detailValue}>{user.phone || 'Not provided'}</Text>
@@ -1928,7 +2019,7 @@ export default function ProfileScreen({ navigation }: any) {
           <Divider style={styles.divider} />
 
           <View style={styles.detailRow}>
-            <Icon name="badge-account" size={20} color="#666" />
+            <MaterialCommunityIcons name="badge-account" size={20} color="#666" />
             <View style={styles.detailContent}>
               <Text style={styles.detailLabel}>User Type</Text>
               <Text style={styles.detailValue}>{getUserTypeDisplay(user.user_type)}</Text>
@@ -1939,7 +2030,7 @@ export default function ProfileScreen({ navigation }: any) {
             <>
               <Divider style={styles.divider} />
               <View style={styles.detailRow}>
-                <Icon name="map-marker" size={20} color="#666" />
+                <MaterialCommunityIcons name="map-marker" size={20} color="#666" />
                 <View style={styles.detailContent}>
                   <Text style={styles.detailLabel}>Address</Text>
                   <Text style={styles.detailValue}>{user.address}</Text>
