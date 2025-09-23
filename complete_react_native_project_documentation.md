@@ -46,9 +46,12 @@
 VisitCareHealthcare/
 ├── src/
 │   ├── components/
+│   │   │   └── LanguageSwitcher.tsx
 │   ├── constants/
+│   │   │   ├── locales.ts
 │   │   │   └── theme.ts
 │   ├── contexts/
+│   │   │   ├── LanguageContext.tsx
 │   │   │   └── ThemeContext.tsx
 │   ├── hooks/
 │   │   │   └── useStyles.ts
