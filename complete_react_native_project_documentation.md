@@ -667,6 +667,19 @@ class HealthcareService {
     }
   }
 
+  async updateAppointmentStatus(appointmentId: number, status: string, notes?: string): Promise<any> {
+    try {
+      const response = await ApiService.post(`healthcare/appointments/${appointmentId}/update-status`, {
+        status,
+        notes
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Failed to update appointment status:', error);
+      this.handleServiceError(error, 'Failed to update appointment status');
+    }
+  }
+
   async getConnectionRequests(): Promise<any> {
     try {
       const response = await ApiService.get('/healthcare/connection-requests');
