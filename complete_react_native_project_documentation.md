@@ -1155,14 +1155,16 @@ export default function RegisterScreen({ navigation }: RegisterScreenProps) {
 
 ```typescript
 import React, { useEffect, useState } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, Text, StyleSheet } from 'react-native';
-import { ActivityIndicator, Button } from 'react-native-paper';
+import { Button } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
+import { useTheme } from '../contexts/ThemeContext';
 import authService from '../services/authService';
+
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
 import DashboardScreen from '../screens/dashboard/DashboardScreen';
@@ -1185,28 +1187,27 @@ function MainTabs() {
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
+    const loadCurrentUser = async () => {
+      const user = await authService.getCurrentUser();
+      setCurrentUser(user);
+    };
     loadCurrentUser();
   }, []);
 
-  const loadCurrentUser = async () => {
-    const user = await authService.getCurrentUser();
-    setCurrentUser(user);
-  };
-
   const handleLogout = async () => {
     await authService.logout();
-    // The auth state will be updated automatically and trigger re-navigation
+    // Auth state auto-updates, navigation will change via AppNavigator
   };
+
+  const { theme, isDark } = useTheme();
 
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName: keyof typeof MaterialCommunityIcons.glyphMap;
-          
+          let iconName: keyof typeof MaterialCommunityIcons.glyphMap = 'circle';
           switch (route.name) {
             case 'Dashboard':
-              // Fixed: Use correct icon names that exist in MaterialCommunityIcons
               iconName = focused ? 'view-dashboard' : 'view-dashboard-variant';
               break;
             case 'Appointments':
@@ -1215,24 +1216,20 @@ function MainTabs() {
             case 'Profile':
               iconName = focused ? 'account' : 'account-outline';
               break;
-            default:
-              iconName = 'circle';
           }
-          
+          // @ts-ignore
           return <MaterialCommunityIcons name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: '#2E7D32',
         tabBarInactiveTintColor: 'gray',
-        headerRight: () => (
-          <Button 
-            mode="text" 
-            onPress={handleLogout}
-            style={{ marginRight: 10 }}
-          >
-            Logout
-          </Button>
-        ),
-        headerTitle: `${route.name} - ${currentUser?.name || 'User'}`
+        headerRight: () =>
+          route.name === 'Profile' ? null : (
+            <Button mode="text" onPress={handleLogout} style={{ marginRight: 10 }}>
+              Logout
+            </Button>
+          ),
+        headerTitle: route.name + (currentUser ? ` - ${currentUser.name}` : ''),
+        tabBarStyle: { backgroundColor: theme.colors.surface },
       })}
     >
       <Tab.Screen name="Dashboard" component={DashboardScreen} />
@@ -1245,40 +1242,43 @@ function MainTabs() {
 export default function AppNavigator() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { theme, isDark } = useTheme();
 
   useEffect(() => {
-    checkAuthState();
-    
     // Listen for auth state changes
+    let unmounted = false;
+    const checkAuthState = async () => {
+      try {
+        const authenticated = await authService.isAuthenticated();
+        if (!unmounted) setIsAuthenticated(authenticated);
+      } catch (error) {
+        if (!unmounted) setIsAuthenticated(false);
+      } finally {
+        if (!unmounted && isLoading) setIsLoading(false);
+      }
+    };
+    checkAuthState();
     const interval = setInterval(checkAuthState, 1000);
-    return () => clearInterval(interval);
+    return () => {
+      unmounted = true;
+      clearInterval(interval);
+    };
   }, []);
 
-  const checkAuthState = async () => {
-    try {
-      const authenticated = await authService.isAuthenticated();
-      if (authenticated !== isAuthenticated) {
-        setIsAuthenticated(authenticated);
-      }
-    } catch (error) {
-      console.error('Error checking auth state:', error);
-      setIsAuthenticated(false);
-    } finally {
-      if (isLoading) {
-        setIsLoading(false);
-      }
-    }
-  };
-
-  if (isLoading) {
-    return <LoadingScreen />;
-  }
+  if (isLoading) return <LoadingScreen />;
 
   return (
-    <NavigationContainer>
+    <NavigationContainer 
+      theme={{
+        ...((isDark ? DarkTheme : DefaultTheme) as any),
+        colors: {
+          ...((isDark ? DarkTheme : DefaultTheme).colors),
+          ...theme.colors,
+        },
+      }}
+    >
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {isAuthenticated ? (
-          // Fixed: Changed from 'MainTabs' to 'Main' to match LoginScreen navigation
           <Stack.Screen name="Main" component={MainTabs} />
         ) : (
           <>
@@ -1296,13 +1296,13 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F5F7FA'
+    backgroundColor: '#F5F7FA',
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#666'
-  }
+    color: '#666',
+  },
 });
 ```
 
