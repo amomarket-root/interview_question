@@ -584,6 +584,21 @@ export interface AppointmentsResponse {
   };
 }
 
+export interface PasswordChangeInfo {
+  is_social_user: boolean;
+  login_methods: string[];
+  social_providers: string[];
+  email: string;
+  phone: string;
+  can_change_password: boolean;
+}
+
+export interface ChangePasswordRequest {
+  current_password: string;
+  new_password: string;
+  new_password_confirmation: string;
+}
+
 class HealthcareService {
   private static instance: HealthcareService;
 
@@ -628,6 +643,26 @@ class HealthcareService {
     }
   }
   
+  // Password Management Methods
+  async getPasswordChangeInfo(): Promise<{ data: PasswordChangeInfo }> {
+    try {
+      const response = await ApiService.get('/healthcare/password-change-info');
+      return response;
+    } catch (error) {
+      console.error('Failed to fetch password change info:', error);
+      this.handleServiceError(error, 'Failed to load password change information');
+    }
+  }
+
+  async changePassword(passwordData: ChangePasswordRequest): Promise<any> {
+    try {
+      const response = await ApiService.post('/healthcare/change-password', passwordData);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to change password:', error);
+      this.handleServiceError(error, 'Failed to change password');
+    }
+  }
 
   async getAppointments(
     page: number = 1,
