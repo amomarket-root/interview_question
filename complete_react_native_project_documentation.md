@@ -697,18 +697,18 @@ class HealthcareService {
     }
   }
 
-  async respondToConnectionRequest(requestId: number, status: string, data: Record<string, any> = {}): Promise<any> {
-    try {
-      const response = await ApiService.post(`/healthcare/connection-requests/${requestId}/respond`, {
-        status,
-        ...data
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Failed to respond to connection request:', error);
-      this.handleServiceError(error, 'Failed to respond to connection request');
-    }
+  async respondToConnectionRequest(requestId: string, status: string, data: Record<string, any>): Promise<any> {
+  try {
+    const response = await ApiService.post(`/healthcare/connection-requests/${requestId}/respond`, {
+      status,
+      ...data
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Failed to respond to connection request:', error);
+    this.handleServiceError(error, 'Failed to respond to connection request');
   }
+}
 
   async getConnectedDoctors(): Promise<any> {
     try {
@@ -5853,7 +5853,7 @@ export default function OrganizationInfoScreen({ navigation }: any) {
 
 ```typescript
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, ScrollView, RefreshControl, Alert, Image, TouchableOpacity } from 'react-native';
+import { View, ScrollView, RefreshControl, Alert, Image, TouchableOpacity, Modal } from 'react-native';
 import { Card, Title, Text, Button, ActivityIndicator, Chip, IconButton, Divider } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -5918,6 +5918,10 @@ export default function DoctorManagementScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'requests' | 'connected'>('requests');
+  const [selectedRequest, setSelectedRequest] = useState<ConnectionRequest | null>(null);
+  const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [processingRequest, setProcessingRequest] = useState(false);
   const { theme } = useTheme();
 
   const styles = useStyles((theme) => ({
@@ -6142,6 +6146,158 @@ export default function DoctorManagementScreen({ navigation }: any) {
     disconnectButton: {
       backgroundColor: '#F44336',
     },
+    // Modal Styles with Fixed Close Button Height
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 10,
+    },
+    modalContent: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 16,
+      width: '95%',
+      height: '85%',
+      maxHeight: '90%',
+      minHeight: 600,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.mode === 'dark' ? '#333' : '#E0E0E0',
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: theme.colors.text,
+      fontFamily: theme.typography.fontFamily,
+    },
+    closeButton: {
+      padding: 0,
+      margin: 0,
+    },
+    modalBody: {
+      flex: 1,
+      paddingHorizontal: 20,
+    },
+    modalScrollContent: {
+      paddingVertical: 20,
+      paddingBottom: 40,
+    },
+    doctorProfileSection: {
+      alignItems: 'center',
+      marginBottom: 24,
+    },
+    modalAvatar: {
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+      marginBottom: 16,
+    },
+    modalFallbackAvatar: {
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+      backgroundColor: theme.colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    modalDoctorName: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: theme.colors.text,
+      marginBottom: 6,
+      textAlign: 'center',
+      fontFamily: theme.typography.fontFamily,
+    },
+    modalDoctorSpecialty: {
+      fontSize: 16,
+      color: theme.colors.textSecondary,
+      marginBottom: 12,
+      textAlign: 'center',
+      fontFamily: theme.typography.fontFamily,
+    },
+    detailsGrid: {
+      marginBottom: 24,
+    },
+    detailCard: {
+      backgroundColor: theme.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#F8F9FA',
+      padding: 18,
+      borderRadius: 12,
+      marginBottom: 16,
+    },
+    detailCardTitle: {
+      fontSize: 15,
+      fontWeight: 'bold',
+      color: theme.colors.text,
+      marginBottom: 10,
+      fontFamily: theme.typography.fontFamily,
+    },
+    detailCardContent: {
+      fontSize: 15,
+      color: theme.colors.textSecondary,
+      lineHeight: 22,
+      fontFamily: theme.typography.fontFamily,
+    },
+    scheduleCard: {
+      backgroundColor: theme.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#F8F9FA',
+      padding: 18,
+      borderRadius: 12,
+      marginBottom: 24,
+    },
+    scheduleTitle: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      color: theme.colors.text,
+      marginBottom: 12,
+      fontFamily: theme.typography.fontFamily,
+    },
+    scheduleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    scheduleText: {
+      marginLeft: 12,
+      fontSize: 15,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+    },
+    modalActions: {
+      flexDirection: 'row',
+      padding: 20,
+      paddingTop: 16,
+      gap: 16,
+      borderTopWidth: 1,
+      borderTopColor: theme.mode === 'dark' ? '#333' : '#E0E0E0',
+    },
+    // Updated Close Button Styles - Reduced Height
+    acceptButton: {
+      flex: 1,
+      backgroundColor: '#4CAF50',
+      paddingVertical: 8,
+    },
+    rejectButton: {
+      flex: 1,
+      backgroundColor: '#F44336',
+      paddingVertical: 8,
+    },
+    closeModalButton: {
+      flex: 1,
+      backgroundColor: 'transparent',
+      borderColor: theme.colors.primary,
+      borderWidth: 1,
+      paddingVertical: 8,
+    },
+    buttonLabel: {
+      fontSize: 14,
+      lineHeight: 18,
+    },
   }));
 
   useEffect(() => {
@@ -6176,8 +6332,89 @@ export default function DoctorManagementScreen({ navigation }: any) {
     loadData();
   }, []);
 
-  const handleViewDetails = (doctor: Doctor) => {
-    Alert.alert('Doctor Details', `View details for ${doctor.user.name}`);
+  // Fixed handleViewDetails to accept both ConnectionRequest and Doctor
+  const handleViewDetails = (request: ConnectionRequest) => {
+    setSelectedRequest(request);
+    setSelectedDoctor(null);
+    setModalVisible(true);
+  };
+
+  // New handler for viewing doctor profiles
+  const handleViewDoctorProfile = (doctor: Doctor) => {
+    setSelectedDoctor(doctor);
+    setSelectedRequest(null);
+    setModalVisible(true);
+  };
+
+  const handleConnectionResponse = async (status: 'approved' | 'rejected', rejectionReason?: string) => {
+    if (!selectedRequest) return;
+
+    setProcessingRequest(true);
+    try {
+      const payload = {
+        status,
+        rejection_reason: rejectionReason || '',
+      };
+
+      const response = await healthcareService.respondToConnectionRequest(
+        selectedRequest.id,
+        status,
+        payload
+      );
+
+      Alert.alert(
+        'Success',
+        response.message || `Connection request ${status} successfully!`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setModalVisible(false);
+              setSelectedRequest(null);
+              loadData();
+            }
+          }
+        ]
+      );
+    } catch (error: any) {
+      console.error('Failed to respond to connection request:', error);
+      Alert.alert(
+        'Error',
+        error.message || `Failed to ${status} connection request`
+      );
+    } finally {
+      setProcessingRequest(false);
+    }
+  };
+
+  const handleAccept = () => {
+    Alert.alert(
+      'Accept Connection',
+      'Are you sure you want to accept this connection request?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Accept',
+          style: 'default',
+          onPress: () => handleConnectionResponse('approved')
+        }
+      ]
+    );
+  };
+
+  const handleReject = () => {
+    Alert.alert(
+      'Reject Connection',
+      'Are you sure you want to reject this connection request?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reject',
+          style: 'destructive',
+          onPress: () => handleConnectionResponse('rejected', 'Request rejected by clinic')
+        }
+      ]
+    );
   };
 
   const handleManageSchedule = (doctor: Doctor) => {
@@ -6190,10 +6427,12 @@ export default function DoctorManagementScreen({ navigation }: any) {
       `Are you sure you want to disconnect ${doctor.user.name}?`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Disconnect', style: 'destructive', onPress: () => {
-          Alert.alert('Success', 'Doctor disconnected successfully');
-          loadData();
-        }}
+        {
+          text: 'Disconnect', style: 'destructive', onPress: () => {
+            Alert.alert('Success', 'Doctor disconnected successfully');
+            loadData();
+          }
+        }
       ]
     );
   };
@@ -6211,15 +6450,10 @@ export default function DoctorManagementScreen({ navigation }: any) {
     }
   };
 
-  // Helper function to parse and format available days
   const parseAvailableDays = (availableDaysString: string): string[] => {
     try {
       if (!availableDaysString) return [];
-      
-      // Parse the JSON string
       const days = JSON.parse(availableDaysString);
-      
-      // Return array of days or empty array
       return Array.isArray(days) ? days : [];
     } catch (error) {
       console.error('Error parsing available days:', error);
@@ -6227,16 +6461,14 @@ export default function DoctorManagementScreen({ navigation }: any) {
     }
   };
 
-  // Helper function to format day name for display
   const formatDayName = (day: string): string => {
     if (!day) return '';
     return day.charAt(0).toUpperCase() + day.slice(1, 3);
   };
 
-  // Helper function to render available days chips
   const renderAvailableDays = (availableDaysString: string) => {
     const days = parseAvailableDays(availableDaysString);
-    
+
     if (days.length === 0) {
       return (
         <Text style={styles.dayText}>No days specified</Text>
@@ -6254,6 +6486,227 @@ export default function DoctorManagementScreen({ navigation }: any) {
     );
   };
 
+  // Fixed modal rendering to handle both request and doctor data
+  const renderDetailsModal = () => {
+    const currentDoctor = selectedRequest ? selectedRequest.doctor : selectedDoctor;
+    if (!currentDoctor) return null;
+
+    const isConnectionRequest = selectedRequest !== null;
+
+    return (
+      <Modal
+        visible={modalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {isConnectionRequest ? 'Connection Request Details' : 'Doctor Profile'}
+              </Text>
+              <IconButton
+                icon="close"
+                size={24}
+                iconColor={theme.colors.text}
+                onPress={() => setModalVisible(false)}
+                style={styles.closeButton}
+              />
+            </View>
+
+            {/* Modal Body */}
+            <ScrollView 
+              style={styles.modalBody} 
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ flexGrow: 1 }}
+            >
+              <View style={styles.modalScrollContent}>
+                {/* Doctor Profile Section */}
+                <View style={styles.doctorProfileSection}>
+                  {currentDoctor.profile_image ? (
+                    <Image
+                      source={{ uri: currentDoctor.profile_image }}
+                      style={styles.modalAvatar}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={styles.modalFallbackAvatar}>
+                      <MaterialCommunityIcons name="doctor" size={50} color="white" />
+                    </View>
+                  )}
+
+                  <Text style={styles.modalDoctorName}>
+                    Dr. {currentDoctor.user.name}
+                  </Text>
+                  <Text style={styles.modalDoctorSpecialty}>
+                    {currentDoctor.specialization}
+                  </Text>
+                </View>
+
+                {/* Details Grid */}
+                <View style={styles.detailsGrid}>
+                  <View style={styles.detailCard}>
+                    <Text style={styles.detailCardTitle}>Experience</Text>
+                    <Text style={styles.detailCardContent}>
+                      {currentDoctor.experience_years} years of experience
+                    </Text>
+                  </View>
+
+                  <View style={styles.detailCard}>
+                    <Text style={styles.detailCardTitle}>Consultation Fee</Text>
+                    <Text style={styles.detailCardContent}>
+                      ₹{currentDoctor.consultation_fee}
+                    </Text>
+                  </View>
+
+                  <View style={styles.detailCard}>
+                    <Text style={styles.detailCardTitle}>License Number</Text>
+                    <Text style={styles.detailCardContent}>
+                      {currentDoctor.license_number}
+                    </Text>
+                  </View>
+
+                  <View style={styles.detailCard}>
+                    <Text style={styles.detailCardTitle}>Email</Text>
+                    <Text style={styles.detailCardContent}>
+                      {currentDoctor.user.email}
+                    </Text>
+                  </View>
+
+                  {currentDoctor.qualification && (
+                    <View style={styles.detailCard}>
+                      <Text style={styles.detailCardTitle}>Qualification</Text>
+                      <Text style={styles.detailCardContent}>
+                        {currentDoctor.qualification}
+                      </Text>
+                    </View>
+                  )}
+
+                  {currentDoctor.bio && (
+                    <View style={styles.detailCard}>
+                      <Text style={styles.detailCardTitle}>Bio</Text>
+                      <Text style={styles.detailCardContent}>
+                        {currentDoctor.bio}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Show schedule for connection requests */}
+                {isConnectionRequest && selectedRequest && (
+                  <View style={styles.scheduleCard}>
+                    <Text style={styles.scheduleTitle}>Proposed Schedule</Text>
+
+                    <View style={styles.scheduleRow}>
+                      <MaterialCommunityIcons name="clock" size={18} color="#666" />
+                      <Text style={styles.scheduleText}>
+                        {selectedRequest.proposed_schedule.start_time} - {selectedRequest.proposed_schedule.end_time}
+                      </Text>
+                    </View>
+
+                    <View style={styles.scheduleRow}>
+                      <MaterialCommunityIcons name="calendar" size={18} color="#666" />
+                      <Text style={styles.scheduleText}>
+                        Slot Duration: {selectedRequest.proposed_schedule.slot_duration} minutes
+                      </Text>
+                    </View>
+
+                    <View style={styles.availableDaysSection}>
+                      <Text style={styles.availableDaysLabel}>Available Days:</Text>
+                      <View style={styles.daysContainer}>
+                        {selectedRequest.proposed_schedule.available_days.map((day, index) => (
+                          <View key={index} style={styles.dayChip}>
+                            <Text style={styles.dayText}>{formatDayName(day)}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  </View>
+                )}
+
+                {/* Show current schedule for connected doctors */}
+                {!isConnectionRequest && selectedDoctor?.clinic_info?.schedule && (
+                  <View style={styles.scheduleCard}>
+                    <Text style={styles.scheduleTitle}>Current Schedule</Text>
+
+                    <View style={styles.scheduleRow}>
+                      <MaterialCommunityIcons name="clock" size={18} color="#666" />
+                      <Text style={styles.scheduleText}>
+                        {selectedDoctor.clinic_info.schedule.start_time} - {selectedDoctor.clinic_info.schedule.end_time}
+                      </Text>
+                    </View>
+
+                    <View style={styles.scheduleRow}>
+                      <MaterialCommunityIcons name="calendar" size={18} color="#666" />
+                      <Text style={styles.scheduleText}>
+                        Slot Duration: {selectedDoctor.clinic_info.schedule.slot_duration} minutes
+                      </Text>
+                    </View>
+
+                    <View style={styles.availableDaysSection}>
+                      <Text style={styles.availableDaysLabel}>Available Days:</Text>
+                      {renderAvailableDays(selectedDoctor.clinic_info.schedule.available_days)}
+                    </View>
+                  </View>
+                )}
+
+                {/* Show message for connection requests */}
+                {isConnectionRequest && selectedRequest?.message && (
+                  <View style={styles.messageSection}>
+                    <Text style={styles.messageLabel}>Message:</Text>
+                    <Text style={styles.messageText}>{selectedRequest.message}</Text>
+                  </View>
+                )}
+              </View>
+            </ScrollView>
+
+            {/* Modal Actions */}
+            <View style={styles.modalActions}>
+              {isConnectionRequest && selectedRequest?.status === 'pending' ? (
+                <>
+                  <Button
+                    mode="contained"
+                    onPress={handleAccept}
+                    style={styles.acceptButton}
+                    disabled={processingRequest}
+                    loading={processingRequest}
+                    icon="check"
+                    labelStyle={styles.buttonLabel}
+                  >
+                    Accept
+                  </Button>
+
+                  <Button
+                    mode="contained"
+                    onPress={handleReject}
+                    style={styles.rejectButton}
+                    disabled={processingRequest}
+                    icon="close"
+                    labelStyle={styles.buttonLabel}
+                  >
+                    Reject
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  mode="outlined"
+                  onPress={() => setModalVisible(false)}
+                  style={styles.closeModalButton}
+                  icon="close"
+                  labelStyle={styles.buttonLabel}
+                >
+                  Close
+                </Button>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
   const renderConnectionRequests = () => {
     if (connectionRequests.length === 0) {
       return (
@@ -6267,7 +6720,6 @@ export default function DoctorManagementScreen({ navigation }: any) {
     return connectionRequests.map((request) => (
       <Card key={request.id} style={styles.doctorCard}>
         <View style={styles.cardContent}>
-          {/* Header */}
           <View style={styles.doctorHeader}>
             {request.doctor.profile_image ? (
               <Image
@@ -6280,7 +6732,7 @@ export default function DoctorManagementScreen({ navigation }: any) {
                 <MaterialCommunityIcons name="doctor" size={24} color="white" />
               </View>
             )}
-            
+
             <View style={styles.doctorInfo}>
               <Text style={styles.doctorName}>
                 Dr. {request.doctor.user.name}
@@ -6298,7 +6750,6 @@ export default function DoctorManagementScreen({ navigation }: any) {
             </Chip>
           </View>
 
-          {/* Details */}
           <View style={styles.doctorDetails}>
             <View style={styles.detailRow}>
               <MaterialCommunityIcons name="hospital-building" size={16} color="#666" />
@@ -6306,7 +6757,6 @@ export default function DoctorManagementScreen({ navigation }: any) {
             </View>
           </View>
 
-          {/* Message */}
           {request.message && (
             <View style={styles.messageSection}>
               <Text style={styles.messageLabel}>Message:</Text>
@@ -6316,11 +6766,10 @@ export default function DoctorManagementScreen({ navigation }: any) {
 
           <Divider style={{ marginVertical: 8 }} />
 
-          {/* Action Buttons */}
           <View style={styles.actionButtons}>
             <Button
               mode="outlined"
-              onPress={() => handleViewDetails(request.doctor)}
+              onPress={() => handleViewDetails(request)}
               style={[styles.actionButton, styles.viewButton]}
               icon="eye"
             >
@@ -6345,7 +6794,6 @@ export default function DoctorManagementScreen({ navigation }: any) {
     return connectedDoctors.map((doctor) => (
       <Card key={doctor.id} style={styles.doctorCard}>
         <View style={styles.cardContent}>
-          {/* Header */}
           <View style={styles.doctorHeader}>
             {doctor.profile_image ? (
               <Image
@@ -6358,7 +6806,7 @@ export default function DoctorManagementScreen({ navigation }: any) {
                 <MaterialCommunityIcons name="doctor" size={24} color="white" />
               </View>
             )}
-            
+
             <View style={styles.doctorInfo}>
               <Text style={styles.doctorName}>
                 Dr. {doctor.user.name}
@@ -6379,7 +6827,6 @@ export default function DoctorManagementScreen({ navigation }: any) {
             </Chip>
           </View>
 
-          {/* Schedule Details */}
           <View style={styles.doctorDetails}>
             <View style={styles.detailRow}>
               <MaterialCommunityIcons name="hospital-building" size={16} color="#666" />
@@ -6401,7 +6848,6 @@ export default function DoctorManagementScreen({ navigation }: any) {
             </View>
           </View>
 
-          {/* Available Days Section */}
           {doctor.clinic_info?.schedule?.available_days && (
             <View style={styles.availableDaysSection}>
               <Text style={styles.availableDaysLabel}>Available Days:</Text>
@@ -6411,17 +6857,16 @@ export default function DoctorManagementScreen({ navigation }: any) {
 
           <Divider style={{ marginVertical: 8 }} />
 
-          {/* Action Buttons */}
           <View style={styles.actionButtons}>
             <Button
               mode="outlined"
-              onPress={() => handleViewDetails(doctor)}
+              onPress={() => handleViewDoctorProfile(doctor)}
               style={[styles.actionButton, styles.viewButton]}
               icon="eye"
             >
               View Profile
             </Button>
-            
+
             <Button
               mode="contained"
               onPress={() => handleManageSchedule(doctor)}
@@ -6456,12 +6901,10 @@ export default function DoctorManagementScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Doctor Management</Text>
       </View>
 
-      {/* Tab Navigation */}
       <View style={styles.tabContainer}>
         <TouchableOpacity
           style={[
@@ -6494,7 +6937,6 @@ export default function DoctorManagementScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      {/* Content */}
       <ScrollView
         style={styles.content}
         refreshControl={
@@ -6504,6 +6946,8 @@ export default function DoctorManagementScreen({ navigation }: any) {
       >
         {activeTab === 'requests' ? renderConnectionRequests() : renderConnectedDoctors()}
       </ScrollView>
+
+      {renderDetailsModal()}
     </View>
   );
 }
