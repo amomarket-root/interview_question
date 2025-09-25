@@ -65,7 +65,8 @@ VisitCareHealthcare/
 │   │   ├── organization/
 │   │   │   └── OrganizationInfoScreen.tsx
 │   │   └── profile/
-│   │       └── ProfileScreen.tsx
+│   │   │   ├── EditProfileScreen.tsx
+│   │   │   └── ProfileScreen.tsx
 │   ├── navigation/
 │   │   └── AppNavigator.tsx
 │   ├── services/
@@ -148,6 +149,7 @@ VisitCareHealthcare/
     "axios": "^1.12.2",
     "date-fns": "^4.1.0",
     "expo": "~54.0.9",
+    "expo-image-picker": "^17.0.8",
     "expo-status-bar": "~3.0.8",
     "react": "19.1.0",
     "react-hook-form": "^7.63.0",
@@ -752,7 +754,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const { toggleTheme, isDark } = useTheme();
+  const { isDark } = useTheme(); // Removed toggleTheme since we don't need the toggle button
   
   const styles = useStyles((theme) => ({
     container: {
@@ -777,15 +779,9 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
     iconContainer: {
       alignItems: 'center',
       marginBottom: theme.spacing.md,
-      flexDirection: 'row',
-      justifyContent: 'space-between',
     },
     logoContainer: {
-      flex: 1,
       alignItems: 'center',
-    },
-    themeToggle: {
-      margin: 0,
     },
     logoImage: {
       width: 100,
@@ -904,13 +900,6 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
                     <Icon name="hospital-box" size={80} color="#2E7D32" />
                   )}
                 </View>
-                <IconButton
-                  icon={isDark ? 'weather-sunny' : 'weather-night'}
-                  iconColor={isDark ? '#FFA726' : '#2196F3'}
-                  size={24}
-                  onPress={toggleTheme}
-                  style={styles.themeToggle}
-                />
               </View>
               
               <Title style={styles.title}>Visit Care Healthcare</Title>
@@ -1074,7 +1063,7 @@ export default function RegisterScreen({ navigation }: RegisterScreenProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const { toggleTheme, isDark } = useTheme();
+  const { isDark } = useTheme(); // Removed toggleTheme since we don't need the toggle button
   
   const styles = useStyles((theme) => ({
     container: {
@@ -1099,19 +1088,13 @@ export default function RegisterScreen({ navigation }: RegisterScreenProps) {
     iconContainer: {
       alignItems: 'center',
       marginBottom: theme.spacing.md,
-      flexDirection: 'row',
-      justifyContent: 'space-between',
     },
     logoContainer: {
-      flex: 1,
       alignItems: 'center',
     },
-    themeToggle: {
-      margin: 0,
-    },
     logoImage: {
-      width: 80,
-      height: 60,
+      width: 100,
+      height: 80,
       marginBottom: theme.spacing.xs,
     },
     title: {
@@ -1234,16 +1217,9 @@ export default function RegisterScreen({ navigation }: RegisterScreenProps) {
                       onError={() => setImageError(true)}
                     />
                   ) : (
-                    <MaterialCommunityIcons name="hospital-box" size={60} color={isDark ? '#4de352' : '#10d915'} />
+                    <MaterialCommunityIcons name="hospital-box" size={80} color="#2E7D32" />
                   )}
                 </View>
-                <IconButton
-                  icon={isDark ? 'weather-sunny' : 'weather-night'}
-                  iconColor={isDark ? '#FFA726' : '#2196F3'}
-                  size={24}
-                  onPress={toggleTheme}
-                  style={styles.themeToggle}
-                />
               </View>
               
               <Title style={styles.title}>Create Account</Title>
@@ -1483,6 +1459,7 @@ const AppointmentsScreen = React.lazy(() => import('../screens/appointments/Appo
 const DoctorManagementScreen = React.lazy(() => import('../screens/doctor/DoctorManagementScreen'));
 const OrganizationInfoScreen = React.lazy(() => import('../screens/organization/OrganizationInfoScreen'));
 const ProfileScreen = React.lazy(() => import('../screens/profile/ProfileScreen'));
+const EditProfileScreen = React.lazy(() => import('../screens/profile/EditProfileScreen'));
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -1501,6 +1478,7 @@ type StackParamList = {
   Main: undefined;
   DoctorManagement: undefined;
   OrganizationInfo: undefined;
+  EditProfile: undefined;
 };
 
 // Font weight type definition
@@ -1803,6 +1781,14 @@ const MainNavigator = React.memo(() => {
             fontSize: 18,
             fontWeight: '600' as FontWeight,
           },
+        }}
+      />
+      <Stack.Screen 
+        name="EditProfile" 
+        component={EditProfileScreen}
+        options={{
+          headerShown: false, // Using custom header in EditProfileScreen
+          presentation: 'modal',
         }}
       />
     </Stack.Navigator>
@@ -3659,184 +3645,385 @@ export default function AppointmentsScreen() {
 
 ```typescript
 import React, { useEffect, useState } from 'react';
-import { View, ScrollView, Alert } from 'react-native';
-import { Card, Title, Text, Button, Avatar, Divider, List, IconButton, Menu, Switch } from 'react-native-paper';
+import { View, ScrollView, Alert, Image, TouchableOpacity, TextInput } from 'react-native';
+import { Card, Title, Text, Button, Avatar, Divider, Switch, Chip } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useStyles } from '../../hooks/useStyles';
 import authService from '../../services/authService';
 import healthcareService from '../../services/healthcareService';
 
+interface HealthcareProfile {
+  id: string;
+  name: string;
+  description: string;
+  address: string;
+  phone: string;
+  email: string;
+  website: string;
+  facilities: string[];
+  specialties: string[];
+  opening_time: string;
+  closing_time: string;
+  working_days: string[];
+  rating: string;
+  total_reviews: number;
+  is_verified: boolean;
+  logo: string;
+  organization_type: string;
+  established_date: string;
+  registration_number: string;
+  license_number: string;
+  bed_count: number;
+}
+
 export default function ProfileScreen({ navigation }: any) {
   const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<HealthcareProfile | null>(null);
   const [loading, setLoading] = useState(false);
-  const [menuVisible, setMenuVisible] = useState(false);
+  const [activeTab, setActiveTab] = useState<'basic' | 'operations' | 'security'>('basic');
   const { toggleTheme, isDark, setTheme, themeMode } = useTheme();
 
   const styles = useStyles((theme) => ({
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
-      padding: theme.spacing.md,
     },
-    loadingContainer: {
-      flex: 1,
+    // Profile Header with Organization Card
+    profileHeaderCard: {
+      marginHorizontal: 16,
+      marginTop: 16,
+      marginBottom: 20,
+      borderRadius: 16,
+      overflow: 'hidden',
+      elevation: 8,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.25,
+      shadowRadius: 8,
+    },
+    gradientHeader: {
+      background: 'linear-gradient(135deg, #FF6B6B, #4ECDC4)',
+      backgroundColor: theme.colors.primary,
+      padding: 24,
+      alignItems: 'center',
+      position: 'relative',
+    },
+    organizationLogo: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      marginBottom: 12,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    fallbackLogo: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: 'rgba(255, 255, 255, 0.3)',
       justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: theme.colors.background,
+      marginBottom: 12,
     },
-    profileCard: {
-      marginBottom: theme.spacing.md,
-      ...theme.shadows.medium,
-      backgroundColor: theme.colors.surface,
-      borderRadius: theme.borderRadius.md,
+    organizationName: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: 'white',
+      textAlign: 'center',
+      fontFamily: theme.typography.fontFamily,
+      textTransform: 'capitalize',
+      marginBottom: 4,
     },
-    profileContent: {
-      alignItems: 'center',
-      paddingVertical: theme.spacing.lg,
+    organizationType: {
+      fontSize: 14,
+      color: 'rgba(255, 255, 255, 0.9)',
+      textAlign: 'center',
+      fontFamily: theme.typography.fontFamily,
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+      marginBottom: 8,
     },
-    profileHeader: {
+    providerType: {
+      fontSize: 12,
+      color: 'rgba(255, 255, 255, 0.8)',
+      textAlign: 'center',
+      fontFamily: theme.typography.fontFamily,
+    },
+    verifiedBadge: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
       alignItems: 'center',
-      width: '100%',
-      marginBottom: theme.spacing.md,
+      marginTop: 8,
     },
-    avatarSection: {
+    verifiedText: {
+      fontSize: 14,
+      color: 'white',
+      marginLeft: 4,
+      fontFamily: theme.typography.fontFamily,
+    },
+    editProfileButton: {
+      position: 'absolute',
+      bottom: 16,
+      right: 16,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      borderRadius: 20,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    editButtonText: {
+      color: 'white',
+      marginLeft: 4,
+      fontSize: 12,
+      fontFamily: theme.typography.fontFamily,
+    },
+    // Organization Statistics
+    statsContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      padding: 16,
+      backgroundColor: theme.colors.surface,
+    },
+    statItem: {
       alignItems: 'center',
       flex: 1,
     },
-    themeToggle: {
-      margin: 0,
-    },
-    avatar: {
-      backgroundColor: theme.colors.primary,
-      marginBottom: theme.spacing.md,
-    },
-    userName: {
-      fontSize: theme.typography.sizes.xl,
-      fontWeight: theme.typography.weights.bold,
+    statValue: {
+      fontSize: 24,
+      fontWeight: 'bold',
       color: theme.colors.text,
-      marginBottom: 4,
       fontFamily: theme.typography.fontFamily,
-    },
-    userType: {
-      fontSize: theme.typography.sizes.md,
-      color: theme.colors.primary,
       marginBottom: 4,
-      fontWeight: theme.typography.weights.medium,
-      fontFamily: theme.typography.fontFamily,
     },
-    userEmail: {
-      fontSize: theme.typography.sizes.sm,
+    statLabel: {
+      fontSize: 12,
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
+      textAlign: 'center',
     },
-    detailsCard: {
-      marginBottom: theme.spacing.md,
-      ...theme.shadows.medium,
+    // Tab Navigation
+    tabContainer: {
+      flexDirection: 'row',
       backgroundColor: theme.colors.surface,
-      borderRadius: theme.borderRadius.md,
+      marginHorizontal: 16,
+      borderRadius: 12,
+      padding: 4,
+      marginBottom: 16,
+      elevation: 2,
+    },
+    tabButton: {
+      flex: 1,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    activeTab: {
+      backgroundColor: theme.colors.primary,
+    },
+    inactiveTab: {
+      backgroundColor: 'transparent',
+    },
+    tabText: {
+      fontSize: 14,
+      fontWeight: '600',
+      fontFamily: theme.typography.fontFamily,
+    },
+    activeTabText: {
+      color: 'white',
+    },
+    inactiveTabText: {
+      color: theme.colors.text,
+    },
+    tabIcon: {
+      marginBottom: 4,
+    },
+    // Content Cards
+    contentCard: {
+      marginHorizontal: 16,
+      marginBottom: 16,
+      backgroundColor: theme.colors.surface,
+      borderRadius: 12,
+      elevation: 2,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+    },
+    cardContent: {
+      padding: 20,
     },
     sectionTitle: {
-      fontSize: theme.typography.sizes.lg,
-      marginBottom: theme.spacing.md,
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: theme.colors.text,
+      marginBottom: 16,
+      fontFamily: theme.typography.fontFamily,
+    },
+    // Form Fields
+    fieldContainer: {
+      marginBottom: 16,
+    },
+    fieldLabel: {
+      fontSize: 12,
+      color: theme.colors.textSecondary,
+      marginBottom: 6,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      fontFamily: theme.typography.fontFamily,
+    },
+    fieldInput: {
+      borderWidth: 1,
+      borderColor: theme.colors.border || '#E0E0E0',
+      borderRadius: 8,
+      padding: 12,
+      fontSize: 14,
+      color: theme.colors.text,
+      backgroundColor: theme.colors.background,
+      fontFamily: theme.typography.fontFamily,
+    },
+    fieldValue: {
+      fontSize: 14,
       color: theme.colors.text,
       fontFamily: theme.typography.fontFamily,
-      fontWeight: theme.typography.weights.semibold,
+      backgroundColor: theme.colors.background,
+      padding: 12,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: theme.colors.border || '#E0E0E0',
     },
-    detailRow: {
+    // Working Days
+    workingDaysContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginTop: 8,
+    },
+    dayChip: {
+      backgroundColor: theme.colors.primary,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+    },
+    dayText: {
+      color: 'white',
+      fontSize: 12,
+      fontWeight: '500',
+      fontFamily: theme.typography.fontFamily,
+    },
+    // Security Section
+    securityItem: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: theme.spacing.sm,
+      justifyContent: 'space-between',
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border || '#E0E0E0',
     },
-    detailContent: {
-      marginLeft: theme.spacing.md,
+    securityLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
       flex: 1,
     },
-    detailLabel: {
-      fontSize: theme.typography.sizes.xs,
-      color: theme.colors.textSecondary,
-      marginBottom: 2,
-      textTransform: 'uppercase',
-      fontFamily: theme.typography.fontFamily,
-      fontWeight: theme.typography.weights.medium,
+    securityIcon: {
+      marginRight: 16,
     },
-    detailValue: {
-      fontSize: theme.typography.sizes.md,
+    securityTitle: {
+      fontSize: 16,
       color: theme.colors.text,
       fontFamily: theme.typography.fontFamily,
+      fontWeight: '500',
     },
-    divider: {
-      marginVertical: 4,
-      backgroundColor: theme.colors.divider,
+    securitySubtitle: {
+      fontSize: 12,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      marginTop: 2,
     },
-    themeCard: {
-      marginBottom: theme.spacing.md,
-      ...theme.shadows.medium,
-      backgroundColor: theme.colors.surface,
-      borderRadius: theme.borderRadius.md,
+    securityAction: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 20,
     },
+    changeButton: {
+      backgroundColor: theme.colors.primary,
+    },
+    verifiedButton: {
+      backgroundColor: '#4CAF50',
+    },
+    actionText: {
+      color: 'white',
+      fontSize: 12,
+      fontWeight: '500',
+      fontFamily: theme.typography.fontFamily,
+    },
+    // Theme Settings
     themeRow: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingVertical: theme.spacing.sm,
+      paddingVertical: 12,
     },
     themeLabel: {
-      fontSize: theme.typography.sizes.md,
+      fontSize: 16,
       color: theme.colors.text,
       fontFamily: theme.typography.fontFamily,
       flex: 1,
     },
     themeDescription: {
-      fontSize: theme.typography.sizes.sm,
+      fontSize: 12,
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
       marginTop: 2,
     },
     themeOptions: {
-      marginTop: theme.spacing.sm,
+      marginTop: 16,
     },
     themeOption: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingVertical: theme.spacing.xs,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      marginBottom: 8,
+      backgroundColor: theme.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#F8F9FA',
+    },
+    themeOptionLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
     },
     themeOptionText: {
-      fontSize: theme.typography.sizes.sm,
+      fontSize: 14,
       color: theme.colors.text,
       fontFamily: theme.typography.fontFamily,
-      marginLeft: theme.spacing.sm,
+      marginLeft: 12,
     },
-    actionsCard: {
-      marginBottom: theme.spacing.md,
-      ...theme.shadows.medium,
-      backgroundColor: theme.colors.surface,
-      borderRadius: theme.borderRadius.md,
+    activeButton: {
+      backgroundColor: theme.colors.primary,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
     },
-    actionButton: {
-      marginBottom: theme.spacing.sm,
+    selectButton: {
+      borderWidth: 1,
+      borderColor: theme.colors.primary,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
     },
-    logoutButton: {
-      marginTop: theme.spacing.xs,
-    },
-    infoCard: {
-      ...theme.shadows.small,
-      marginBottom: theme.spacing.lg,
-      backgroundColor: theme.colors.surface,
-      borderRadius: theme.borderRadius.md,
-    },
-    appInfo: {
-      textAlign: 'center',
-      fontSize: theme.typography.sizes.xs,
-      color: theme.colors.textSecondary,
-      marginBottom: 4,
+    buttonText: {
+      fontSize: 12,
+      fontWeight: '500',
       fontFamily: theme.typography.fontFamily,
     },
-    menuAnchor: {
-      position: 'relative',
+    activeButtonText: {
+      color: 'white',
+    },
+    selectButtonText: {
+      color: theme.colors.primary,
     },
   }));
 
@@ -3848,15 +4035,15 @@ export default function ProfileScreen({ navigation }: any) {
     try {
       const currentUser = await authService.getCurrentUser();
       setUser(currentUser);
-      
-      // Try to get more detailed profile from API
+
+      // Load profile data from API
       try {
         const profileData = await healthcareService.getProfile();
-        if (profileData?.user) {
-          setUser(profileData.user);
+        if (profileData?.profile) {
+          setProfile(profileData.profile);
         }
       } catch (profileError) {
-        console.log('Could not fetch extended profile data:', profileError);
+        console.log('Could not fetch profile data:', profileError);
       }
     } catch (error) {
       console.error('Failed to load profile:', error);
@@ -3876,7 +4063,6 @@ export default function ProfileScreen({ navigation }: any) {
             setLoading(true);
             try {
               await authService.logout();
-              // Navigation will be handled by auth state change
             } catch (error) {
               console.error('Logout error:', error);
             } finally {
@@ -3888,704 +4074,1782 @@ export default function ProfileScreen({ navigation }: any) {
     );
   };
 
-  const getUserTypeDisplay = (userType: string) => {
-    switch (userType?.toLowerCase()) {
-      case 'healthcare':
-        return 'Healthcare Provider';
-      case 'doctor':
-        return 'Doctor';
-      case 'patient':
-        return 'Patient';
-      case 'admin':
-        return 'Administrator';
-      default:
-        return userType || 'User';
+  const formatDate = (dateString: string) => {
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).replace(/\//g, '-');
+    } catch {
+      return dateString;
     }
   };
 
-  const getThemeModeDisplay = (mode: string) => {
-    switch (mode) {
-      case 'light':
-        return 'Light Mode';
-      case 'dark':
-        return 'Dark Mode';
-      case 'system':
-        return 'System Default';
-      default:
-        return 'System Default';
-    }
+  const formatWorkingDay = (day: string) => {
+    return day.charAt(0).toUpperCase() + day.slice(1, 3);
   };
+
+  const renderBasicTab = () => (
+    <Card style={styles.contentCard}>
+      <View style={styles.cardContent}>
+        <Text style={styles.sectionTitle}>Basic Information</Text>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Organization Name *</Text>
+          <Text style={styles.fieldValue}>{profile?.name || 'sunshine clinic'}</Text>
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Organization Type</Text>
+          <Text style={styles.fieldValue}>{profile?.organization_type?.toUpperCase() || 'CLINIC'}</Text>
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Registration Number *</Text>
+          <Text style={styles.fieldValue}>{profile?.registration_number || 'APHL0012345'}</Text>
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Medical License Number *</Text>
+          <Text style={styles.fieldValue}>{profile?.license_number || 'KAR/HOSP/2024/0013456'}</Text>
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Phone Number *</Text>
+          <Text style={styles.fieldValue}>{profile?.phone || '7008392889'}</Text>
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Email</Text>
+          <Text style={styles.fieldValue}>{profile?.email || user?.email}</Text>
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Website</Text>
+          <Text style={styles.fieldValue}>{profile?.website || 'https://www.sunshine.com'}</Text>
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Established Date</Text>
+          <Text style={styles.fieldValue}>{profile?.established_date ? formatDate(profile.established_date) : '17-06-2014'}</Text>
+        </View>
+      </View>
+    </Card>
+  );
+
+  const renderOperationsTab = () => (
+    <Card style={styles.contentCard}>
+      <View style={styles.cardContent}>
+        <Text style={styles.sectionTitle}>Operational Information</Text>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Opening Time</Text>
+          <Text style={styles.fieldValue}>{profile?.opening_time || '09:00'}</Text>
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Closing Time</Text>
+          <Text style={styles.fieldValue}>{profile?.closing_time || '18:00'}</Text>
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Bed Count (if applicable)</Text>
+          <Text style={styles.fieldValue}>{profile?.bed_count || '56'}</Text>
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Working Days</Text>
+          <View style={styles.workingDaysContainer}>
+            {(profile?.working_days || ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']).map((day, index) => (
+              <View key={index} style={styles.dayChip}>
+                <Text style={styles.dayText}>{formatWorkingDay(day)}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Specialties (comma separated)</Text>
+          <Text style={styles.fieldValue}>
+            {profile?.specialties?.join(', ') || 'General Medicine, Cardiology, Dermatology, Orthopedics, Pediatrics, Neurology, Gynecology, Psychiatry, Dentistry'}
+          </Text>
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Facilities (comma separated)</Text>
+          <Text style={styles.fieldValue}>
+            {profile?.facilities?.join(', ') || 'X-Ray, CT Scan, MRI, Ultrasound, ECG, Laboratory, Pharmacy, Emergency Care, Surgery Theater, ICU'}
+          </Text>
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Certifications (comma separated)</Text>
+          <Text style={styles.fieldValue}>NABH, JCI</Text>
+        </View>
+      </View>
+    </Card>
+  );
+
+  const renderSecurityTab = () => (
+    <Card style={styles.contentCard}>
+      <View style={styles.cardContent}>
+        <Text style={styles.sectionTitle}>Security Settings</Text>
+
+        <View style={styles.securityItem}>
+          <View style={styles.securityLeft}>
+            <MaterialCommunityIcons
+              name="lock"
+              size={24}
+              color="#4CAF50"
+              style={styles.securityIcon}
+            />
+            <View>
+              <Text style={styles.securityTitle}>Change Password</Text>
+              <Text style={styles.securitySubtitle}>Update your account password</Text>
+            </View>
+          </View>
+          <TouchableOpacity style={[styles.securityAction, styles.changeButton]}>
+            <Text style={styles.actionText}>Change</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.securityItem}>
+          <View style={styles.securityLeft}>
+            <MaterialCommunityIcons
+              name="shield-check"
+              size={24}
+              color="#4CAF50"
+              style={styles.securityIcon}
+            />
+            <View>
+              <Text style={styles.securityTitle}>Verification Status</Text>
+              <Text style={styles.securitySubtitle}>Your facility is verified</Text>
+            </View>
+          </View>
+          <TouchableOpacity style={[styles.securityAction, styles.verifiedButton]}>
+            <Text style={styles.actionText}>Verified</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Card>
+  );
+
+  const renderThemeSettings = () => (
+    <Card style={styles.contentCard}>
+      <View style={styles.cardContent}>
+        <Text style={styles.sectionTitle}>Theme Settings</Text>
+
+        <View style={styles.themeRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.themeLabel}>Dark Mode</Text>
+            <Text style={styles.themeDescription}>Toggle between light and dark themes</Text>
+          </View>
+          <Switch
+            value={isDark}
+            onValueChange={toggleTheme}
+            trackColor={{
+              false: '#767577',
+              true: '#4CAF50'
+            }}
+            thumbColor='#f4f3f4'
+          />
+        </View>
+
+        <View style={styles.themeOptions}>
+          <Text style={styles.themeLabel}>Theme Mode</Text>
+
+          <View style={styles.themeOption}>
+            <View style={styles.themeOptionLeft}>
+              <MaterialCommunityIcons
+                name="weather-sunny"
+                size={20}
+                color={themeMode === 'light' ? '#FFA726' : '#666'}
+              />
+              <Text style={styles.themeOptionText}>Light</Text>
+            </View>
+            <TouchableOpacity
+              style={themeMode === 'light' ? styles.activeButton : styles.selectButton}
+              onPress={() => setTheme('light')}
+            >
+              <Text style={[
+                styles.buttonText,
+                themeMode === 'light' ? styles.activeButtonText : styles.selectButtonText
+              ]}>
+                {themeMode === 'light' ? 'Active' : 'Select'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.themeOption}>
+            <View style={styles.themeOptionLeft}>
+              <MaterialCommunityIcons
+                name="weather-night"
+                size={20}
+                color={themeMode === 'dark' ? '#2196F3' : '#666'}
+              />
+              <Text style={styles.themeOptionText}>Dark</Text>
+            </View>
+            <TouchableOpacity
+              style={themeMode === 'dark' ? styles.activeButton : styles.selectButton}
+              onPress={() => setTheme('dark')}
+            >
+              <Text style={[
+                styles.buttonText,
+                themeMode === 'dark' ? styles.activeButtonText : styles.selectButtonText
+              ]}>
+                {themeMode === 'dark' ? 'Active' : 'Select'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.themeOption}>
+            <View style={styles.themeOptionLeft}>
+              <MaterialCommunityIcons
+                name="theme-light-dark"
+                size={20}
+                color={themeMode === 'system' ? '#9C27B0' : '#666'}
+              />
+              <Text style={styles.themeOptionText}>System</Text>
+            </View>
+            <TouchableOpacity
+              style={themeMode === 'system' ? styles.activeButton : styles.selectButton}
+              onPress={() => setTheme('system')}
+            >
+              <Text style={[
+                styles.buttonText,
+                themeMode === 'system' ? styles.activeButtonText : styles.selectButtonText
+              ]}>
+                {themeMode === 'system' ? 'Active' : 'Select'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Card>
+  );
 
   if (!user) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.userName}>Loading profile...</Text>
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text>Loading profile...</Text>
       </View>
     );
   }
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Profile Header */}
-      <Card style={styles.profileCard}>
-        <Card.Content style={styles.profileContent}>
-          <View style={styles.profileHeader}>
-            <View style={styles.avatarSection}>
-              <Avatar.Text 
-                size={80} 
-                label={user.name?.charAt(0)?.toUpperCase() || 'U'} 
-                style={styles.avatar}
-              />
-              <Title style={styles.userName}>{user.name || 'User'}</Title>
-              <Text style={styles.userType}>{getUserTypeDisplay(user.user_type)}</Text>
-              <Text style={styles.userEmail}>{user.email}</Text>
-            </View>
-            <IconButton
-              icon={isDark ? 'weather-sunny' : 'weather-night'}
-              iconColor={isDark ? '#FFA726' : '#2196F3'}
-              size={24}
-              onPress={toggleTheme}
-              style={styles.themeToggle}
+      {/* Organization Header */}
+      <Card style={styles.profileHeaderCard}>
+        <View style={styles.gradientHeader}>
+          {profile?.logo ? (
+            <Image
+              source={{ uri: profile.logo }}
+              style={styles.organizationLogo}
+              resizeMode="cover"
             />
-          </View>
-        </Card.Content>
-      </Card>
-
-      {/* Theme Settings */}
-      <Card style={styles.themeCard}>
-        <Card.Content>
-          <Title style={styles.sectionTitle}>Theme Settings</Title>
-          
-          <View style={styles.themeRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.themeLabel}>Dark Mode</Text>
-              <Text style={styles.themeDescription}>
-                Toggle between light and dark themes
-              </Text>
+          ) : (
+            <View style={styles.fallbackLogo}>
+              <MaterialCommunityIcons name="hospital-building" size={40} color="white" />
             </View>
-            <Switch
-              value={isDark}
-              onValueChange={toggleTheme}
-              trackColor={{ 
-                false: isDark ? '#767577' : '#767577', 
-                true: isDark ? '#4de352' : '#10d915' 
-              }}
-              thumbColor={isDark ? '#f4f3f4' : '#f4f3f4'}
-            />
-          </View>
-
-          <Divider style={styles.divider} />
-
-          <View style={styles.themeOptions}>
-            <Text style={styles.themeLabel}>Theme Mode</Text>
-            
-            <View style={styles.themeOption}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                <MaterialCommunityIcons 
-                  name="weather-sunny" 
-                  size={20} 
-                  color={themeMode === 'light' ? '#FFA726' : (isDark ? '#FFF' : '#666')} 
-                />
-                <Text style={styles.themeOptionText}>Light</Text>
-              </View>
-              <Button
-                mode={themeMode === 'light' ? 'contained' : 'outlined'}
-                onPress={() => setTheme('light')}
-                compact
-              >
-                {themeMode === 'light' ? 'Active' : 'Select'}
-              </Button>
-            </View>
-
-            <View style={styles.themeOption}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                <MaterialCommunityIcons 
-                  name="weather-night" 
-                  size={20} 
-                  color={themeMode === 'dark' ? '#2196F3' : (isDark ? '#FFF' : '#666')} 
-                />
-                <Text style={styles.themeOptionText}>Dark</Text>
-              </View>
-              <Button
-                mode={themeMode === 'dark' ? 'contained' : 'outlined'}
-                onPress={() => setTheme('dark')}
-                compact
-              >
-                {themeMode === 'dark' ? 'Active' : 'Select'}
-              </Button>
-            </View>
-
-            <View style={styles.themeOption}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                <MaterialCommunityIcons 
-                  name="theme-light-dark" 
-                  size={20} 
-                  color={themeMode === 'system' ? '#9C27B0' : (isDark ? '#FFF' : '#666')} 
-                />
-                <Text style={styles.themeOptionText}>System</Text>
-              </View>
-              <Button
-                mode={themeMode === 'system' ? 'contained' : 'outlined'}
-                onPress={() => setTheme('system')}
-                compact
-              >
-                {themeMode === 'system' ? 'Active' : 'Select'}
-              </Button>
-            </View>
-          </View>
-        </Card.Content>
-      </Card>
-
-      {/* Profile Details */}
-      <Card style={styles.detailsCard}>
-        <Card.Content>
-          <Title style={styles.sectionTitle}>Account Information</Title>
-          
-          <View style={styles.detailRow}>
-            <MaterialCommunityIcons name="account" size={20} color={isDark ? '#FFF' : '#666'} />
-            <View style={styles.detailContent}>
-              <Text style={styles.detailLabel}>Full Name</Text>
-              <Text style={styles.detailValue}>{user.name || 'Not provided'}</Text>
-            </View>
-          </View>
-
-          <Divider style={styles.divider} />
-
-          <View style={styles.detailRow}>
-            <MaterialCommunityIcons name="email" size={20} color={isDark ? '#FFF' : '#666'} />
-            <View style={styles.detailContent}>
-              <Text style={styles.detailLabel}>Email Address</Text>
-              <Text style={styles.detailValue}>{user.email}</Text>
-            </View>
-          </View>
-
-          <Divider style={styles.divider} />
-
-          <View style={styles.detailRow}>
-            <MaterialCommunityIcons name="phone" size={20} color={isDark ? '#FFF' : '#666'} />
-            <View style={styles.detailContent}>
-              <Text style={styles.detailLabel}>Phone Number</Text>
-              <Text style={styles.detailValue}>{user.phone || 'Not provided'}</Text>
-            </View>
-          </View>
-
-          <Divider style={styles.divider} />
-
-          <View style={styles.detailRow}>
-            <MaterialCommunityIcons name="badge-account" size={20} color={isDark ? '#FFF' : '#666'} />
-            <View style={styles.detailContent}>
-              <Text style={styles.detailLabel}>User Type</Text>
-              <Text style={styles.detailValue}>{getUserTypeDisplay(user.user_type)}</Text>
-            </View>
-          </View>
-
-          {user.address && (
-            <>
-              <Divider style={styles.divider} />
-              <View style={styles.detailRow}>
-                <MaterialCommunityIcons name="map-marker" size={20} color={isDark ? '#FFF' : '#666'} />
-                <View style={styles.detailContent}>
-                  <Text style={styles.detailLabel}>Address</Text>
-                  <Text style={styles.detailValue}>{user.address}</Text>
-                </View>
-              </View>
-            </>
           )}
 
-          <Divider style={styles.divider} />
+          <Text style={styles.organizationName}>{profile?.name || 'sunshine clinic'}</Text>
+          <Text style={styles.organizationType}>{profile?.organization_type || 'CLINIC'}</Text>
+          <Text style={styles.providerType}>Healthcare Provider</Text>
 
-          <View style={styles.detailRow}>
-            <MaterialCommunityIcons name="palette" size={20} color={isDark ? '#FFF' : '#666'} />
-            <View style={styles.detailContent}>
-              <Text style={styles.detailLabel}>Current Theme</Text>
-              <Text style={styles.detailValue}>{getThemeModeDisplay(themeMode)} ({isDark ? 'Dark' : 'Light'})</Text>
+          {profile?.is_verified && (
+            <View style={styles.verifiedBadge}>
+              <MaterialCommunityIcons name="check-decagram" size={20} color="white" />
+              <Text style={styles.verifiedText}>Verified</Text>
             </View>
+          )}
+
+          <TouchableOpacity
+            style={styles.editProfileButton}
+            onPress={() => navigation.navigate('EditProfile')}
+          >
+            <MaterialCommunityIcons name="pencil" size={16} color="white" />
+            <Text style={styles.editButtonText}>Edit Profile</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Organization Statistics */}
+        <View style={styles.statsContainer}>
+          <View style={styles.statItem}>
+            <MaterialCommunityIcons name="star" size={24} color="#FFA726" />
+            <Text style={styles.statValue}>{profile?.rating || '0.00'}</Text>
+            <Text style={styles.statLabel}>Rating</Text>
           </View>
-        </Card.Content>
+          <View style={styles.statItem}>
+            <MaterialCommunityIcons name="account-group" size={24} color="#4CAF50" />
+            <Text style={styles.statValue}>{profile?.total_reviews || '0'}</Text>
+            <Text style={styles.statLabel}>Reviews</Text>
+          </View>
+          <View style={styles.statItem}>
+            <MaterialCommunityIcons name="medical-bag" size={24} color="#2196F3" />
+            <Text style={styles.statValue}>{profile?.specialties?.length || '9'}</Text>
+            <Text style={styles.statLabel}>Specialties</Text>
+          </View>
+          <View style={styles.statItem}>
+            <MaterialCommunityIcons name="calendar" size={24} color="#FF9800" />
+            <Text style={styles.statValue}>{profile?.working_days?.length || '6'}</Text>
+            <Text style={styles.statLabel}>Working Days</Text>
+          </View>
+        </View>
       </Card>
 
-      {/* Action Buttons */}
-      <Card style={styles.actionsCard}>
-        <Card.Content>
-          <Title style={styles.sectionTitle}>Account Actions</Title>
-          
-          <Button
-            mode="outlined"
-            icon="account-edit"
-            onPress={() => Alert.alert('Info', 'Edit profile functionality will be implemented')}
-            style={styles.actionButton}
-          >
-            Edit Profile
-          </Button>
+      {/* Tab Navigation */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'basic' ? styles.activeTab : styles.inactiveTab]}
+          onPress={() => setActiveTab('basic')}
+        >
+          <MaterialCommunityIcons
+            name="domain"
+            size={20}
+            color={activeTab === 'basic' ? 'white' : (isDark ? '#FFF' : '#666')}
+            style={styles.tabIcon}
+          />
+          <Text style={[
+            styles.tabText,
+            activeTab === 'basic' ? styles.activeTabText : styles.inactiveTabText
+          ]}>
+            Basic
+          </Text>
+        </TouchableOpacity>
 
-          <Button
-            mode="outlined"
-            icon="lock-reset"
-            onPress={() => Alert.alert('Info', 'Change password functionality will be implemented')}
-            style={styles.actionButton}
-          >
-            Change Password
-          </Button>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'operations' ? styles.activeTab : styles.inactiveTab]}
+          onPress={() => setActiveTab('operations')}
+        >
+          <MaterialCommunityIcons
+            name="cog"
+            size={20}
+            color={activeTab === 'operations' ? 'white' : (isDark ? '#FFF' : '#666')}
+            style={styles.tabIcon}
+          />
+          <Text style={[
+            styles.tabText,
+            activeTab === 'operations' ? styles.activeTabText : styles.inactiveTabText
+          ]}>
+            Operations
+          </Text>
+        </TouchableOpacity>
 
-          <Button
-            mode="outlined"
-            icon="bell-cog"
-            onPress={() => Alert.alert('Info', 'Notification settings functionality will be implemented')}
-            style={styles.actionButton}
-          >
-            Notification Settings
-          </Button>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'security' ? styles.activeTab : styles.inactiveTab]}
+          onPress={() => setActiveTab('security')}
+        >
+          <MaterialCommunityIcons
+            name="shield-check"
+            size={20}
+            color={activeTab === 'security' ? 'white' : (isDark ? '#FFF' : '#666')}
+            style={styles.tabIcon}
+          />
+          <Text style={[
+            styles.tabText,
+            activeTab === 'security' ? styles.activeTabText : styles.inactiveTabText
+          ]}>
+            Security
+          </Text>
+        </TouchableOpacity>
+      </View>
 
-          <Button
-            mode="outlined"
-            icon="palette"
-            onPress={() => Alert.alert(
-              'Theme Info', 
-              `Current theme: ${getThemeModeDisplay(themeMode)}\nActive mode: ${isDark ? 'Dark' : 'Light'}\n\nUse the theme controls above to customize your experience.`
-            )}
-            style={styles.actionButton}
-          >
-            Theme Information
-          </Button>
+      {/* Tab Content */}
+      {activeTab === 'basic' && renderBasicTab()}
+      {activeTab === 'operations' && renderOperationsTab()}
+      {activeTab === 'security' && renderSecurityTab()}
 
+      {/* Theme Settings */}
+      {renderThemeSettings()}
+
+      {/* Logout Button */}
+      <Card style={[styles.contentCard, { marginBottom: 32 }]}>
+        <View style={styles.cardContent}>
           <Button
             mode="contained"
             icon="logout"
             onPress={handleLogout}
             loading={loading}
-            style={[styles.actionButton, styles.logoutButton]}
-            buttonColor={isDark ? '#cf6679' : '#F44336'}
+            buttonColor="#F44336"
+            style={{ borderRadius: 8 }}
           >
             Logout
           </Button>
-        </Card.Content>
-      </Card>
-
-      {/* App Info */}
-      <Card style={styles.infoCard}>
-        <Card.Content>
-          <Text style={styles.appInfo}>Visit Care Healthcare v1.0.0</Text>
-          <Text style={styles.appInfo}>© 2024 Visit Care. All rights reserved.</Text>
-          <Text style={styles.appInfo}>
-            Theme: {getThemeModeDisplay(themeMode)} • {isDark ? 'Dark Mode' : 'Light Mode'}
-          </Text>
-        </Card.Content>
+        </View>
       </Card>
     </ScrollView>
   );
 }
 ```
 
-### 10. App.tsx 
+### 10. Edit Profile Screen (`src/screens/profile/EditProfileScreen.tsx`)
 
 ```typescript
-import React from 'react';
-import { PaperProvider } from 'react-native-paper';
-import { StatusBar } from 'expo-status-bar';
-import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
-import AppNavigator from './src/navigation/AppNavigator';
+import React, { useState, useEffect } from 'react';
+import { View, ScrollView, Alert, TouchableOpacity, Image, TextInput } from 'react-native';
+import { Card, Text, Button, Switch, Chip } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTheme } from '../../contexts/ThemeContext';
+import { useStyles } from '../../hooks/useStyles';
+import healthcareService from '../../services/healthcareService';
+import * as ImagePicker from 'expo-image-picker';
 
-const AppContent = () => {
-  const { theme, isDark } = useTheme();
-  
-  const paperTheme = {
-    colors: {
-      primary: theme.colors.primary,
-      secondary: theme.colors.secondary,
-      surface: theme.colors.surface,
-      background: theme.colors.background,
-      error: theme.colors.error,
-      text: theme.colors.text,
-      onPrimary: theme.colors.onPrimary,
-      onSecondary: theme.colors.onSecondary,
-      onSurface: theme.colors.onSurface,
-      onBackground: theme.colors.onBackground,
-      outline: theme.colors.border,
+interface FormData {
+  name: string;
+  registration_number: string;
+  license_number: string;
+  organization_type: string;
+  description: { en: string; od: string };
+  address: { en: string; od: string };
+  phone: string;
+  email: string;
+  website: string;
+  opening_time: string;
+  closing_time: string;
+  working_days: string[];
+  established_date: string;
+  bed_count: string;
+  facilities: { en: string[]; od: string[] };
+  specialties: { en: string[]; od: string[] };
+  certifications: { en: string[]; od: string[] };
+}
+
+export default function EditProfileScreen({ navigation, route }: any) {
+  const [currentStep, setCurrentStep] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState<FormData>({
+    name: '',
+    registration_number: '',
+    license_number: '',
+    organization_type: 'clinic',
+    description: { en: '', od: '' },
+    address: { en: '', od: '' },
+    phone: '',
+    email: '',
+    website: '',
+    opening_time: '09:00',
+    closing_time: '18:00',
+    working_days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
+    established_date: '',
+    bed_count: '',
+    facilities: { en: [], od: [] },
+    specialties: { en: [], od: [] },
+    certifications: { en: [], od: [] },
+  });
+  const [newFacility, setNewFacility] = useState('');
+  const [newSpecialty, setNewSpecialty] = useState('');
+  const [newCertification, setNewCertification] = useState('');
+  const [logoImage, setLogoImage] = useState<string | null>(null);
+  const [facilityImages, setFacilityImages] = useState<string[]>([]);
+
+  const { theme } = useTheme();
+
+  const styles = useStyles((theme) => ({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
     },
-  };
-
-  return (
-    <PaperProvider theme={paperTheme}>
-      <StatusBar style={isDark ? 'light' : 'dark'} backgroundColor={theme.colors.background} />
-      <AppNavigator />
-    </PaperProvider>
-  );
-};
-
-export default function App() {
-  return (
-    <ThemeProvider>
-      <AppContent />
-    </ThemeProvider>
-  );
-}
-```
-### 11. Theme (`src/constants/theme.ts`)
-
-```typescript
-export interface ThemeColors {
-  primary: string;
-  primaryLight: string;
-  primaryDark: string;
-  secondary: string;
-  secondaryLight: string;
-  secondaryDark: string;
-  background: string;
-  surface: string;
-  error: string;
-  warning: string;
-  info: string;
-  success: string;
-  onPrimary: string;
-  onSecondary: string;
-  onBackground: string;
-  onSurface: string;
-  onError: string;
-  text: string;
-  textSecondary: string;
-  border: string;
-  divider: string;
-  disabled: string;
-  placeholder: string;
-}
-
-export interface Theme {
-  colors: ThemeColors;
-  mode: 'light' | 'dark';
-  spacing: {
-    xs: number;
-    sm: number;
-    md: number;
-    lg: number;
-    xl: number;
-    xxl: number;
-  };
-  typography: {
-    fontFamily: string;
-    sizes: {
-      xs: number;
-      sm: number;
-      md: number;
-      lg: number;
-      xl: number;
-      xxl: number;
-    };
-    weights: {
-      light: '200';
-      normal: '300';
-      regular: '400';
-      medium: '500';
-      semibold: '600';
-      bold: '700';
-    };
-  };
-  shadows: {
-    small: object;
-    medium: object;
-    large: object;
-  };
-  borderRadius: {
-    xs: number;
-    sm: number;
-    md: number;
-    lg: number;
-    xl: number;
-  };
-}
-
-const baseSpacing = {
-  xs: 4,
-  sm: 8,
-  md: 16,
-  lg: 24,
-  xl: 32,
-  xxl: 48,
-};
-
-const baseTypography = {
-  fontFamily: 'Poppins',
-  sizes: {
-    xs: 12,
-    sm: 14,
-    md: 16,
-    lg: 18,
-    xl: 24,
-    xxl: 32,
-  },
-  weights: {
-    light: '200' as const,
-    normal: '300' as const,
-    regular: '400' as const,
-    medium: '500' as const,
-    semibold: '600' as const,
-    bold: '700' as const,
-  },
-};
-
-const baseShadows = {
-  small: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  medium: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  large: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-};
-
-const baseBorderRadius = {
-  xs: 4,
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 24,
-};
-
-export const lightTheme: Theme = {
-  colors: {
-    primary: '#10d915',
-    primaryLight: '#4de352',
-    primaryDark: '#0cb010',
-    secondary: '#dc004e',
-    secondaryLight: '#ff5983',
-    secondaryDark: '#9a0036',
-    background: '#f5f5f5',
-    surface: '#ffffff',
-    error: '#f44336',
-    warning: '#ff9800',
-    info: '#2196f3',
-    success: '#4caf50',
-    onPrimary: '#ffffff',
-    onSecondary: '#ffffff',
-    onBackground: '#000000',
-    onSurface: '#000000',
-    onError: '#ffffff',
-    text: 'rgba(0, 0, 0, 0.87)',
-    textSecondary: 'rgba(0, 0, 0, 0.6)',
-    border: 'rgba(0, 0, 0, 0.12)',
-    divider: 'rgba(0, 0, 0, 0.12)',
-    disabled: 'rgba(0, 0, 0, 0.26)',
-    placeholder: 'rgba(0, 0, 0, 0.38)',
-  },
-  mode: 'light',
-  spacing: baseSpacing,
-  typography: baseTypography,
-  shadows: baseShadows,
-  borderRadius: baseBorderRadius,
-};
-
-export const darkTheme: Theme = {
-  colors: {
-    primary: '#10d915',
-    primaryLight: '#4de352',
-    primaryDark: '#0cb010',
-    secondary: '#dc004e',
-    secondaryLight: '#ff5983',
-    secondaryDark: '#9a0036',
-    background: '#121212',
-    surface: '#1e1e1e',
-    error: '#cf6679',
-    warning: '#ffb74d',
-    info: '#81c784',
-    success: '#66bb6a',
-    onPrimary: '#000000',
-    onSecondary: '#000000',
-    onBackground: '#ffffff',
-    onSurface: '#ffffff',
-    onError: '#000000',
-    text: '#ffffff',
-    textSecondary: 'rgba(255, 255, 255, 0.7)',
-    border: 'rgba(255, 255, 255, 0.12)',
-    divider: 'rgba(255, 255, 255, 0.12)',
-    disabled: 'rgba(255, 255, 255, 0.38)',
-    placeholder: 'rgba(255, 255, 255, 0.5)',
-  },
-  mode: 'dark',
-  spacing: baseSpacing,
-  typography: baseTypography,
-  shadows: {
-    small: {
-      ...baseShadows.small,
-      shadowColor: '#000',
-      shadowOpacity: 0.3,
+    header: {
+      backgroundColor: theme.colors.primary,
+      padding: 20,
+      paddingTop: 40,
     },
-    medium: {
-      ...baseShadows.medium,
-      shadowColor: '#000',
-      shadowOpacity: 0.4,
+    headerTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: 'white',
+      textAlign: 'center',
+      fontFamily: theme.typography.fontFamily,
     },
-    large: {
-      ...baseShadows.large,
-      shadowColor: '#000',
-      shadowOpacity: 0.5,
+    headerSubtitle: {
+      fontSize: 12,
+      color: 'rgba(255, 255, 255, 0.8)',
+      textAlign: 'center',
+      fontFamily: theme.typography.fontFamily,
+      marginTop: 4,
     },
-  },
-  borderRadius: baseBorderRadius,
-};
-```
+    stepIndicator: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingVertical: 20,
+      backgroundColor: theme.colors.surface,
+      marginBottom: 16,
+    },
+    stepDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      marginHorizontal: 4,
+    },
+    activeDot: {
+      backgroundColor: theme.colors.primary,
+    },
+    inactiveDot: {
+      backgroundColor: '#E0E0E0',
+    },
+    contentCard: {
+      marginHorizontal: 16,
+      marginBottom: 16,
+      backgroundColor: theme.colors.surface,
+      borderRadius: 12,
+      elevation: 2,
+    },
+    cardContent: {
+      padding: 20,
+    },
+    stepTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: theme.colors.text,
+      marginBottom: 16,
+      fontFamily: theme.typography.fontFamily,
+    },
+    fieldContainer: {
+      marginBottom: 16,
+    },
+    fieldLabel: {
+      fontSize: 12,
+      color: theme.colors.textSecondary,
+      marginBottom: 6,
+      fontFamily: theme.typography.fontFamily,
+    },
+    textInput: {
+      borderWidth: 1,
+      borderColor: theme.colors.border || '#E0E0E0',
+      borderRadius: 8,
+      padding: 12,
+      fontSize: 14,
+      color: theme.colors.text,
+      backgroundColor: theme.colors.background,
+      fontFamily: theme.typography.fontFamily,
+      minHeight: 48,
+    },
+    textArea: {
+      minHeight: 100,
+      textAlignVertical: 'top',
+    },
+    dropdown: {
+      borderWidth: 1,
+      borderColor: theme.colors.border || '#E0E0E0',
+      borderRadius: 8,
+      padding: 12,
+      backgroundColor: theme.colors.background,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    dropdownText: {
+      fontSize: 14,
+      color: theme.colors.text,
+      fontFamily: theme.typography.fontFamily,
+      textTransform: 'uppercase',
+    },
+    workingDaysContainer: {
+      marginTop: 8,
+    },
+    dayRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 8,
+    },
+    dayLabel: {
+      flex: 1,
+      fontSize: 14,
+      color: theme.colors.text,
+      fontFamily: theme.typography.fontFamily,
+      textTransform: 'capitalize',
+    },
+    chipsContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginTop: 8,
+    },
+    chip: {
+      backgroundColor: theme.colors.primary,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    chipText: {
+      color: 'white',
+      fontSize: 12,
+      fontFamily: theme.typography.fontFamily,
+    },
+    chipRemove: {
+      marginLeft: 6,
+    },
+    addContainer: {
+      flexDirection: 'row',
+      gap: 8,
+      marginTop: 8,
+    },
+    addInput: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: theme.colors.border || '#E0E0E0',
+      borderRadius: 8,
+      padding: 12,
+      fontSize: 14,
+      color: theme.colors.text,
+      backgroundColor: theme.colors.background,
+      fontFamily: theme.typography.fontFamily,
+    },
+    addButton: {
+      backgroundColor: theme.colors.primary,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderRadius: 8,
+      justifyContent: 'center',
+    },
+    addButtonText: {
+      color: 'white',
+      fontSize: 12,
+      fontWeight: '500',
+      fontFamily: theme.typography.fontFamily,
+    },
+    imageContainer: {
+      alignItems: 'center',
+      marginVertical: 16,
+    },
+    logoImage: {
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+      backgroundColor: theme.colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    imageButton: {
+      backgroundColor: theme.colors.primary,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 20,
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    removeButton: {
+      backgroundColor: '#F44336',
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 20,
+    },
+    imageButtonText: {
+      color: 'white',
+      fontSize: 12,
+      fontFamily: theme.typography.fontFamily,
+      marginLeft: 4,
+    },
+    supportText: {
+      fontSize: 10,
+      color: theme.colors.textSecondary,
+      textAlign: 'center',
+      fontFamily: theme.typography.fontFamily,
+      marginTop: 4,
+    },
+    navigationButtons: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      padding: 16,
+      backgroundColor: theme.colors.surface,
+    },
+    navButton: {
+      flex: 1,
+      marginHorizontal: 8,
+      borderRadius: 8,
+    },
+    backButton: {
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      borderColor: theme.colors.primary,
+    },
+    nextButton: {
+      backgroundColor: theme.colors.primary,
+    },
+    updateButton: {
+      backgroundColor: '#4CAF50',
+    },
+  }));
 
-### 12. Theme Context (`src/contexts/ThemeContext.tsx`)
-
-```typescript
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Appearance, ColorSchemeName } from 'react-native';
-import { lightTheme, darkTheme, Theme } from '../constants/theme';
-
-interface ThemeContextType {
-  theme: Theme;
-  isDark: boolean;
-  toggleTheme: () => void;
-  setTheme: (theme: 'light' | 'dark' | 'system') => void;
-  themeMode: 'light' | 'dark' | 'system';
-}
-
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
-
-export const useTheme = () => {
-  const context = useContext(ThemeContext);
-  if (!context) {
-    throw new Error('useTheme must be used within a ThemeProvider');
-  }
-  return context;
-};
-
-interface ThemeProviderProps {
-  children: ReactNode;
-}
-
-export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
-  const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>('system');
-  const [currentTheme, setCurrentTheme] = useState<Theme>(lightTheme);
-
-  // Memoized theme calculation
-  const calculateTheme = useCallback((mode: 'light' | 'dark' | 'system', systemScheme?: ColorSchemeName) => {
-    if (mode === 'system') {
-      const scheme = systemScheme || Appearance.getColorScheme();
-      return scheme === 'dark' ? darkTheme : lightTheme;
-    }
-    return mode === 'dark' ? darkTheme : lightTheme;
+  useEffect(() => {
+    loadProfileData();
   }, []);
 
-  useEffect(() => {
-    let mounted = true;
-
-    const loadThemePreference = async () => {
-      try {
-        const savedTheme = await AsyncStorage.getItem('theme_preference');
-        const preference = (savedTheme as 'light' | 'dark' | 'system') || 'system';
-        
-        if (mounted) {
-          setThemeMode(preference);
-          setCurrentTheme(calculateTheme(preference));
-        }
-      } catch (error) {
-        console.error('Error loading theme preference:', error);
-        if (mounted) {
-          setCurrentTheme(lightTheme);
+  const loadProfileData = async () => {
+    try {
+      const response = await healthcareService.getProfile();
+      if (response?.profile) {
+        const profile = response.profile;
+        setFormData({
+          name: profile.name || '',
+          registration_number: profile.registration_number || '',
+          license_number: profile.license_number || '',
+          organization_type: profile.organization_type || 'clinic',
+          description: {
+            en: profile.description || '',
+            od: profile.description_translations?.od || '',
+          },
+          address: {
+            en: profile.address || '',
+            od: profile.address_translations?.od || '',
+          },
+          phone: profile.phone || '',
+          email: profile.email || '',
+          website: profile.website || '',
+          opening_time: profile.opening_time?.substring(0, 5) || '09:00',
+          closing_time: profile.closing_time?.substring(0, 5) || '18:00',
+          working_days: profile.working_days || [],
+          established_date: profile.established_date?.split('T')[0] || '',
+          bed_count: profile.bed_count?.toString() || '',
+          facilities: {
+            en: profile.facilities || [],
+            od: profile.facilities_translations?.od || profile.facilities || [],
+          },
+          specialties: {
+            en: profile.specialties || [],
+            od: profile.specialties_translations?.od || profile.specialties || [],
+          },
+          certifications: {
+            en: profile.certifications?.en || [],
+            od: profile.certifications?.od || [],
+          },
+        });
+        if (profile.logo) {
+          setLogoImage(profile.logo);
         }
       }
-    };
-
-    loadThemePreference();
-
-    return () => {
-      mounted = false;
-    };
-  }, [calculateTheme]);
-
-  useEffect(() => {
-    if (themeMode !== 'system') return;
-
-    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
-      setCurrentTheme(calculateTheme('system', colorScheme));
-    });
-
-    return () => subscription?.remove();
-  }, [themeMode, calculateTheme]);
-
-  const toggleTheme = useCallback(() => {
-    const newMode = currentTheme.mode === 'light' ? 'dark' : 'light';
-    setTheme(newMode);
-  }, [currentTheme.mode]);
-
-  const setTheme = useCallback(async (mode: 'light' | 'dark' | 'system') => {
-    try {
-      setThemeMode(mode);
-      await AsyncStorage.setItem('theme_preference', mode);
-      setCurrentTheme(calculateTheme(mode));
     } catch (error) {
-      console.error('Error saving theme preference:', error);
+      console.error('Failed to load profile:', error);
     }
-  }, [calculateTheme]);
-
-  const value: ThemeContextType = {
-    theme: currentTheme,
-    isDark: currentTheme.mode === 'dark',
-    toggleTheme,
-    setTheme,
-    themeMode,
   };
 
-  return (
-    <ThemeContext.Provider value={value}>
-      {children}
-    </ThemeContext.Provider>
+  const pickImage = async (type: 'logo' | 'facility') => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: type === 'logo' ? [1, 1] : [16, 9],
+      quality: 1,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      if (type === 'logo') {
+        setLogoImage(result.assets[0].uri);
+      } else {
+        setFacilityImages(prev => [...prev, result.assets[0].uri]);
+      }
+    }
+  };
+
+  const toggleWorkingDay = (day: string) => {
+    setFormData(prev => ({
+      ...prev,
+      working_days: prev.working_days.includes(day)
+        ? prev.working_days.filter(d => d !== day)
+        : [...prev.working_days, day]
+    }));
+  };
+
+  const addItem = (type: 'facilities' | 'specialties' | 'certifications', value: string) => {
+    if (value.trim()) {
+      setFormData(prev => ({
+        ...prev,
+        [type]: {
+          en: [...prev[type].en, value.trim()],
+          od: [...prev[type].od, value.trim()],
+        }
+      }));
+      
+      if (type === 'facilities') setNewFacility('');
+      if (type === 'specialties') setNewSpecialty('');
+      if (type === 'certifications') setNewCertification('');
+    }
+  };
+
+  const removeItem = (type: 'facilities' | 'specialties' | 'certifications', index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      [type]: {
+        en: prev[type].en.filter((_, i) => i !== index),
+        od: prev[type].od.filter((_, i) => i !== index),
+      }
+    }));
+  };
+
+  const handleSubmit = async () => {
+    setLoading(true);
+    try {
+      const payload: any = {
+        name: formData.name,
+        registration_number: formData.registration_number,
+        license_number: formData.license_number,
+        organization_type: formData.organization_type,
+        'description[en]': formData.description.en,
+        'description[od]': formData.description.od,
+        'address[en]': formData.address.en,
+        'address[od]': formData.address.od,
+        phone: formData.phone,
+        email: formData.email,
+        website: formData.website,
+        opening_time: formData.opening_time,
+        closing_time: formData.closing_time,
+        established_date: formData.established_date,
+        bed_count: parseInt(formData.bed_count) || 0,
+      };
+
+      // Add working days
+      formData.working_days.forEach((day, index) => {
+        payload[`working_days[${index}]`] = day;
+      });
+
+      // Add facilities
+      formData.facilities.en.forEach((facility, index) => {
+        payload[`facilities[en][${index}]`] = facility;
+        payload[`facilities[od][${index}]`] = formData.facilities.od[index] || facility;
+      });
+
+      // Add specialties
+      formData.specialties.en.forEach((specialty, index) => {
+        payload[`specialties[en][${index}]`] = specialty;
+        payload[`specialties[od][${index}]`] = formData.specialties.od[index] || specialty;
+      });
+
+      // Add certifications
+      formData.certifications.en.forEach((cert, index) => {
+        payload[`certifications[en][${index}]`] = cert;
+        payload[`certifications[od][${index}]`] = formData.certifications.od[index] || cert;
+      });
+
+      const response = await healthcareService.updateProfile(payload);
+      
+      if (response?.message) {
+        Alert.alert('Success', response.message, [
+          { text: 'OK', onPress: () => navigation.goBack() }
+        ]);
+      }
+    } catch (error) {
+      console.error('Update error:', error);
+      Alert.alert('Error', 'Failed to update profile. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderStep1 = () => (
+    <Card style={styles.contentCard}>
+      <View style={styles.cardContent}>
+        <Text style={styles.stepTitle}>Step 1 of 4: Organization</Text>
+        
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Organization Name *</Text>
+          <TextInput
+            style={styles.textInput}
+            value={formData.name}
+            onChangeText={(text) => setFormData(prev => ({ ...prev, name: text }))}
+            placeholder="Enter the full legal name of your healthcare organization"
+          />
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Registration Number *</Text>
+          <TextInput
+            style={styles.textInput}
+            value={formData.registration_number}
+            onChangeText={(text) => setFormData(prev => ({ ...prev, registration_number: text }))}
+          />
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Government registration number</Text>
+          <TextInput
+            style={styles.textInput}
+            value={formData.license_number}
+            onChangeText={(text) => setFormData(prev => ({ ...prev, license_number: text }))}
+          />
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Organization Type *</Text>
+          <View style={styles.dropdown}>
+            <Text style={styles.dropdownText}>{formData.organization_type}</Text>
+            <MaterialCommunityIcons name="chevron-down" size={20} color="#666" />
+          </View>
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Organization Description *</Text>
+          <TextInput
+            style={[styles.textInput, styles.textArea]}
+            value={formData.description.en}
+            onChangeText={(text) => setFormData(prev => ({ 
+              ...prev, 
+              description: { ...prev.description, en: text } 
+            }))}
+            multiline
+            placeholder="255/2000 characters"
+          />
+        </View>
+      </View>
+    </Card>
   );
-};
+
+  const renderStep2 = () => (
+    <Card style={styles.contentCard}>
+      <View style={styles.cardContent}>
+        <Text style={styles.stepTitle}>Step 2 of 4: Contact</Text>
+        
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Complete Address *</Text>
+          <TextInput
+            style={[styles.textInput, styles.textArea]}
+            value={formData.address.en}
+            onChangeText={(text) => setFormData(prev => ({ 
+              ...prev, 
+              address: { ...prev.address, en: text } 
+            }))}
+            multiline
+            placeholder="Full address including city, state, and postal code"
+          />
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Phone number *</Text>
+          <TextInput
+            style={styles.textInput}
+            value={formData.phone}
+            onChangeText={(text) => setFormData(prev => ({ ...prev, phone: text }))}
+            placeholder="Primary contact number"
+          />
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Contact email (optional)</Text>
+          <TextInput
+            style={styles.textInput}
+            value={formData.email}
+            onChangeText={(text) => setFormData(prev => ({ ...prev, email: text }))}
+          />
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Website URL</Text>
+          <TextInput
+            style={styles.textInput}
+            value={formData.website}
+            onChangeText={(text) => setFormData(prev => ({ ...prev, website: text }))}
+            placeholder="Your organization's website (optional)"
+          />
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Operating Hours</Text>
+          
+          <View style={{ flexDirection: 'row', gap: 16, marginTop: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.fieldLabel}>Opening Time *</Text>
+              <TextInput
+                style={styles.textInput}
+                value={formData.opening_time}
+                onChangeText={(text) => setFormData(prev => ({ ...prev, opening_time: text }))}
+                placeholder="09:00"
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.fieldLabel}>Closing Time *</Text>
+              <TextInput
+                style={styles.textInput}
+                value={formData.closing_time}
+                onChangeText={(text) => setFormData(prev => ({ ...prev, closing_time: text }))}
+                placeholder="18:00"
+              />
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Working Days * (select at least one)</Text>
+          <View style={styles.workingDaysContainer}>
+            {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map((day) => (
+              <View key={day} style={styles.dayRow}>
+                <Text style={styles.dayLabel}>{day}</Text>
+                <Switch
+                  value={formData.working_days.includes(day)}
+                  onValueChange={() => toggleWorkingDay(day)}
+                  trackColor={{ false: '#767577', true: '#4CAF50' }}
+                  thumbColor='#f4f3f4'
+                />
+              </View>
+            ))}
+          </View>
+        </View>
+      </View>
+    </Card>
+  );
+
+  const renderStep3 = () => (
+    <Card style={styles.contentCard}>
+      <View style={styles.cardContent}>
+        <Text style={styles.stepTitle}>Step 3 of 4: Services</Text>
+        
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Medical Specialties</Text>
+          <Text style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
+            Select from common specialties or add custom ones
+          </Text>
+          
+          <View style={styles.chipsContainer}>
+            {formData.specialties.en.map((specialty, index) => (
+              <View key={index} style={styles.chip}>
+                <Text style={styles.chipText}>{specialty}</Text>
+                <TouchableOpacity onPress={() => removeItem('specialties', index)}>
+                  <MaterialCommunityIcons name="close" size={14} color="white" style={styles.chipRemove} />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.addContainer}>
+            <TextInput
+              style={styles.addInput}
+              value={newSpecialty}
+              onChangeText={setNewSpecialty}
+              placeholder="Add Custom Specialty"
+            />
+            <TouchableOpacity 
+              style={styles.addButton}
+              onPress={() => addItem('specialties', newSpecialty)}
+            >
+              <Text style={styles.addButtonText}>Add</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Quick Add Specialties */}
+          <View style={styles.chipsContainer}>
+            {['General Medicine', 'Cardiology', 'Dermatology', 'Orthopedics', 'Pediatrics'].map((specialty) => (
+              <TouchableOpacity 
+                key={specialty}
+                onPress={() => addItem('specialties', specialty)}
+                style={[styles.chip, { backgroundColor: '#FF9800' }]}
+              >
+                <Text style={styles.chipText}>{specialty}</Text>
+                <MaterialCommunityIcons name="plus" size={14} color="white" style={styles.chipRemove} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Facilities Available</Text>
+          <Text style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
+            Select from common facilities or add custom ones
+          </Text>
+          
+          <View style={styles.chipsContainer}>
+            {formData.facilities.en.map((facility, index) => (
+              <View key={index} style={styles.chip}>
+                <Text style={styles.chipText}>{facility}</Text>
+                <TouchableOpacity onPress={() => removeItem('facilities', index)}>
+                  <MaterialCommunityIcons name="close" size={14} color="white" style={styles.chipRemove} />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.addContainer}>
+            <TextInput
+              style={styles.addInput}
+              value={newFacility}
+              onChangeText={setNewFacility}
+              placeholder="Add Custom Facility"
+            />
+            <TouchableOpacity 
+              style={styles.addButton}
+              onPress={() => addItem('facilities', newFacility)}
+            >
+              <Text style={styles.addButtonText}>Add</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Quick Add Facilities */}
+          <View style={styles.chipsContainer}>
+            {['X-Ray', 'CT Scan', 'MRI', 'Ultrasound', 'ECG', 'Laboratory', 'Pharmacy', 'Emergency Care'].map((facility) => (
+              <TouchableOpacity 
+                key={facility}
+                onPress={() => addItem('facilities', facility)}
+                style={[styles.chip, { backgroundColor: '#4CAF50' }]}
+              >
+                <Text style={styles.chipText}>{facility}</Text>
+                <MaterialCommunityIcons name="plus" size={14} color="white" style={styles.chipRemove} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </View>
+    </Card>
+  );
+
+  const renderStep4 = () => (
+    <Card style={styles.contentCard}>
+      <View style={styles.cardContent}>
+        <Text style={styles.stepTitle}>Step 4 of 4: Additional</Text>
+        
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Established Date</Text>
+          <TextInput
+            style={styles.textInput}
+            value={formData.established_date}
+            onChangeText={(text) => setFormData(prev => ({ ...prev, established_date: text }))}
+            placeholder="17-06-2014"
+          />
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>When was your organization established? (optional)</Text>
+          <TextInput
+            style={styles.textInput}
+            value={formData.bed_count}
+            onChangeText={(text) => setFormData(prev => ({ ...prev, bed_count: text }))}
+            placeholder="56"
+            keyboardType="numeric"
+          />
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Total bed capacity (if applicable)</Text>
+          
+          <View style={styles.chipsContainer}>
+            {formData.certifications.en.map((cert, index) => (
+              <View key={index} style={[styles.chip, { backgroundColor: '#9C27B0' }]}>
+                <Text style={styles.chipText}>{cert}</Text>
+                <TouchableOpacity onPress={() => removeItem('certifications', index)}>
+                  <MaterialCommunityIcons name="close" size={14} color="white" style={styles.chipRemove} />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.addContainer}>
+            <TextInput
+              style={styles.addInput}
+              value={newCertification}
+              onChangeText={setNewCertification}
+              placeholder="Add Certification"
+            />
+            <TouchableOpacity 
+              style={styles.addButton}
+              onPress={() => addItem('certifications', newCertification)}
+            >
+              <Text style={styles.addButtonText}>Add</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Certifications & Accreditations</Text>
+          <Text style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
+            Add any certifications, accreditations, or awards
+          </Text>
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Images & Media</Text>
+          
+          <View style={styles.imageContainer}>
+            <Text style={styles.fieldLabel}>Organization Logo (Optional)</Text>
+            {logoImage ? (
+              <Image source={{ uri: logoImage }} style={styles.logoImage} />
+            ) : (
+              <View style={styles.logoImage}>
+                <MaterialCommunityIcons name="hospital-building" size={40} color="white" />
+              </View>
+            )}
+            
+            <TouchableOpacity style={styles.imageButton} onPress={() => pickImage('logo')}>
+              <MaterialCommunityIcons name="camera" size={16} color="white" />
+              <Text style={styles.imageButtonText}>Change Logo</Text>
+            </TouchableOpacity>
+            
+            {logoImage && (
+              <TouchableOpacity style={styles.removeButton} onPress={() => setLogoImage(null)}>
+                <Text style={[styles.imageButtonText, { marginLeft: 0 }]}>Remove</Text>
+              </TouchableOpacity>
+            )}
+            
+            <Text style={styles.supportText}>Supported formats: JPEG, PNG, WebP, GIF (Max: 5MB)</Text>
+          </View>
+        </View>
+      </View>
+    </Card>
+  );
+
+  return (
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Edit Healthcare Profile</Text>
+        <Text style={styles.headerSubtitle}>Update your organization information</Text>
+      </View>
+
+      {/* Step Indicator */}
+      <View style={styles.stepIndicator}>
+        {[1, 2, 3, 4].map((step) => (
+          <View
+            key={step}
+            style={[
+              styles.stepDot,
+              step === currentStep ? styles.activeDot : styles.inactiveDot
+            ]}
+          />
+        ))}
+      </View>
+
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {currentStep === 1 && renderStep1()}
+        {currentStep === 2 && renderStep2()}
+        {currentStep === 3 && renderStep3()}
+        {currentStep === 4 && renderStep4()}
+      </ScrollView>
+
+      {/* Navigation Buttons */}
+      <View style={styles.navigationButtons}>
+        <Button
+          mode="outlined"
+          onPress={() => {
+            if (currentStep > 1) {
+              setCurrentStep(currentStep - 1);
+            } else {
+              navigation.goBack();
+            }
+          }}
+          style={[styles.navButton, styles.backButton]}
+        >
+          {currentStep === 1 ? 'Cancel' : 'Back'}
+        </Button>
+
+        <Button
+          mode="contained"
+          onPress={() => {
+            if (currentStep < 4) {
+              setCurrentStep(currentStep + 1);
+            } else {
+              handleSubmit();
+            }
+          }}
+          loading={loading}
+          style={[
+            styles.navButton,
+            currentStep === 4 ? styles.updateButton : styles.nextButton
+          ]}
+        >
+          {currentStep === 4 ? 'Update' : 'Next'}
+        </Button>
+      </View>
+    </View>
+  );
+}
 ```
-### 13. Hook For Theme (`src/hook/useStyles.ts`)
+
+### 11. Organization Info Screen (`src/screens/organization/OrganizationInfoScreen.tsx`)
 
 ```typescript
-import { useMemo } from 'react';
-import { StyleSheet } from 'react-native';
-import { useTheme } from '../contexts/ThemeContext';
-import { Theme } from '../constants/theme';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, ScrollView, RefreshControl, Image, TouchableOpacity } from 'react-native';
+import { Card, Text, Button, ActivityIndicator, Chip } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTheme } from '../../contexts/ThemeContext';
+import { useStyles } from '../../hooks/useStyles';
+import healthcareService from '../../services/healthcareService';
 
-// Optimized styles hook with better memoization
-export const useStyles = <T extends StyleSheet.NamedStyles<T>>(
-  stylesFn: (theme: Theme) => T
-): T => {
+interface HealthcareProfile {
+  id: string;
+  name: string;
+  description: string;
+  address: string;
+  phone: string;
+  email: string;
+  website: string;
+  facilities: string[];
+  specialties: string[];
+  image: string;
+  images: string[];
+  opening_time: string;
+  closing_time: string;
+  working_days: string[];
+  rating: string;
+  total_reviews: number;
+  is_active: boolean;
+  is_featured: boolean;
+  is_verified: boolean;
+  logo: string;
+  organization_type: string;
+  established_date: string;
+  bed_count: number;
+  certifications: any;
+}
+
+export default function OrganizationInfoScreen({ navigation }: any) {
+  const [profile, setProfile] = useState<HealthcareProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const { theme } = useTheme();
-  
-  return useMemo(() => {
-    return StyleSheet.create(stylesFn(theme));
-  }, [theme, stylesFn]);
-};
 
-// Performance monitoring hook
-export const usePerformance = () => {
-  const startTime = useMemo(() => Date.now(), []);
-  
-  const measureRender = useMemo(() => (componentName: string) => {
-    const endTime = Date.now();
-    const renderTime = endTime - startTime;
-    
-    if (__DEV__ && renderTime > 100) {
-      console.warn(`Slow render detected in ${componentName}: ${renderTime}ms`);
+  const styles = useStyles((theme) => ({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    loadingText: {
+      marginTop: 16,
+      fontSize: 16,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+    },
+    // Organization Header Card
+    headerCard: {
+      margin: 16,
+      marginBottom: 0,
+      borderRadius: 12,
+      overflow: 'hidden',
+      elevation: 4,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 4,
+    },
+    gradientHeader: {
+      background: 'linear-gradient(135deg, #FF6B6B, #4ECDC4)',
+      backgroundColor: theme.colors.primary,
+      padding: 20,
+      alignItems: 'center',
+    },
+    headerLogo: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      marginBottom: 12,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    fallbackHeaderLogo: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: 'rgba(255, 255, 255, 0.3)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    headerClinicName: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: 'white',
+      textAlign: 'center',
+      fontFamily: theme.typography.fontFamily,
+      textTransform: 'capitalize',
+      marginBottom: 4,
+    },
+    headerClinicType: {
+      fontSize: 14,
+      color: 'rgba(255, 255, 255, 0.9)',
+      textAlign: 'center',
+      fontFamily: theme.typography.fontFamily,
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+      marginBottom: 8,
+    },
+    headerProviderType: {
+      fontSize: 12,
+      color: 'rgba(255, 255, 255, 0.8)',
+      textAlign: 'center',
+      fontFamily: theme.typography.fontFamily,
+    },
+    verifiedHeaderBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    verifiedHeaderText: {
+      fontSize: 14,
+      color: 'white',
+      marginLeft: 4,
+      fontFamily: theme.typography.fontFamily,
+    },
+    // Section Cards
+    sectionCard: {
+      margin: 16,
+      marginBottom: 12,
+      backgroundColor: theme.colors.surface,
+      borderRadius: 12,
+      elevation: 2,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: theme.colors.primary,
+      marginBottom: 16,
+      fontFamily: theme.typography.fontFamily,
+    },
+    infoRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      marginBottom: 16,
+    },
+    infoIcon: {
+      marginRight: 12,
+      marginTop: 2,
+    },
+    infoContent: {
+      flex: 1,
+    },
+    infoLabel: {
+      fontSize: 12,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      marginBottom: 4,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    infoText: {
+      fontSize: 14,
+      color: theme.colors.text,
+      fontFamily: theme.typography.fontFamily,
+      lineHeight: 20,
+    },
+    // Chips containers
+    chipsContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginTop: 8,
+    },
+    facilityChip: {
+      backgroundColor: theme.colors.primary,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      marginRight: 8,
+      marginBottom: 8,
+    },
+    facilityText: {
+      fontSize: 12,
+      color: 'white',
+      fontWeight: '500',
+      fontFamily: theme.typography.fontFamily,
+    },
+    specialtyChip: {
+      backgroundColor: '#FF9800',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      marginRight: 8,
+      marginBottom: 8,
+    },
+    specialtyText: {
+      fontSize: 12,
+      color: 'white',
+      fontWeight: '500',
+      fontFamily: theme.typography.fontFamily,
+    },
+    workingDayChip: {
+      backgroundColor: '#4CAF50',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      marginRight: 8,
+      marginBottom: 8,
+    },
+    workingDayText: {
+      fontSize: 12,
+      color: 'white',
+      fontWeight: '500',
+      fontFamily: theme.typography.fontFamily,
+    },
+    // Edit button
+    editButton: {
+      margin: 16,
+      marginTop: 8,
+      borderRadius: 8,
+    },
+  }));
+
+  const loadProfile = async () => {
+    try {
+      const response = await healthcareService.getProfile();
+      setProfile(response.profile);
+    } catch (error) {
+      console.error('Failed to load profile:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
-    
-    return renderTime;
-  }, [startTime]);
+  };
 
-  return { measureRender };
-};
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadProfile();
+  }, []);
+
+  const formatWorkingDay = (day: string) => {
+    return day.charAt(0).toUpperCase() + day.slice(1, 3);
+  };
+
+  const formatDate = (dateString: string) => {
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={styles.loadingText}>Loading organization info...</Text>
+      </View>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <View style={styles.loadingContainer}>
+        <MaterialCommunityIcons name="alert-circle" size={64} color="#F44336" />
+        <Text style={styles.loadingText}>Failed to load organization information</Text>
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Organization Header */}
+      <Card style={styles.headerCard}>
+        <View style={styles.gradientHeader}>
+          {profile.logo ? (
+            <Image
+              source={{ uri: profile.logo }}
+              style={styles.headerLogo}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={styles.fallbackHeaderLogo}>
+              <MaterialCommunityIcons name="hospital-building" size={40} color="white" />
+            </View>
+          )}
+          
+          <Text style={styles.headerClinicName}>{profile.name}</Text>
+          <Text style={styles.headerClinicType}>{profile.organization_type}</Text>
+          <Text style={styles.headerProviderType}>Healthcare Provider</Text>
+          
+          {profile.is_verified && (
+            <View style={styles.verifiedHeaderBadge}>
+              <MaterialCommunityIcons name="check-decagram" size={20} color="white" />
+              <Text style={styles.verifiedHeaderText}>Verified</Text>
+            </View>
+          )}
+        </View>
+      </Card>
+
+      {/* Basic Information */}
+      <Card style={styles.sectionCard}>
+        <Card.Content>
+          <Text style={styles.sectionTitle}>Basic Information</Text>
+          
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons name="domain" size={20} color="#666" style={styles.infoIcon} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Organization Name</Text>
+              <Text style={styles.infoText}>{profile.name}</Text>
+            </View>
+          </View>
+
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons name="hospital-building" size={20} color="#666" style={styles.infoIcon} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Organization Type</Text>
+              <Text style={styles.infoText}>{profile.organization_type.toUpperCase()}</Text>
+            </View>
+          </View>
+
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons name="certificate" size={20} color="#666" style={styles.infoIcon} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Registration Number</Text>
+              <Text style={styles.infoText}>APHL0012345</Text>
+            </View>
+          </View>
+
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons name="card-account-details" size={20} color="#666" style={styles.infoIcon} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>License Number</Text>
+              <Text style={styles.infoText}>KAR/HOSP/2024/0013456</Text>
+            </View>
+          </View>
+
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons name="calendar" size={20} color="#666" style={styles.infoIcon} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Established Date</Text>
+              <Text style={styles.infoText}>{formatDate(profile.established_date)}</Text>
+            </View>
+          </View>
+        </Card.Content>
+      </Card>
+
+      {/* Contact Information */}
+      <Card style={styles.sectionCard}>
+        <Card.Content>
+          <Text style={styles.sectionTitle}>Contact Information</Text>
+          
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons name="map-marker" size={20} color="#666" style={styles.infoIcon} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Address</Text>
+              <Text style={styles.infoText}>{profile.address}</Text>
+            </View>
+          </View>
+
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons name="phone" size={20} color="#666" style={styles.infoIcon} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Phone Number</Text>
+              <Text style={styles.infoText}>{profile.phone}</Text>
+            </View>
+          </View>
+
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons name="email" size={20} color="#666" style={styles.infoIcon} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Email</Text>
+              <Text style={styles.infoText}>{profile.email}</Text>
+            </View>
+          </View>
+
+          {profile.website && (
+            <View style={styles.infoRow}>
+              <MaterialCommunityIcons name="web" size={20} color="#666" style={styles.infoIcon} />
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>Website</Text>
+                <Text style={styles.infoText}>{profile.website}</Text>
+              </View>
+            </View>
+          )}
+
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons name="clock" size={20} color="#666" style={styles.infoIcon} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Operating Hours</Text>
+              <Text style={styles.infoText}>
+                {profile.opening_time} - {profile.closing_time}
+              </Text>
+            </View>
+          </View>
+        </Card.Content>
+      </Card>
+
+      {/* Additional Information */}
+      <Card style={styles.sectionCard}>
+        <Card.Content>
+          <Text style={styles.sectionTitle}>Additional Information</Text>
+          
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons name="information" size={20} color="#666" style={styles.infoIcon} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Description</Text>
+              <Text style={styles.infoText}>{profile.description}</Text>
+            </View>
+          </View>
+
+          {/* Facilities */}
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons name="medical-bag" size={20} color="#666" style={styles.infoIcon} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Facilities</Text>
+              <View style={styles.chipsContainer}>
+                {profile.facilities.map((facility, index) => (
+                  <View key={index} style={styles.facilityChip}>
+                    <Text style={styles.facilityText}>{facility}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+
+          {/* Specialties */}
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons name="stethoscope" size={20} color="#666" style={styles.infoIcon} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Specialties</Text>
+              <View style={styles.chipsContainer}>
+                {profile.specialties.map((specialty, index) => (
+                  <View key={index} style={styles.specialtyChip}>
+                    <Text style={styles.specialtyText}>{specialty}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+
+          {/* Working Days */}
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons name="calendar-week" size={20} color="#666" style={styles.infoIcon} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Working Days</Text>
+              <View style={styles.chipsContainer}>
+                {profile.working_days.map((day, index) => (
+                  <View key={index} style={styles.workingDayChip}>
+                    <Text style={styles.workingDayText}>{formatWorkingDay(day)}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+        </Card.Content>
+      </Card>
+
+      {/* Edit Organization Profile Button */}
+      <Button
+        mode="contained"
+        style={styles.editButton}
+        icon="pencil"
+        onPress={() => navigation.navigate('Profile')}
+      >
+        Edit Organization Profile
+      </Button>
+    </ScrollView>
+  );
+}
 ```
 
-### 13. Doctor Management (`src/screens/doctor/DoctorManagementScreen.tsx`)
+### 12.Doctor Management Screen (`src/screens/doctor/DoctorManagementScreen.tsx`)
 
 ```typescript
 import React, { useEffect, useState, useCallback } from 'react';
@@ -5245,7 +6509,1076 @@ export default function DoctorManagementScreen({ navigation }: any) {
 }
 ```
 
-### 13. Organization Info (`src/screens/organization/OrganizationInfoScreen.tsx`)
+### 13. App.tsx 
+
+```typescript
+import React from 'react';
+import { PaperProvider } from 'react-native-paper';
+import { StatusBar } from 'expo-status-bar';
+import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
+import AppNavigator from './src/navigation/AppNavigator';
+
+const AppContent = () => {
+  const { theme, isDark } = useTheme();
+  
+  const paperTheme = {
+    colors: {
+      primary: theme.colors.primary,
+      secondary: theme.colors.secondary,
+      surface: theme.colors.surface,
+      background: theme.colors.background,
+      error: theme.colors.error,
+      text: theme.colors.text,
+      onPrimary: theme.colors.onPrimary,
+      onSecondary: theme.colors.onSecondary,
+      onSurface: theme.colors.onSurface,
+      onBackground: theme.colors.onBackground,
+      outline: theme.colors.border,
+    },
+  };
+
+  return (
+    <PaperProvider theme={paperTheme}>
+      <StatusBar style={isDark ? 'light' : 'dark'} backgroundColor={theme.colors.background} />
+      <AppNavigator />
+    </PaperProvider>
+  );
+};
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
+  );
+}
+```
+### 14. Theme (`src/constants/theme.ts`)
+
+```typescript
+export interface ThemeColors {
+  primary: string;
+  primaryLight: string;
+  primaryDark: string;
+  secondary: string;
+  secondaryLight: string;
+  secondaryDark: string;
+  background: string;
+  surface: string;
+  error: string;
+  warning: string;
+  info: string;
+  success: string;
+  onPrimary: string;
+  onSecondary: string;
+  onBackground: string;
+  onSurface: string;
+  onError: string;
+  text: string;
+  textSecondary: string;
+  border: string;
+  divider: string;
+  disabled: string;
+  placeholder: string;
+}
+
+export interface Theme {
+  colors: ThemeColors;
+  mode: 'light' | 'dark';
+  spacing: {
+    xs: number;
+    sm: number;
+    md: number;
+    lg: number;
+    xl: number;
+    xxl: number;
+  };
+  typography: {
+    fontFamily: string;
+    sizes: {
+      xs: number;
+      sm: number;
+      md: number;
+      lg: number;
+      xl: number;
+      xxl: number;
+    };
+    weights: {
+      light: '200';
+      normal: '300';
+      regular: '400';
+      medium: '500';
+      semibold: '600';
+      bold: '700';
+    };
+  };
+  shadows: {
+    small: object;
+    medium: object;
+    large: object;
+  };
+  borderRadius: {
+    xs: number;
+    sm: number;
+    md: number;
+    lg: number;
+    xl: number;
+  };
+}
+
+const baseSpacing = {
+  xs: 4,
+  sm: 8,
+  md: 16,
+  lg: 24,
+  xl: 32,
+  xxl: 48,
+};
+
+const baseTypography = {
+  fontFamily: 'Poppins',
+  sizes: {
+    xs: 12,
+    sm: 14,
+    md: 16,
+    lg: 18,
+    xl: 24,
+    xxl: 32,
+  },
+  weights: {
+    light: '200' as const,
+    normal: '300' as const,
+    regular: '400' as const,
+    medium: '500' as const,
+    semibold: '600' as const,
+    bold: '700' as const,
+  },
+};
+
+const baseShadows = {
+  small: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  medium: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  large: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+};
+
+const baseBorderRadius = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 24,
+};
+
+export const lightTheme: Theme = {
+  colors: {
+    primary: '#10d915',
+    primaryLight: '#4de352',
+    primaryDark: '#0cb010',
+    secondary: '#dc004e',
+    secondaryLight: '#ff5983',
+    secondaryDark: '#9a0036',
+    background: '#f5f5f5',
+    surface: '#ffffff',
+    error: '#f44336',
+    warning: '#ff9800',
+    info: '#2196f3',
+    success: '#4caf50',
+    onPrimary: '#ffffff',
+    onSecondary: '#ffffff',
+    onBackground: '#000000',
+    onSurface: '#000000',
+    onError: '#ffffff',
+    text: 'rgba(0, 0, 0, 0.87)',
+    textSecondary: 'rgba(0, 0, 0, 0.6)',
+    border: 'rgba(0, 0, 0, 0.12)',
+    divider: 'rgba(0, 0, 0, 0.12)',
+    disabled: 'rgba(0, 0, 0, 0.26)',
+    placeholder: 'rgba(0, 0, 0, 0.38)',
+  },
+  mode: 'light',
+  spacing: baseSpacing,
+  typography: baseTypography,
+  shadows: baseShadows,
+  borderRadius: baseBorderRadius,
+};
+
+export const darkTheme: Theme = {
+  colors: {
+    primary: '#10d915',
+    primaryLight: '#4de352',
+    primaryDark: '#0cb010',
+    secondary: '#dc004e',
+    secondaryLight: '#ff5983',
+    secondaryDark: '#9a0036',
+    background: '#121212',
+    surface: '#1e1e1e',
+    error: '#cf6679',
+    warning: '#ffb74d',
+    info: '#81c784',
+    success: '#66bb6a',
+    onPrimary: '#000000',
+    onSecondary: '#000000',
+    onBackground: '#ffffff',
+    onSurface: '#ffffff',
+    onError: '#000000',
+    text: '#ffffff',
+    textSecondary: 'rgba(255, 255, 255, 0.7)',
+    border: 'rgba(255, 255, 255, 0.12)',
+    divider: 'rgba(255, 255, 255, 0.12)',
+    disabled: 'rgba(255, 255, 255, 0.38)',
+    placeholder: 'rgba(255, 255, 255, 0.5)',
+  },
+  mode: 'dark',
+  spacing: baseSpacing,
+  typography: baseTypography,
+  shadows: {
+    small: {
+      ...baseShadows.small,
+      shadowColor: '#000',
+      shadowOpacity: 0.3,
+    },
+    medium: {
+      ...baseShadows.medium,
+      shadowColor: '#000',
+      shadowOpacity: 0.4,
+    },
+    large: {
+      ...baseShadows.large,
+      shadowColor: '#000',
+      shadowOpacity: 0.5,
+    },
+  },
+  borderRadius: baseBorderRadius,
+};
+```
+
+### 15.Theme Context (`src/contexts/ThemeContext.tsx`)
+
+```typescript
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Appearance, ColorSchemeName } from 'react-native';
+import { lightTheme, darkTheme, Theme } from '../constants/theme';
+
+interface ThemeContextType {
+  theme: Theme;
+  isDark: boolean;
+  toggleTheme: () => void;
+  setTheme: (theme: 'light' | 'dark' | 'system') => void;
+  themeMode: 'light' | 'dark' | 'system';
+}
+
+const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+
+export const useTheme = () => {
+  const context = useContext(ThemeContext);
+  if (!context) {
+    throw new Error('useTheme must be used within a ThemeProvider');
+  }
+  return context;
+};
+
+interface ThemeProviderProps {
+  children: ReactNode;
+}
+
+export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
+  const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>('system');
+  const [currentTheme, setCurrentTheme] = useState<Theme>(lightTheme);
+
+  // Memoized theme calculation
+  const calculateTheme = useCallback((mode: 'light' | 'dark' | 'system', systemScheme?: ColorSchemeName) => {
+    if (mode === 'system') {
+      const scheme = systemScheme || Appearance.getColorScheme();
+      return scheme === 'dark' ? darkTheme : lightTheme;
+    }
+    return mode === 'dark' ? darkTheme : lightTheme;
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadThemePreference = async () => {
+      try {
+        const savedTheme = await AsyncStorage.getItem('theme_preference');
+        const preference = (savedTheme as 'light' | 'dark' | 'system') || 'system';
+        
+        if (mounted) {
+          setThemeMode(preference);
+          setCurrentTheme(calculateTheme(preference));
+        }
+      } catch (error) {
+        console.error('Error loading theme preference:', error);
+        if (mounted) {
+          setCurrentTheme(lightTheme);
+        }
+      }
+    };
+
+    loadThemePreference();
+
+    return () => {
+      mounted = false;
+    };
+  }, [calculateTheme]);
+
+  useEffect(() => {
+    if (themeMode !== 'system') return;
+
+    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+      setCurrentTheme(calculateTheme('system', colorScheme));
+    });
+
+    return () => subscription?.remove();
+  }, [themeMode, calculateTheme]);
+
+  const toggleTheme = useCallback(() => {
+    const newMode = currentTheme.mode === 'light' ? 'dark' : 'light';
+    setTheme(newMode);
+  }, [currentTheme.mode]);
+
+  const setTheme = useCallback(async (mode: 'light' | 'dark' | 'system') => {
+    try {
+      setThemeMode(mode);
+      await AsyncStorage.setItem('theme_preference', mode);
+      setCurrentTheme(calculateTheme(mode));
+    } catch (error) {
+      console.error('Error saving theme preference:', error);
+    }
+  }, [calculateTheme]);
+
+  const value: ThemeContextType = {
+    theme: currentTheme,
+    isDark: currentTheme.mode === 'dark',
+    toggleTheme,
+    setTheme,
+    themeMode,
+  };
+
+  return (
+    <ThemeContext.Provider value={value}>
+      {children}
+    </ThemeContext.Provider>
+  );
+};
+```
+### 16. Hook For Theme (`src/hook/useStyles.ts`)
+
+```typescript
+import { useMemo } from 'react';
+import { StyleSheet } from 'react-native';
+import { useTheme } from '../contexts/ThemeContext';
+import { Theme } from '../constants/theme';
+
+// Optimized styles hook with better memoization
+export const useStyles = <T extends StyleSheet.NamedStyles<T>>(
+  stylesFn: (theme: Theme) => T
+): T => {
+  const { theme } = useTheme();
+  
+  return useMemo(() => {
+    return StyleSheet.create(stylesFn(theme));
+  }, [theme, stylesFn]);
+};
+
+// Performance monitoring hook
+export const usePerformance = () => {
+  const startTime = useMemo(() => Date.now(), []);
+  
+  const measureRender = useMemo(() => (componentName: string) => {
+    const endTime = Date.now();
+    const renderTime = endTime - startTime;
+    
+    if (__DEV__ && renderTime > 100) {
+      console.warn(`Slow render detected in ${componentName}: ${renderTime}ms`);
+    }
+    
+    return renderTime;
+  }, [startTime]);
+
+  return { measureRender };
+};
+```
+
+### 17. Doctor Management (`src/screens/doctor/DoctorManagementScreen.tsx`)
+
+```typescript
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, ScrollView, RefreshControl, Alert, Image, TouchableOpacity } from 'react-native';
+import { Card, Title, Text, Button, ActivityIndicator, Chip, IconButton, Divider } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTheme } from '../../contexts/ThemeContext';
+import { useStyles } from '../../hooks/useStyles';
+import healthcareService from '../../services/healthcareService';
+
+interface Doctor {
+  id: string;
+  user_id: string;
+  specialization: string;
+  license_number: string;
+  experience_years: number;
+  bio: string;
+  education: string;
+  consultation_fee: string;
+  qualification: string;
+  languages: string[];
+  services: string[];
+  rating: string;
+  total_reviews: number;
+  is_verified: boolean;
+  is_available: boolean;
+  profile_image: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    user_type: string;
+  };
+  clinic_info?: {
+    clinic_id: string;
+    clinic_name: string;
+    schedule: {
+      start_time: string;
+      end_time: string;
+      slot_duration: number;
+      available_days: string;
+      is_active: boolean;
+    };
+  };
+}
+
+interface ConnectionRequest {
+  id: string;
+  doctor_id: string;
+  clinic_id: string;
+  status: string;
+  message: string;
+  rejection_reason?: string;
+  proposed_schedule: {
+    start_time: string;
+    end_time: string;
+    slot_duration: number;
+    available_days: string[];
+  };
+  doctor: Doctor;
+}
+
+export default function DoctorManagementScreen({ navigation }: any) {
+  const [connectedDoctors, setConnectedDoctors] = useState<Doctor[]>([]);
+  const [connectionRequests, setConnectionRequests] = useState<ConnectionRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<'requests' | 'connected'>('requests');
+  const { theme } = useTheme();
+
+  const styles = useStyles((theme) => ({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    header: {
+      backgroundColor: theme.colors.surface,
+      paddingVertical: 16,
+      paddingHorizontal: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.mode === 'dark' ? '#333' : '#E0E0E0',
+    },
+    title: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: theme.colors.text,
+      textAlign: 'center',
+      fontFamily: theme.typography.fontFamily,
+    },
+    tabContainer: {
+      flexDirection: 'row',
+      backgroundColor: theme.colors.surface,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+    },
+    tabButton: {
+      flex: 1,
+      paddingVertical: 12,
+      alignItems: 'center',
+      borderRadius: 8,
+      marginHorizontal: 4,
+    },
+    activeTab: {
+      backgroundColor: theme.colors.primary,
+    },
+    inactiveTab: {
+      backgroundColor: 'transparent',
+    },
+    tabText: {
+      fontSize: 14,
+      fontWeight: '500',
+      fontFamily: theme.typography.fontFamily,
+    },
+    activeTabText: {
+      color: 'white',
+    },
+    inactiveTabText: {
+      color: theme.colors.text,
+    },
+    content: {
+      flex: 1,
+      padding: 16,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    loadingText: {
+      marginTop: 16,
+      fontSize: 16,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+    },
+    emptyContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingVertical: 40,
+    },
+    emptyText: {
+      fontSize: 16,
+      color: theme.colors.textSecondary,
+      textAlign: 'center',
+      marginTop: 16,
+      fontFamily: theme.typography.fontFamily,
+    },
+    // Doctor Card Styles
+    doctorCard: {
+      marginBottom: 16,
+      backgroundColor: theme.colors.surface,
+      borderRadius: 12,
+      elevation: 2,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+    },
+    cardContent: {
+      padding: 16,
+    },
+    doctorHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    avatar: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      marginRight: 12,
+    },
+    fallbackAvatar: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      backgroundColor: theme.colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+    },
+    doctorInfo: {
+      flex: 1,
+    },
+    doctorName: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      color: theme.colors.text,
+      fontFamily: theme.typography.fontFamily,
+    },
+    doctorSpecialty: {
+      fontSize: 14,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+    },
+    doctorExperience: {
+      fontSize: 12,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+    },
+    statusChip: {
+      alignSelf: 'flex-start',
+    },
+    chipText: {
+      fontSize: 12,
+      fontWeight: 'bold',
+      fontFamily: theme.typography.fontFamily,
+    },
+    doctorDetails: {
+      marginBottom: 12,
+    },
+    detailRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 4,
+    },
+    detailText: {
+      marginLeft: 8,
+      fontSize: 14,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+    },
+    availableDaysSection: {
+      backgroundColor: theme.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#F8F9FA',
+      padding: 12,
+      borderRadius: 8,
+      marginBottom: 12,
+    },
+    availableDaysLabel: {
+      fontSize: 12,
+      fontWeight: 'bold',
+      color: theme.colors.text,
+      marginBottom: 8,
+      fontFamily: theme.typography.fontFamily,
+    },
+    daysContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 6,
+    },
+    dayChip: {
+      backgroundColor: theme.colors.primary,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 12,
+      marginRight: 4,
+      marginBottom: 4,
+    },
+    dayText: {
+      fontSize: 11,
+      color: 'white',
+      fontWeight: '500',
+      fontFamily: theme.typography.fontFamily,
+    },
+    messageSection: {
+      backgroundColor: theme.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#F8F9FA',
+      padding: 12,
+      borderRadius: 8,
+      marginBottom: 12,
+    },
+    messageLabel: {
+      fontSize: 12,
+      fontWeight: 'bold',
+      color: theme.colors.text,
+      marginBottom: 4,
+      fontFamily: theme.typography.fontFamily,
+    },
+    messageText: {
+      fontSize: 14,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+    },
+    actionButtons: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 8,
+    },
+    actionButton: {
+      flex: 1,
+      marginHorizontal: 4,
+    },
+    viewButton: {
+      backgroundColor: 'transparent',
+      borderColor: theme.colors.primary,
+      borderWidth: 1,
+    },
+    manageButton: {
+      backgroundColor: theme.colors.primary,
+    },
+    disconnectButton: {
+      backgroundColor: '#F44336',
+    },
+  }));
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const [requestsResponse, doctorsResponse] = await Promise.allSettled([
+        healthcareService.getConnectionRequests(),
+        healthcareService.getConnectedDoctors(),
+      ]);
+
+      if (requestsResponse.status === 'fulfilled') {
+        setConnectionRequests(requestsResponse.value.data || []);
+      }
+
+      if (doctorsResponse.status === 'fulfilled') {
+        setConnectedDoctors(doctorsResponse.value || []);
+      }
+    } catch (error) {
+      console.error('Failed to load doctor data:', error);
+      Alert.alert('Error', 'Failed to load doctor data');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadData();
+  }, []);
+
+  const handleViewDetails = (doctor: Doctor) => {
+    Alert.alert('Doctor Details', `View details for ${doctor.user.name}`);
+  };
+
+  const handleManageSchedule = (doctor: Doctor) => {
+    Alert.alert('Manage Schedule', `Manage schedule for ${doctor.user.name}`);
+  };
+
+  const handleDisconnect = (doctor: Doctor) => {
+    Alert.alert(
+      'Disconnect Doctor',
+      `Are you sure you want to disconnect ${doctor.user.name}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Disconnect', style: 'destructive', onPress: () => {
+          Alert.alert('Success', 'Doctor disconnected successfully');
+          loadData();
+        }}
+      ]
+    );
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'approved':
+        return '#4CAF50';
+      case 'pending':
+        return '#FF9800';
+      case 'rejected':
+        return '#F44336';
+      default:
+        return '#757575';
+    }
+  };
+
+  // Helper function to parse and format available days
+  const parseAvailableDays = (availableDaysString: string): string[] => {
+    try {
+      if (!availableDaysString) return [];
+      
+      // Parse the JSON string
+      const days = JSON.parse(availableDaysString);
+      
+      // Return array of days or empty array
+      return Array.isArray(days) ? days : [];
+    } catch (error) {
+      console.error('Error parsing available days:', error);
+      return [];
+    }
+  };
+
+  // Helper function to format day name for display
+  const formatDayName = (day: string): string => {
+    if (!day) return '';
+    return day.charAt(0).toUpperCase() + day.slice(1, 3);
+  };
+
+  // Helper function to render available days chips
+  const renderAvailableDays = (availableDaysString: string) => {
+    const days = parseAvailableDays(availableDaysString);
+    
+    if (days.length === 0) {
+      return (
+        <Text style={styles.dayText}>No days specified</Text>
+      );
+    }
+
+    return (
+      <View style={styles.daysContainer}>
+        {days.map((day, index) => (
+          <View key={index} style={styles.dayChip}>
+            <Text style={styles.dayText}>{formatDayName(day)}</Text>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  const renderConnectionRequests = () => {
+    if (connectionRequests.length === 0) {
+      return (
+        <View style={styles.emptyContainer}>
+          <MaterialCommunityIcons name="doctor" size={64} color="#CCC" />
+          <Text style={styles.emptyText}>No connection requests found</Text>
+        </View>
+      );
+    }
+
+    return connectionRequests.map((request) => (
+      <Card key={request.id} style={styles.doctorCard}>
+        <View style={styles.cardContent}>
+          {/* Header */}
+          <View style={styles.doctorHeader}>
+            {request.doctor.profile_image ? (
+              <Image
+                source={{ uri: request.doctor.profile_image }}
+                style={styles.avatar}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.fallbackAvatar}>
+                <MaterialCommunityIcons name="doctor" size={24} color="white" />
+              </View>
+            )}
+            
+            <View style={styles.doctorInfo}>
+              <Text style={styles.doctorName}>
+                Dr. {request.doctor.user.name}
+              </Text>
+              <Text style={styles.doctorSpecialty}>
+                {request.doctor.specialization} • {request.doctor.experience_years} years
+              </Text>
+            </View>
+
+            <Chip
+              style={[styles.statusChip, { backgroundColor: getStatusColor(request.status) }]}
+              textStyle={[styles.chipText, { color: 'white' }]}
+            >
+              {request.status}
+            </Chip>
+          </View>
+
+          {/* Details */}
+          <View style={styles.doctorDetails}>
+            <View style={styles.detailRow}>
+              <MaterialCommunityIcons name="hospital-building" size={16} color="#666" />
+              <Text style={styles.detailText}>Clinic: sunshine clinic</Text>
+            </View>
+          </View>
+
+          {/* Message */}
+          {request.message && (
+            <View style={styles.messageSection}>
+              <Text style={styles.messageLabel}>Message:</Text>
+              <Text style={styles.messageText}>{request.message}</Text>
+            </View>
+          )}
+
+          <Divider style={{ marginVertical: 8 }} />
+
+          {/* Action Buttons */}
+          <View style={styles.actionButtons}>
+            <Button
+              mode="outlined"
+              onPress={() => handleViewDetails(request.doctor)}
+              style={[styles.actionButton, styles.viewButton]}
+              icon="eye"
+            >
+              View Details
+            </Button>
+          </View>
+        </View>
+      </Card>
+    ));
+  };
+
+  const renderConnectedDoctors = () => {
+    if (connectedDoctors.length === 0) {
+      return (
+        <View style={styles.emptyContainer}>
+          <MaterialCommunityIcons name="doctor" size={64} color="#CCC" />
+          <Text style={styles.emptyText}>No connected doctors found</Text>
+        </View>
+      );
+    }
+
+    return connectedDoctors.map((doctor) => (
+      <Card key={doctor.id} style={styles.doctorCard}>
+        <View style={styles.cardContent}>
+          {/* Header */}
+          <View style={styles.doctorHeader}>
+            {doctor.profile_image ? (
+              <Image
+                source={{ uri: doctor.profile_image }}
+                style={styles.avatar}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.fallbackAvatar}>
+                <MaterialCommunityIcons name="doctor" size={24} color="white" />
+              </View>
+            )}
+            
+            <View style={styles.doctorInfo}>
+              <Text style={styles.doctorName}>
+                Dr. {doctor.user.name}
+              </Text>
+              <Text style={styles.doctorSpecialty}>
+                {doctor.specialization}
+              </Text>
+              <Text style={styles.doctorExperience}>
+                ₹{doctor.consultation_fee}
+              </Text>
+            </View>
+
+            <Chip
+              style={[styles.statusChip, { backgroundColor: '#4CAF50' }]}
+              textStyle={[styles.chipText, { color: 'white' }]}
+            >
+              Connected
+            </Chip>
+          </View>
+
+          {/* Schedule Details */}
+          <View style={styles.doctorDetails}>
+            <View style={styles.detailRow}>
+              <MaterialCommunityIcons name="hospital-building" size={16} color="#666" />
+              <Text style={styles.detailText}>
+                Schedule at {doctor.clinic_info?.clinic_name || 'sunshine clinic'}
+              </Text>
+            </View>
+            {doctor.clinic_info?.schedule && (
+              <View style={styles.detailRow}>
+                <MaterialCommunityIcons name="clock" size={16} color="#666" />
+                <Text style={styles.detailText}>
+                  {doctor.clinic_info.schedule.start_time} - {doctor.clinic_info.schedule.end_time}
+                </Text>
+              </View>
+            )}
+            <View style={styles.detailRow}>
+              <MaterialCommunityIcons name="email" size={16} color="#666" />
+              <Text style={styles.detailText}>{doctor.user.email}</Text>
+            </View>
+          </View>
+
+          {/* Available Days Section */}
+          {doctor.clinic_info?.schedule?.available_days && (
+            <View style={styles.availableDaysSection}>
+              <Text style={styles.availableDaysLabel}>Available Days:</Text>
+              {renderAvailableDays(doctor.clinic_info.schedule.available_days)}
+            </View>
+          )}
+
+          <Divider style={{ marginVertical: 8 }} />
+
+          {/* Action Buttons */}
+          <View style={styles.actionButtons}>
+            <Button
+              mode="outlined"
+              onPress={() => handleViewDetails(doctor)}
+              style={[styles.actionButton, styles.viewButton]}
+              icon="eye"
+            >
+              View Profile
+            </Button>
+            
+            <Button
+              mode="contained"
+              onPress={() => handleManageSchedule(doctor)}
+              style={[styles.actionButton, styles.manageButton]}
+              icon="calendar-edit"
+            >
+              Manage Schedule
+            </Button>
+
+            <Button
+              mode="contained"
+              onPress={() => handleDisconnect(doctor)}
+              style={[styles.actionButton, styles.disconnectButton]}
+              icon="account-remove"
+            >
+              Disconnect
+            </Button>
+          </View>
+        </View>
+      </Card>
+    ));
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#2E7D32" />
+        <Text style={styles.loadingText}>Loading doctors...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>Doctor Management</Text>
+      </View>
+
+      {/* Tab Navigation */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === 'requests' ? styles.activeTab : styles.inactiveTab
+          ]}
+          onPress={() => setActiveTab('requests')}
+        >
+          <Text style={[
+            styles.tabText,
+            activeTab === 'requests' ? styles.activeTabText : styles.inactiveTabText
+          ]}>
+            Connection Requests ({connectionRequests.length})
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === 'connected' ? styles.activeTab : styles.inactiveTab
+          ]}
+          onPress={() => setActiveTab('connected')}
+        >
+          <Text style={[
+            styles.tabText,
+            activeTab === 'connected' ? styles.activeTabText : styles.inactiveTabText
+          ]}>
+            Connected Doctors ({connectedDoctors.length})
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Content */}
+      <ScrollView
+        style={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        showsVerticalScrollIndicator={false}
+      >
+        {activeTab === 'requests' ? renderConnectionRequests() : renderConnectedDoctors()}
+      </ScrollView>
+    </View>
+  );
+}
+```
+
+### 18. Organization Info (`src/screens/organization/OrganizationInfoScreen.tsx`)
 
 ```typescript
 import React, { useEffect, useState, useCallback } from 'react';
