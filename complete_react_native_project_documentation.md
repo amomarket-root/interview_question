@@ -3691,7 +3691,7 @@ export default function AppointmentsScreen() {
 
 ```typescript
 import React, { useEffect, useState } from 'react';
-import { View, ScrollView, Alert, Image, TouchableOpacity, TextInput } from 'react-native';
+import { View, ScrollView, Alert, Image, TouchableOpacity, TextInput, Modal, Dimensions } from 'react-native';
 import { Card, Title, Text, Button, Avatar, Divider, Switch, Chip } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -3723,11 +3723,43 @@ interface HealthcareProfile {
   bed_count: number;
 }
 
+interface PasswordChangeInfo {
+  is_social_user: boolean;
+  login_methods: string[];
+  social_providers: string[];
+  email: string;
+  phone: string;
+  can_change_password: boolean;
+}
+
+interface ChangePasswordForm {
+  current_password: string;
+  new_password: string;
+  new_password_confirmation: string;
+}
+
+const { width: screenWidth } = Dimensions.get('window');
+
 export default function ProfileScreen({ navigation }: any) {
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<HealthcareProfile | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'basic' | 'operations' | 'security'>('basic');
+  
+  // Password change states
+  const [passwordChangeInfo, setPasswordChangeInfo] = useState<PasswordChangeInfo | null>(null);
+  const [socialAuthModalVisible, setSocialAuthModalVisible] = useState(false);
+  const [changePasswordModalVisible, setChangePasswordModalVisible] = useState(false);
+  const [passwordForm, setPasswordForm] = useState<ChangePasswordForm>({
+    current_password: '',
+    new_password: '',
+    new_password_confirmation: ''
+  });
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
   const { isDark } = useTheme();
 
   const styles = useStyles((theme) => ({
@@ -4035,6 +4067,131 @@ export default function ProfileScreen({ navigation }: any) {
       marginTop: 2,
       marginLeft: 16,
     },
+    // Modal Styles
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+    },
+    modalContainer: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 16,
+      padding: 24,
+      width: '100%',
+      maxWidth: 400,
+      maxHeight: '80%',
+    },
+    modalHeader: {
+      alignItems: 'center',
+      marginBottom: 20,
+    },
+    modalTitle: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: theme.colors.text,
+      fontFamily: theme.typography.fontFamily,
+      marginBottom: 8,
+    },
+    modalSubtitle: {
+      fontSize: 14,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      textAlign: 'center',
+      lineHeight: 20,
+    },
+    socialProviderItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 12,
+      backgroundColor: '#4CAF50',
+      borderRadius: 8,
+      marginBottom: 8,
+    },
+    socialProviderText: {
+      color: 'white',
+      marginLeft: 8,
+      fontSize: 14,
+      fontWeight: '500',
+      fontFamily: theme.typography.fontFamily,
+      textTransform: 'capitalize',
+    },
+    emailLoginItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 12,
+      backgroundColor: theme.colors.background,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: theme.colors.border || '#E0E0E0',
+      marginBottom: 16,
+    },
+    emailLoginText: {
+      color: theme.colors.text,
+      marginLeft: 8,
+      fontSize: 14,
+      fontFamily: theme.typography.fontFamily,
+    },
+    emailText: {
+      fontSize: 12,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+    },
+    useEmailLoginButton: {
+      backgroundColor: theme.colors.primary,
+      borderRadius: 8,
+      paddingVertical: 12,
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    useEmailLoginText: {
+      color: 'white',
+      fontSize: 14,
+      fontWeight: '600',
+      fontFamily: theme.typography.fontFamily,
+    },
+    modalButtonsContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 20,
+    },
+    modalButton: {
+      flex: 1,
+      marginHorizontal: 4,
+      borderRadius: 8,
+    },
+    // Password change form styles
+    passwordInputContainer: {
+      marginBottom: 16,
+    },
+    passwordInput: {
+      backgroundColor: theme.colors.background,
+      borderWidth: 1,
+      borderColor: theme.colors.border || '#E0E0E0',
+      borderRadius: 8,
+      padding: 12,
+      fontSize: 14,
+      color: theme.colors.text,
+      fontFamily: theme.typography.fontFamily,
+      paddingRight: 50,
+    },
+    passwordInputWithIcon: {
+      position: 'relative',
+    },
+    passwordToggle: {
+      position: 'absolute',
+      right: 12,
+      top: 12,
+    },
+    passwordLabel: {
+      fontSize: 12,
+      color: theme.colors.textSecondary,
+      marginBottom: 6,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      fontFamily: theme.typography.fontFamily,
+    },
   }));
 
   useEffect(() => {
@@ -4057,6 +4214,76 @@ export default function ProfileScreen({ navigation }: any) {
       }
     } catch (error) {
       console.error('Failed to load profile:', error);
+    }
+  };
+
+  const handlePasswordChangePress = async () => {
+    try {
+      setLoading(true);
+      const response = await healthcareService.getPasswordChangeInfo();
+      const passwordInfo = response.data;
+      setPasswordChangeInfo(passwordInfo);
+
+      if (passwordInfo.is_social_user && !passwordInfo.can_change_password) {
+        // Show social auth modal
+        setSocialAuthModalVisible(true);
+      } else {
+        // Directly show change password modal
+        setChangePasswordModalVisible(true);
+      }
+    } catch (error: any) {
+      console.error('Failed to get password change info:', error);
+      Alert.alert('Error', error.message || 'Failed to load password change information');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUseEmailLogin = () => {
+    setSocialAuthModalVisible(false);
+    setTimeout(() => {
+      setChangePasswordModalVisible(true);
+    }, 300);
+  };
+
+  const handleChangePassword = async () => {
+    if (!passwordForm.current_password || !passwordForm.new_password || !passwordForm.new_password_confirmation) {
+      Alert.alert('Validation Error', 'Please fill in all password fields');
+      return;
+    }
+
+    if (passwordForm.new_password !== passwordForm.new_password_confirmation) {
+      Alert.alert('Validation Error', 'New passwords do not match');
+      return;
+    }
+
+    if (passwordForm.new_password.length < 8) {
+      Alert.alert('Validation Error', 'New password must be at least 8 characters long');
+      return;
+    }
+
+    try {
+      setPasswordLoading(true);
+      await healthcareService.changePassword(passwordForm);
+      
+      Alert.alert('Success', 'Password changed successfully!', [
+        {
+          text: 'OK',
+          onPress: () => {
+            setChangePasswordModalVisible(false);
+            setPasswordForm({
+              current_password: '',
+              new_password: '',
+              new_password_confirmation: ''
+            });
+          }
+        }
+      ]);
+    } catch (error: any) {
+      console.error('Failed to change password:', error);
+      Alert.alert('Error', error.message || 'Failed to change password');
+    } finally {
+      setPasswordLoading(false);
     }
   };
 
@@ -4219,8 +4446,12 @@ export default function ProfileScreen({ navigation }: any) {
               <Text style={styles.securitySubtitle}>Update your account password</Text>
             </View>
           </View>
-          <TouchableOpacity style={[styles.securityAction, styles.changeButton]}>
-            <Text style={styles.actionText}>Change</Text>
+          <TouchableOpacity 
+            style={[styles.securityAction, styles.changeButton]}
+            onPress={handlePasswordChangePress}
+            disabled={loading}
+          >
+            <Text style={styles.actionText}>{loading ? 'Loading...' : 'Change'}</Text>
           </TouchableOpacity>
         </View>
 
@@ -4243,6 +4474,187 @@ export default function ProfileScreen({ navigation }: any) {
         </View>
       </View>
     </Card>
+  );
+
+  // Social Auth Modal
+  const renderSocialAuthModal = () => (
+    <Modal
+      visible={socialAuthModalVisible}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={() => setSocialAuthModalVisible(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <MaterialCommunityIcons name="alert" size={32} color="#FF9800" />
+            <Text style={styles.modalTitle}>Social Login Detected</Text>
+            <Text style={styles.modalSubtitle}>
+              You are currently logged in using social authentication. To change your password, you need to use email/password login instead.
+            </Text>
+          </View>
+
+          <Text style={[styles.fieldLabel, { marginBottom: 12 }]}>Available Login Methods</Text>
+
+          {/* Social Providers */}
+          {passwordChangeInfo?.social_providers?.map((provider, index) => (
+            <View key={index} style={styles.socialProviderItem}>
+              <MaterialCommunityIcons name="google" size={20} color="white" />
+              <Text style={styles.socialProviderText}>{provider}</Text>
+            </View>
+          ))}
+
+          {/* Email Login */}
+          <View style={styles.emailLoginItem}>
+            <MaterialCommunityIcons name="email" size={20} color="#4CAF50" />
+            <View style={{ marginLeft: 8, flex: 1 }}>
+              <Text style={styles.emailLoginText}>Email Login</Text>
+              <Text style={styles.emailText}>{passwordChangeInfo?.email}</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity style={styles.useEmailLoginButton} onPress={handleUseEmailLogin}>
+            <Text style={styles.useEmailLoginText}>Use Email Login</Text>
+          </TouchableOpacity>
+
+          <View style={styles.modalButtonsContainer}>
+            <Button
+              mode="outlined"
+              onPress={() => setSocialAuthModalVisible(false)}
+              style={styles.modalButton}
+            >
+              Cancel
+            </Button>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  // Change Password Modal
+  const renderChangePasswordModal = () => (
+    <Modal
+      visible={changePasswordModalVisible}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={() => setChangePasswordModalVisible(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <MaterialCommunityIcons name="lock-reset" size={32} color="#2196F3" />
+            <Text style={styles.modalTitle}>Change Password</Text>
+            <Text style={styles.modalSubtitle}>
+              Enter your current password and choose a new secure password.
+            </Text>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {/* Current Password */}
+            <View style={styles.passwordInputContainer}>
+              <Text style={styles.passwordLabel}>Current Password *</Text>
+              <View style={styles.passwordInputWithIcon}>
+                <TextInput
+                  style={styles.passwordInput}
+                  value={passwordForm.current_password}
+                  onChangeText={(text) => setPasswordForm({ ...passwordForm, current_password: text })}
+                  secureTextEntry={!showCurrentPassword}
+                  placeholder="Enter current password"
+                  placeholderTextColor={isDark ? '#999' : '#666'}
+                />
+                <TouchableOpacity
+                  style={styles.passwordToggle}
+                  onPress={() => setShowCurrentPassword(!showCurrentPassword)}
+                >
+                  <MaterialCommunityIcons
+                    name={showCurrentPassword ? 'eye-off' : 'eye'}
+                    size={20}
+                    color={isDark ? '#999' : '#666'}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* New Password */}
+            <View style={styles.passwordInputContainer}>
+              <Text style={styles.passwordLabel}>New Password *</Text>
+              <View style={styles.passwordInputWithIcon}>
+                <TextInput
+                  style={styles.passwordInput}
+                  value={passwordForm.new_password}
+                  onChangeText={(text) => setPasswordForm({ ...passwordForm, new_password: text })}
+                  secureTextEntry={!showNewPassword}
+                  placeholder="Enter new password (min 8 characters)"
+                  placeholderTextColor={isDark ? '#999' : '#666'}
+                />
+                <TouchableOpacity
+                  style={styles.passwordToggle}
+                  onPress={() => setShowNewPassword(!showNewPassword)}
+                >
+                  <MaterialCommunityIcons
+                    name={showNewPassword ? 'eye-off' : 'eye'}
+                    size={20}
+                    color={isDark ? '#999' : '#666'}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Confirm New Password */}
+            <View style={styles.passwordInputContainer}>
+              <Text style={styles.passwordLabel}>Confirm New Password *</Text>
+              <View style={styles.passwordInputWithIcon}>
+                <TextInput
+                  style={styles.passwordInput}
+                  value={passwordForm.new_password_confirmation}
+                  onChangeText={(text) => setPasswordForm({ ...passwordForm, new_password_confirmation: text })}
+                  secureTextEntry={!showConfirmPassword}
+                  placeholder="Confirm new password"
+                  placeholderTextColor={isDark ? '#999' : '#666'}
+                />
+                <TouchableOpacity
+                  style={styles.passwordToggle}
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  <MaterialCommunityIcons
+                    name={showConfirmPassword ? 'eye-off' : 'eye'}
+                    size={20}
+                    color={isDark ? '#999' : '#666'}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
+
+          <View style={styles.modalButtonsContainer}>
+            <Button
+              mode="outlined"
+              onPress={() => {
+                setChangePasswordModalVisible(false);
+                setPasswordForm({
+                  current_password: '',
+                  new_password: '',
+                  new_password_confirmation: ''
+                });
+              }}
+              style={styles.modalButton}
+              disabled={passwordLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              mode="contained"
+              onPress={handleChangePassword}
+              style={styles.modalButton}
+              loading={passwordLoading}
+              disabled={passwordLoading}
+            >
+              {passwordLoading ? 'Changing...' : 'Change Password'}
+            </Button>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 
   if (!user) {
@@ -4411,6 +4823,10 @@ export default function ProfileScreen({ navigation }: any) {
           </Button>
         </View>
       </Card>
+
+      {/* Modals */}
+      {renderSocialAuthModal()}
+      {renderChangePasswordModal()}
     </ScrollView>
   );
 }
