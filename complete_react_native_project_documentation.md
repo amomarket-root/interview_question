@@ -67,6 +67,8 @@ VisitCareHealthcare/
 │   │   └── profile/
 │   │   │   ├── EditProfileScreen.tsx
 │   │   │   └── ProfileScreen.tsx
+│   │   ├── settings/
+│   │   │   └── SettingsScreen.tsx
 │   ├── navigation/
 │   │   └── AppNavigator.tsx
 │   ├── services/
@@ -1460,6 +1462,7 @@ const DoctorManagementScreen = React.lazy(() => import('../screens/doctor/Doctor
 const OrganizationInfoScreen = React.lazy(() => import('../screens/organization/OrganizationInfoScreen'));
 const ProfileScreen = React.lazy(() => import('../screens/profile/ProfileScreen'));
 const EditProfileScreen = React.lazy(() => import('../screens/profile/EditProfileScreen'));
+const SettingsScreen = React.lazy(() => import('../screens/settings/SettingsScreen'));
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -1479,6 +1482,7 @@ type StackParamList = {
   DoctorManagement: undefined;
   OrganizationInfo: undefined;
   EditProfile: undefined;
+  Settings: undefined;
 };
 
 // Font weight type definition
@@ -1523,10 +1527,9 @@ const AvatarDropdown = React.memo(({ currentUser, onLogout, navigation }: {
   const handleSettingsPress = useCallback(() => {
     closeDropdown();
     setTimeout(() => {
-      console.log('Settings pressed - Navigate to settings screen');
-      // Add navigation to settings screen when available
+      navigation.navigate('Settings');
     }, 100);
-  }, [closeDropdown]);
+  }, [navigation, closeDropdown]);
 
   const handleLogoutPress = useCallback(async () => {
     closeDropdown();
@@ -1791,6 +1794,14 @@ const MainNavigator = React.memo(() => {
           presentation: 'modal',
         }}
       />
+      <Stack.Screen 
+        name="Settings" 
+        component={SettingsScreen}
+        options={{
+          headerShown: false, // Using custom header in SettingsScreen
+          presentation: 'card',
+        }}
+      />
     </Stack.Navigator>
   );
 });
@@ -1904,10 +1915,10 @@ const MainTabs = React.memo(() => {
           name="Dashboard" 
           component={DashboardScreen}
           options={{
-            headerTitle: `Dashboard${currentUser ? ` - ${currentUser.name}` : ''}`,
+            headerTitle: `Dashboard`,
             headerTitleStyle: {
               fontSize: 18,
-              fontWeight: '600' as FontWeight,
+              fontWeight: '650' as FontWeight,
             },
           }}
         />
@@ -1915,10 +1926,10 @@ const MainTabs = React.memo(() => {
           name="Appointments" 
           component={AppointmentsScreen}
           options={{
-            headerTitle: `Appointments${currentUser ? ` - ${currentUser.name}` : ''}`,
+            headerTitle: `Appointments`,
             headerTitleStyle: {
               fontSize: 18,
-              fontWeight: '600' as FontWeight,
+              fontWeight: '650' as FontWeight,
             },
           }}
         />
@@ -1926,10 +1937,10 @@ const MainTabs = React.memo(() => {
           name="Profile" 
           component={ProfileScreen}
           options={{
-            headerTitle: `Profile${currentUser ? ` - ${currentUser.name}` : ''}`,
+            headerTitle: `Profile`,
             headerTitleStyle: {
               fontSize: 18,
-              fontWeight: '600' as FontWeight,
+              fontWeight: '650' as FontWeight,
             },
           }}
         />
@@ -3682,7 +3693,7 @@ export default function ProfileScreen({ navigation }: any) {
   const [profile, setProfile] = useState<HealthcareProfile | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'basic' | 'operations' | 'security'>('basic');
-  const { toggleTheme, isDark, setTheme, themeMode } = useTheme();
+  const { isDark } = useTheme();
 
   const styles = useStyles((theme) => ({
     container: {
@@ -3958,72 +3969,36 @@ export default function ProfileScreen({ navigation }: any) {
       fontWeight: '500',
       fontFamily: theme.typography.fontFamily,
     },
-    // Theme Settings
-    themeRow: {
+    // Settings Button
+    settingsButton: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingVertical: 12,
+      paddingVertical: 16,
+      paddingHorizontal: 16,
+      backgroundColor: theme.colors.surface,
+      borderRadius: 8,
+      marginBottom: 8,
+      elevation: 1,
     },
-    themeLabel: {
+    settingsLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+    },
+    settingsTitle: {
       fontSize: 16,
       color: theme.colors.text,
       fontFamily: theme.typography.fontFamily,
-      flex: 1,
+      fontWeight: '500',
+      marginLeft: 16,
     },
-    themeDescription: {
+    settingsSubtitle: {
       fontSize: 12,
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
       marginTop: 2,
-    },
-    themeOptions: {
-      marginTop: 16,
-    },
-    themeOption: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingVertical: 12,
-      paddingHorizontal: 16,
-      borderRadius: 8,
-      marginBottom: 8,
-      backgroundColor: theme.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#F8F9FA',
-    },
-    themeOptionLeft: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      flex: 1,
-    },
-    themeOptionText: {
-      fontSize: 14,
-      color: theme.colors.text,
-      fontFamily: theme.typography.fontFamily,
-      marginLeft: 12,
-    },
-    activeButton: {
-      backgroundColor: theme.colors.primary,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 16,
-    },
-    selectButton: {
-      borderWidth: 1,
-      borderColor: theme.colors.primary,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 16,
-    },
-    buttonText: {
-      fontSize: 12,
-      fontWeight: '500',
-      fontFamily: theme.typography.fontFamily,
-    },
-    activeButtonText: {
-      color: 'white',
-    },
-    selectButtonText: {
-      color: theme.colors.primary,
+      marginLeft: 16,
     },
   }));
 
@@ -4235,100 +4210,6 @@ export default function ProfileScreen({ navigation }: any) {
     </Card>
   );
 
-  const renderThemeSettings = () => (
-    <Card style={styles.contentCard}>
-      <View style={styles.cardContent}>
-        <Text style={styles.sectionTitle}>Theme Settings</Text>
-
-        <View style={styles.themeRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.themeLabel}>Dark Mode</Text>
-            <Text style={styles.themeDescription}>Toggle between light and dark themes</Text>
-          </View>
-          <Switch
-            value={isDark}
-            onValueChange={toggleTheme}
-            trackColor={{
-              false: '#767577',
-              true: '#4CAF50'
-            }}
-            thumbColor='#f4f3f4'
-          />
-        </View>
-
-        <View style={styles.themeOptions}>
-          <Text style={styles.themeLabel}>Theme Mode</Text>
-
-          <View style={styles.themeOption}>
-            <View style={styles.themeOptionLeft}>
-              <MaterialCommunityIcons
-                name="weather-sunny"
-                size={20}
-                color={themeMode === 'light' ? '#FFA726' : '#666'}
-              />
-              <Text style={styles.themeOptionText}>Light</Text>
-            </View>
-            <TouchableOpacity
-              style={themeMode === 'light' ? styles.activeButton : styles.selectButton}
-              onPress={() => setTheme('light')}
-            >
-              <Text style={[
-                styles.buttonText,
-                themeMode === 'light' ? styles.activeButtonText : styles.selectButtonText
-              ]}>
-                {themeMode === 'light' ? 'Active' : 'Select'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.themeOption}>
-            <View style={styles.themeOptionLeft}>
-              <MaterialCommunityIcons
-                name="weather-night"
-                size={20}
-                color={themeMode === 'dark' ? '#2196F3' : '#666'}
-              />
-              <Text style={styles.themeOptionText}>Dark</Text>
-            </View>
-            <TouchableOpacity
-              style={themeMode === 'dark' ? styles.activeButton : styles.selectButton}
-              onPress={() => setTheme('dark')}
-            >
-              <Text style={[
-                styles.buttonText,
-                themeMode === 'dark' ? styles.activeButtonText : styles.selectButtonText
-              ]}>
-                {themeMode === 'dark' ? 'Active' : 'Select'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.themeOption}>
-            <View style={styles.themeOptionLeft}>
-              <MaterialCommunityIcons
-                name="theme-light-dark"
-                size={20}
-                color={themeMode === 'system' ? '#9C27B0' : '#666'}
-              />
-              <Text style={styles.themeOptionText}>System</Text>
-            </View>
-            <TouchableOpacity
-              style={themeMode === 'system' ? styles.activeButton : styles.selectButton}
-              onPress={() => setTheme('system')}
-            >
-              <Text style={[
-                styles.buttonText,
-                themeMode === 'system' ? styles.activeButtonText : styles.selectButtonText
-              ]}>
-                {themeMode === 'system' ? 'Active' : 'Select'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Card>
-  );
-
   if (!user) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -4461,8 +4342,24 @@ export default function ProfileScreen({ navigation }: any) {
       {activeTab === 'operations' && renderOperationsTab()}
       {activeTab === 'security' && renderSecurityTab()}
 
-      {/* Theme Settings */}
-      {renderThemeSettings()}
+      {/* Settings Navigation */}
+      <Card style={styles.contentCard}>
+        <View style={styles.cardContent}>
+          <TouchableOpacity
+            style={styles.settingsButton}
+            onPress={() => navigation.navigate('Settings')}
+          >
+            <View style={styles.settingsLeft}>
+              <MaterialCommunityIcons name="cog" size={24} color="#2196F3" />
+              <View>
+                <Text style={styles.settingsTitle}>Settings</Text>
+                <Text style={styles.settingsSubtitle}>Language preferences and theme settings</Text>
+              </View>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={24} color="#666" />
+          </TouchableOpacity>
+        </View>
+      </Card>
 
       {/* Logout Button */}
       <Card style={[styles.contentCard, { marginBottom: 32 }]}>
@@ -8512,6 +8409,494 @@ export default function OrganizationInfoScreen({ navigation }: any) {
         Edit Organization Profile
       </Button>
     </ScrollView>
+  );
+}
+```
+### 19. Settings Screen (`src/screens/settings/SettingsScreen.tsx`)
+
+```typescript
+import React from 'react';
+import { View, ScrollView, TouchableOpacity, StatusBar, Platform } from 'react-native';
+import { Card, Text, Switch, IconButton } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTheme } from '../../contexts/ThemeContext';
+import { useStyles } from '../../hooks/useStyles';
+
+// Safe status bar height calculation
+const getStatusBarHeight = (): number => {
+  if (Platform.OS === 'ios') {
+    return 44; // Default iOS status bar height
+  }
+  // For Android, use currentHeight if available, otherwise fallback to 24
+  return StatusBar.currentHeight || 24;
+};
+
+export default function SettingsScreen({ navigation }: any) {
+  const { toggleTheme, isDark, setTheme, themeMode } = useTheme();
+
+  const styles = useStyles((theme) => ({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    statusBarSpacer: {
+      height: getStatusBarHeight(),
+      backgroundColor: theme.colors.surface,
+    },
+    header: {
+      backgroundColor: theme.colors.surface,
+      paddingVertical: 16,
+      paddingHorizontal: 4, // Reduced padding for better icon alignment
+      borderBottomWidth: 1,
+      borderBottomColor: theme.mode === 'dark' ? '#333' : '#E0E0E0',
+      flexDirection: 'row',
+      alignItems: 'center',
+      minHeight: 64, // Ensure minimum height for proper touch area
+    },
+    backButton: {
+      marginLeft: 4,
+      marginRight: 8,
+      width: 40,
+      height: 40,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    headerTitleContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingRight: 48, // Balance the back button width for centered title
+    },
+    headerTitle: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: theme.colors.text,
+      fontFamily: theme.typography.fontFamily,
+      textAlign: 'center',
+    },
+    contentContainer: {
+      flex: 1,
+    },
+    contentCard: {
+      marginHorizontal: 16,
+      marginTop: 16,
+      marginBottom: 16,
+      backgroundColor: theme.colors.surface,
+      borderRadius: 12,
+      elevation: 2,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+    },
+    cardContent: {
+      padding: 20,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: theme.colors.text,
+      marginBottom: 16,
+      fontFamily: theme.typography.fontFamily,
+    },
+    // Theme Settings Styles
+    themeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 12,
+    },
+    themeLabel: {
+      fontSize: 16,
+      color: theme.colors.text,
+      fontFamily: theme.typography.fontFamily,
+      flex: 1,
+    },
+    themeDescription: {
+      fontSize: 12,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      marginTop: 2,
+    },
+    themeOptions: {
+      marginTop: 16,
+    },
+    themeOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      marginBottom: 8,
+      backgroundColor: theme.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#F8F9FA',
+    },
+    themeOptionLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+    },
+    themeOptionText: {
+      fontSize: 14,
+      color: theme.colors.text,
+      fontFamily: theme.typography.fontFamily,
+      marginLeft: 12,
+    },
+    activeButton: {
+      backgroundColor: theme.colors.primary,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+    },
+    selectButton: {
+      borderWidth: 1,
+      borderColor: theme.colors.primary,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+    },
+    buttonText: {
+      fontSize: 12,
+      fontWeight: '500',
+      fontFamily: theme.typography.fontFamily,
+    },
+    activeButtonText: {
+      color: 'white',
+    },
+    selectButtonText: {
+      color: theme.colors.primary,
+    },
+    // Additional Settings
+    settingsSection: {
+      marginTop: 8,
+    },
+    settingsItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border || '#E0E0E0',
+    },
+    settingsLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+    },
+    settingsIcon: {
+      marginRight: 16,
+    },
+    settingsTitle: {
+      fontSize: 16,
+      color: theme.colors.text,
+      fontFamily: theme.typography.fontFamily,
+      fontWeight: '500',
+    },
+    settingsSubtitle: {
+      fontSize: 12,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      marginTop: 2,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: theme.colors.border || '#E0E0E0',
+      marginVertical: 8,
+    },
+  }));
+
+  return (
+    <View style={styles.container}>
+      <StatusBar
+        backgroundColor={isDark ? '#121212' : '#FFFFFF'}
+        barStyle={isDark ? 'light-content' : 'dark-content'}
+        translucent={false}
+      />
+      
+      {/* Status Bar Spacer for Android */}
+      {Platform.OS === 'android' && <View style={styles.statusBarSpacer} />}
+      
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.7}
+          accessible
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
+        >
+          <MaterialCommunityIcons
+            name="arrow-left"
+            size={24}
+            color={styles.headerTitle.color}
+          />
+        </TouchableOpacity>
+        
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle}>Settings</Text>
+        </View>
+      </View>
+
+      <ScrollView 
+        style={styles.contentContainer} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 32 }}
+      >
+        {/* Theme Settings */}
+        <Card style={styles.contentCard}>
+          <View style={styles.cardContent}>
+            <Text style={styles.sectionTitle}>Theme Settings</Text>
+
+            <View style={styles.themeRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.themeLabel}>Dark Mode</Text>
+                <Text style={styles.themeDescription}>Toggle between light and dark themes</Text>
+              </View>
+              <Switch
+                value={isDark}
+                onValueChange={toggleTheme}
+                trackColor={{
+                  false: '#767577',
+                  true: '#4CAF50'
+                }}
+                thumbColor='#f4f3f4'
+              />
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.themeOptions}>
+              <Text style={styles.themeLabel}>Theme Mode</Text>
+
+              <View style={styles.themeOption}>
+                <View style={styles.themeOptionLeft}>
+                  <MaterialCommunityIcons
+                    name="weather-sunny"
+                    size={20}
+                    color={themeMode === 'light' ? '#FFA726' : '#666'}
+                  />
+                  <Text style={styles.themeOptionText}>Light</Text>
+                </View>
+                <TouchableOpacity
+                  style={themeMode === 'light' ? styles.activeButton : styles.selectButton}
+                  onPress={() => setTheme('light')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    styles.buttonText,
+                    themeMode === 'light' ? styles.activeButtonText : styles.selectButtonText
+                  ]}>
+                    {themeMode === 'light' ? 'Active' : 'Select'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.themeOption}>
+                <View style={styles.themeOptionLeft}>
+                  <MaterialCommunityIcons
+                    name="weather-night"
+                    size={20}
+                    color={themeMode === 'dark' ? '#2196F3' : '#666'}
+                  />
+                  <Text style={styles.themeOptionText}>Dark</Text>
+                </View>
+                <TouchableOpacity
+                  style={themeMode === 'dark' ? styles.activeButton : styles.selectButton}
+                  onPress={() => setTheme('dark')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    styles.buttonText,
+                    themeMode === 'dark' ? styles.activeButtonText : styles.selectButtonText
+                  ]}>
+                    {themeMode === 'dark' ? 'Active' : 'Select'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.themeOption}>
+                <View style={styles.themeOptionLeft}>
+                  <MaterialCommunityIcons
+                    name="theme-light-dark"
+                    size={20}
+                    color={themeMode === 'system' ? '#9C27B0' : '#666'}
+                  />
+                  <Text style={styles.themeOptionText}>System</Text>
+                </View>
+                <TouchableOpacity
+                  style={themeMode === 'system' ? styles.activeButton : styles.selectButton}
+                  onPress={() => setTheme('system')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    styles.buttonText,
+                    themeMode === 'system' ? styles.activeButtonText : styles.selectButtonText
+                  ]}>
+                    {themeMode === 'system' ? 'Active' : 'Select'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Card>
+
+        {/* App Settings */}
+        <Card style={styles.contentCard}>
+          <View style={styles.cardContent}>
+            <Text style={styles.sectionTitle}>App Settings</Text>
+
+            <View style={styles.settingsSection}>
+              <TouchableOpacity 
+                style={styles.settingsItem}
+                activeOpacity={0.7}
+                onPress={() => {
+                  // Handle notifications navigation
+                  console.log('Navigate to Notifications settings');
+                }}
+              >
+                <View style={styles.settingsLeft}>
+                  <MaterialCommunityIcons
+                    name="bell"
+                    size={24}
+                    color="#4CAF50"
+                    style={styles.settingsIcon}
+                  />
+                  <View>
+                    <Text style={styles.settingsTitle}>Notifications</Text>
+                    <Text style={styles.settingsSubtitle}>Manage app notifications</Text>
+                  </View>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={24} color="#666" />
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.settingsItem}
+                activeOpacity={0.7}
+                onPress={() => {
+                  // Handle language navigation
+                  console.log('Navigate to Language settings');
+                }}
+              >
+                <View style={styles.settingsLeft}>
+                  <MaterialCommunityIcons
+                    name="translate"
+                    size={24}
+                    color="#2196F3"
+                    style={styles.settingsIcon}
+                  />
+                  <View>
+                    <Text style={styles.settingsTitle}>Language</Text>
+                    <Text style={styles.settingsSubtitle}>English (default)</Text>
+                  </View>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={24} color="#666" />
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.settingsItem, { borderBottomWidth: 0 }]}
+                activeOpacity={0.7}
+                onPress={() => {
+                  // Handle app updates navigation
+                  console.log('Navigate to App Updates settings');
+                }}
+              >
+                <View style={styles.settingsLeft}>
+                  <MaterialCommunityIcons
+                    name="update"
+                    size={24}
+                    color="#FF9800"
+                    style={styles.settingsIcon}
+                  />
+                  <View>
+                    <Text style={styles.settingsTitle}>App Updates</Text>
+                    <Text style={styles.settingsSubtitle}>Auto-update enabled</Text>
+                  </View>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Card>
+
+        {/* Privacy & Security */}
+        <Card style={styles.contentCard}>
+          <View style={styles.cardContent}>
+            <Text style={styles.sectionTitle}>Privacy & Security</Text>
+
+            <View style={styles.settingsSection}>
+              <TouchableOpacity 
+                style={styles.settingsItem}
+                activeOpacity={0.7}
+                onPress={() => {
+                  // Handle privacy policy navigation
+                  console.log('Navigate to Privacy Policy');
+                }}
+              >
+                <View style={styles.settingsLeft}>
+                  <MaterialCommunityIcons
+                    name="shield-account"
+                    size={24}
+                    color="#9C27B0"
+                    style={styles.settingsIcon}
+                  />
+                  <View>
+                    <Text style={styles.settingsTitle}>Privacy Policy</Text>
+                    <Text style={styles.settingsSubtitle}>View privacy policy</Text>
+                  </View>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={24} color="#666" />
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.settingsItem}
+                activeOpacity={0.7}
+                onPress={() => {
+                  // Handle terms of service navigation
+                  console.log('Navigate to Terms of Service');
+                }}
+              >
+                <View style={styles.settingsLeft}>
+                  <MaterialCommunityIcons
+                    name="file-document"
+                    size={24}
+                    color="#607D8B"
+                    style={styles.settingsIcon}
+                  />
+                  <View>
+                    <Text style={styles.settingsTitle}>Terms of Service</Text>
+                    <Text style={styles.settingsSubtitle}>View terms and conditions</Text>
+                  </View>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={24} color="#666" />
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.settingsItem, { borderBottomWidth: 0 }]}
+                activeOpacity={0.7}
+                onPress={() => {
+                  // Handle about app navigation
+                  console.log('Navigate to About App');
+                }}
+              >
+                <View style={styles.settingsLeft}>
+                  <MaterialCommunityIcons
+                    name="information"
+                    size={24}
+                    color="#00BCD4"
+                    style={styles.settingsIcon}
+                  />
+                  <View>
+                    <Text style={styles.settingsTitle}>About App</Text>
+                    <Text style={styles.settingsSubtitle}>Version 1.0.0</Text>
+                  </View>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Card>
+      </ScrollView>
+    </View>
   );
 }
 ```
